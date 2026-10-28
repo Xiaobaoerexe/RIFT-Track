@@ -1,0 +1,171 @@
+{
+  "repository": "https://github.com/Zhengtianjin/go2-supermimic",
+  "commit": "d9eee9b3f248e5300e636c433255db2c1c3e086a",
+  "files": [
+    {
+      "path": ".gitignore",
+      "blob": "a1edfdfac1ef00d5832e02020ac11406456cebda",
+      "sha256": "67e84d335fdbae683f563863ea54c5d72697e116e5c2ddd206e13be48325fa59"
+    },
+    {
+      "path": "LICENSE",
+      "blob": "b5b64d35f785a9ee5c8f05d1d44d218764f15fd3",
+      "sha256": "74bf77852bebd2733a186f3fb25cd6cff7f22820d1be6ff5c3510b4cad6a35b8"
+    },
+    {
+      "path": "README.md",
+      "blob": "53b8cbd0fa045bbf6ddef3fec326f03dea01a4f5",
+      "sha256": "d35dec61d2fc8a1ece00366a763c3f9aae1d21b8f8f36243c107eb6ad9d854de"
+    },
+    {
+      "path": "go2_supermimic/__init__.py",
+      "blob": "f58d35085704258ec25c76f301a5cca135a5e009",
+      "sha256": "6d7ebda115e2ff6aa0c4e51c34eb4fa3fa20d9219e50fc8df73796475c020d8b"
+    },
+    {
+      "path": "go2_supermimic/env/__init__.py",
+      "blob": "6e93c31e1f5f9b0ded15cc9f15ea255139081a79",
+      "sha256": "16c7f1677961c5d08477c754d7378a008a691631bab02fed63b4b304f68e8755"
+    },
+    {
+      "path": "go2_supermimic/env/command.py",
+      "blob": "b2ffdf56e0d684d693dfe1bba6dc805981256a27",
+      "sha256": "4d56a925ce17de6f93a9dd0227c9b5a8bef67762d4bb6334ca2c2ccc172963e1"
+    },
+    {
+      "path": "go2_supermimic/env/env_cfg.py",
+      "blob": "b5f29b6037f186944332836e102c8d515926ea9e",
+      "sha256": "f94ec85604030dfc85a93fd8faf45ca19b9651c0da16851ec2adafc328d5bf48"
+    },
+    {
+      "path": "go2_supermimic/env/mdp.py",
+      "blob": "66644e0040fc85890743559890f18c1cbc0a067b",
+      "sha256": "f6b59f353af8d8de37ff6b1e78b60a7e7b6eb6ec8db4b49e868aabec0eb7ffa1"
+    },
+    {
+      "path": "go2_supermimic/env/terrains.py",
+      "blob": "4c45e5ced9008ef0c231cae1e675d53d2877ba22",
+      "sha256": "cb89a7a60b5ae0cf151a0dbc2f9e5c2cb49db323055a8201c0b93328951c984c"
+    },
+    {
+      "path": "go2_supermimic/robot/LICENSE_menagerie_go2",
+      "blob": "b646a94d1e171bc58d5761c1bcaadaa579a4d757",
+      "sha256": "7e2dfda59b98e38d123f539b59ecb637ffd8908d19e09f7765884a309f010d40"
+    },
+    {
+      "path": "go2_supermimic/robot/__init__.py",
+      "blob": "5d07c9e4e6962619c214f0d7741719cc82c95036",
+      "sha256": "bb4dd089d450be36448c8039ae8f89e3788cdc09ac5594354272359cfdeeafe2"
+    },
+    {
+      "path": "go2_supermimic/robot/go2.py",
+      "blob": "70cc827a692044ab5eb8fdf16d30eaa5287290d2",
+      "sha256": "2293f2120f8c6cdb627212569b852cf8daaffbd892db9ac413bc35e37c1c9953"
+    },
+    {
+      "path": "go2_supermimic/robot/go2.xml",
+      "blob": "dcfb5eee20bdd31a85c9ff2ff40dfe1f9daa7ef1",
+      "sha256": "cf4a996477e42962c86ac44521db1e956aa8e9da4f0533abe85ee100d7e28740"
+    },
+    {
+      "path": "go2_supermimic/supermimic/__init__.py",
+      "blob": "4ae145e9b3026938915c54c2c5a8f915684656d3",
+      "sha256": "e758f4a0e2b1975fb586f81ff1f082a07412fed6d024db6b2bcf5735cff37953"
+    },
+    {
+      "path": "go2_supermimic/supermimic/buffer.py",
+      "blob": "a7ce3ed32486616c40747a610aa30c3e80d2c7c4",
+      "sha256": "0a6a307a25eb2b80729ede47a237b84b152ae1edb52a78a566066032019ec7bb"
+    },
+    {
+      "path": "go2_supermimic/supermimic/driver.py",
+      "blob": "7d1f11cc8063a70e11f3f69c09b279d25e0893dc",
+      "sha256": "e39166ddccd06ded3c283c1d36822f6ab19448a524fdf83e47c24b1f91b1588a"
+    },
+    {
+      "path": "go2_supermimic/supermimic/imagine.py",
+      "blob": "a12768dbed4b16874a2bde4dcb1f6e5ff9705eca",
+      "sha256": "d4d409f8ef9ee23e35b395f2852abf214df1e2af4a10e1f654889d88bdc2b565"
+    },
+    {
+      "path": "go2_supermimic/supermimic/state.py",
+      "blob": "68c98b0cca8625221f3205f778e8175c41dc0b0d",
+      "sha256": "9fe162a75e70a4e7449fb0da65a01c3ac74a6762edf4e398c70b4107daf47f74"
+    },
+    {
+      "path": "go2_supermimic/supermimic/train.py",
+      "blob": "a3efb7756126c44f1e293c2c676096429baae888",
+      "sha256": "40db0947263f9e48637072c84d89405b4056e58ac45572e9f0e6e8ddbfdf554b"
+    },
+    {
+      "path": "go2_supermimic/supermimic/world_model.py",
+      "blob": "a94cbed58867a5d810df6379bbfeb0cae06baf97",
+      "sha256": "77cd10f39830214e1462897fb305b5b2ee69bda638e06ac5cfce806af3069145"
+    },
+    {
+      "path": "go2_supermimic/target/__init__.py",
+      "blob": "b092195eff7ea13375e1c1006245dec08e2476a4",
+      "sha256": "33cd59f81bec227820332b04f1e6bd3140af104b6782b8129458461d86b96019"
+    },
+    {
+      "path": "go2_supermimic/target/collision.py",
+      "blob": "fcdd5324b6ebf89bd00db0e0ac92d0fb751dc368",
+      "sha256": "e0d80927c8680ad28f6f2749c1ed49e0a911634db039b8051b95b7241483d20b"
+    },
+    {
+      "path": "go2_supermimic/target/generator.py",
+      "blob": "51149fd1192170565e2dfa3a52b72d3236342ba4",
+      "sha256": "e69cffe106214b21f3481ee133d715670ca813e1a27915bdb57b1bfe377ead8e"
+    },
+    {
+      "path": "go2_supermimic/target/interface.py",
+      "blob": "c7863b51c47f9bb0b7df7f40996997d308543d42",
+      "sha256": "afad293b55bd166f530d6ea5bddaa21346b002e824737002438f51314bf5a2d6"
+    },
+    {
+      "path": "go2_supermimic/target/obstacles.py",
+      "blob": "bcc7687d2cd227a18a594210c6a6ada0b2ce48d4",
+      "sha256": "ab1cb9f5685bd79b7a74ed6356e369cfb35dd5852862576c69d1be1a13058257"
+    },
+    {
+      "path": "go2_supermimic/target/terrain.py",
+      "blob": "743df321778fbf52b24cd263043995d72d411f67",
+      "sha256": "2d5c5ef36b8acc36e7d88859361e6290c523943e44dad84622373a1cf99bfaf6"
+    },
+    {
+      "path": "go2_supermimic/viz.py",
+      "blob": "f37e6ff2365ff96e25551829ebdf60039cc0f023",
+      "sha256": "bafa4b9b36de9d5612aaef0812f9c573bfe34bd2dd06aafdaeb1e7a1a0c9709a"
+    },
+    {
+      "path": "pyproject.toml",
+      "blob": "4b9c846cf14b65932c6977c603feee4561ce89ec",
+      "sha256": "bdbe377869647259812bdfebcdf98b67f1a6a33609553c40a76e1f6b006d0388"
+    },
+    {
+      "path": "scripts/eval.py",
+      "blob": "5e36055f354843eb160c7d14b223068d6136a60c",
+      "sha256": "b10e503fdf79b3b62d8d953927f23734664895d675bc47fd0aa41f24f974a35c"
+    },
+    {
+      "path": "scripts/train.py",
+      "blob": "06721211629458faf2bd67658a5dd506485f17ce",
+      "sha256": "f54e98ed7ee5bd0dcaba24dce0ed7599bfd91f57493482b5ee3db6b9e8576969"
+    },
+    {
+      "path": "tests/test_obstacles.py",
+      "blob": "9e57b233bc4cd053167ba16b3fbe65b4592e2046",
+      "sha256": "4366beee0148606bf8a72f383714a5f3de60e62ffc370c7ad9050e88c68e86a4"
+    },
+    {
+      "path": "tests/test_target.py",
+      "blob": "0cf18e8f07851901724c062a6e71734e665c6299",
+      "sha256": "c03241cae7cea65887300dcc11da5f800dde8898a39544fc9b1c049ed5997261"
+    },
+    {
+      "path": "tests/test_terrain.py",
+      "blob": "a53bdfc641d62d9aaa5e9003a5418da04ee9a162",
+      "sha256": "b3ca962eff6ae0598f2b1df9b8289495cc5f123ee388361fa51f7dafee55d084"
+    }
+  ]
+}
