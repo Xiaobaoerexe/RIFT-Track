@@ -67,3 +67,10 @@ Checkpoints include all four models/optimizers, normalization and RNG metadata.
 Like the source, resume starts new simulator episodes and fresh replay; it is
 not a bit-identical full-simulator/replay continuation. Old checkpoints are
 intentionally incompatible. No training capability or B0 is claimed by smoke.
+
+MuJoCo diagnostics bind each rigid body's mass, COM and full inertia tensor to
+the actual training USD using assets/go2_usd_inertials.json. Fixed feet/heads
+are aggregated with rigid transforms and the parallel-axis theorem. Nominal
+mass is16.08700025kg; the unmodified legacy XML was15.206408kg. Zero-joint
+body frames were checked against USD. Collision shapes and contact solvers
+remain platform-specific, so inertial alignment does not imply identical physics.

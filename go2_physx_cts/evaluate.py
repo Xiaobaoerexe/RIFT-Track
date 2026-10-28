@@ -7,6 +7,7 @@ import mujoco
 from . import state as st
 from .networks import Policy
 from .physx_env import quat_inverse,motor_values
+from .inertials import apply_usd_inertials
 
 @torch.no_grad()
 def evaluate(checkpoint,xml,seconds=10.,commands=None):
@@ -15,6 +16,7 @@ def evaluate(checkpoint,xml,seconds=10.,commands=None):
     p=Policy(tuple(cfg['actor_hidden']));p.load_state_dict(ck['policy']);p.eval()
     commands=commands or [(0,0,0),(.5,0,0),(-.3,0,0),(0,.3,0),(0,0,.8)]
     model=mujoco.MjModel.from_xml_path(str(xml));model.opt.timestep=.005
+    inertia_binding=apply_usd_inertials(model);model.geom_friction[:,0]=1.
     joint=[mujoco.mj_name2id(model,mujoco.mjtObj.mjOBJ_JOINT,n) for n in st.JOINT_NAMES]
     if min(joint)<0:raise ValueError('MuJoCo joint names differ')
     qa=model.jnt_qposadr[joint];va=model.jnt_dofadr[joint]
@@ -29,7 +31,7 @@ def evaluate(checkpoint,xml,seconds=10.,commands=None):
       for cmd in commands:
        for payload in (0.,1.):
         model.body_mass[base]=nomass+payload
-        d=mujoco.MjData(model);d.qpos[:7]=[0,0,.29,1,0,0,0];d.qpos[qa]=q0.numpy();mujoco.mj_forward(model,d)
+        d=mujoco.MjData(model);mujoco.mj_setConst(model,d);d.qpos[:7]=[0,0,.29,1,0,0,0];d.qpos[qa]=q0.numpy();mujoco.mj_forward(model,d)
         hist=torch.zeros(1,450);last=torch.zeros(1,12);command=torch.tensor([cmd],dtype=torch.float32)
         xi=torch.tensor([[1,0,0,0,payload]],dtype=torch.float32);ring=q0.repeat(3,1);rp=0;delay=1
         errors=[];heights=[];fell=False
@@ -66,7 +68,7 @@ def evaluate(checkpoint,xml,seconds=10.,commands=None):
         summary[branch]={'survival_fraction':float(np.mean([r['survived'] for r in part])),'xy_rmse':float(np.mean([r['xy_rmse'] for r in part])),'yaw_rmse':float(np.mean([r['yaw_rmse'] for r in part])),'height':float(np.mean([r['height'] for r in part]))}
     student=summary['student'];student_rows=[r for r in rows if r['branch']=='student']
     passed=all(r['survived'] and r['xy_rmse']<.2 and r['yaw_rmse']<.3 and r['height']>.22 for r in student_rows)
-    return {'backend':'mujoco_native','checkpoint':str(checkpoint),'iteration':ck['iteration'],'stage':cfg['stage'],'summary':summary,'rows':rows,'flat_gate_pass':passed,'B0_claim':False,'training_updates':0}
+    return {'backend':'mujoco_native','checkpoint':str(checkpoint),'iteration':ck['iteration'],'stage':cfg['stage'],'summary':summary,'rows':rows,'flat_gate_pass':passed,'B0_claim':False,'training_updates':0,'nominal_mass_kg':inertia_binding['nominal_total_mass_kg'],'inertia_source_usd_sha256':inertia_binding['source_usd_sha256']}
 
 def main():
     a=argparse.ArgumentParser();a.add_argument('--checkpoint',required=True);a.add_argument('--xml',required=True);a.add_argument('--output',required=True);a.add_argument('--seconds',type=float,default=10.)

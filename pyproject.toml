@@ -10,3 +10,6 @@ dependencies = ["torch", "numpy"]
 
 [tool.setuptools.packages.find]
 include = ["go2_physx_cts*"]
+
+[tool.setuptools.package-data]
+go2_physx_cts = ["assets/*.json"]
