@@ -1,5 +1,5 @@
 """Only supported launch entry: Isaac Sim plus PhysX. Old checkpoints rejected."""
-import argparse,json,os,signal,sys,time,hashlib
+import argparse,json,os,signal,sys,time,hashlib,subprocess
 from pathlib import Path
 from .config import TrainCfg
 
@@ -14,6 +14,12 @@ def main():
     parser.add_argument('--probe-only',action='store_true');parser.add_argument('--probe-steps',type=int,default=1000)
     add_launcher_args(parser);args=parser.parse_args()
     cfg=TrainCfg(**json.loads(Path(args.config).read_text()));cfg.validate(production=not args.smoke)
+    code_root=Path(__file__).resolve().parents[1]
+    version=subprocess.run(['git','-C',str(code_root),'rev-parse','HEAD'],capture_output=True,text=True)
+    code_commit=version.stdout.strip() if version.returncode==0 else None
+    if not args.smoke:
+        dirty=subprocess.run(['git','-C',str(code_root),'status','--porcelain'],capture_output=True,text=True)
+        if code_commit is None or dirty.returncode or dirty.stdout.strip():raise RuntimeError('Formal launch requires a clean versioned release')
     os.environ.setdefault('OMNI_KIT_ACCEPT_EULA','YES')
     import torch
     torch.manual_seed(cfg.seed);torch.set_num_threads(8)
@@ -34,7 +40,7 @@ def main():
                   'student_input_dim':450,'shared_actor_input_dim':77,'policy_hz':50,'physics_hz':200,
                   'motor':{k:v.tolist() for k,v in vars(env.consts).items()},'payload_model':'rigid point mass at existing base COM, sampled only on reset','payload_max_kg':cfg.payload_max_kg}
         (out/'physics_contract.json').write_text(json.dumps(contract,indent=2))
-        identity={'pid':os.getpid(),'started_unix':time.time(),'backend':type(env.robot).__module__,'mode':'smoke' if args.smoke else 'formal','command':sys.argv}
+        identity={'pid':os.getpid(),'started_unix':time.time(),'backend':type(env.robot).__module__,'mode':'smoke' if args.smoke else 'formal','command':sys.argv,'code_commit':code_commit,'config_sha256':hashlib.sha256(Path(args.config).read_bytes()).hexdigest()}
         (out/'process.json').write_text(json.dumps(identity,indent=2))
         if args.probe_only:
             from .validation import physical_probe
