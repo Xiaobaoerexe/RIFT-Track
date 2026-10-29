@@ -5,3 +5,17 @@ __pycache__/
 build/
 dist/
 logs/
+
+# Training outputs, weights and local authentication must not be published.
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.safetensors
+runs/
+outputs/
+checkpoints/
+.env
+.env.*
+*.pem
+*.key
