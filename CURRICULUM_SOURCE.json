@@ -1,0 +1,9 @@
+{
+  "go2_rl_lab": {"repository":"https://github.com/wty-yy/go2_rl_lab","commit":"6c95d9feef4814c25eb6536e61bb38e1d1d718d4","scope":"CTS branch means, command sampler and iteration stages, mixed direct mesh, distance terrain progression, two reward definitions/courses"},
+  "go2_supermimic": {"repository":"https://github.com/Zhengtianjin/go2-supermimic","commit":"d9eee9b3f248e5300e636c433255db2c1c3e086a","scope":"shared replay, persistent terrain10% driver+10% flat expert, WM/BPTT cadence, priorities/archive, OU, normalization, optimizers, ramp/collapse and new-stage resume"},
+  "robogauge": {"repository":"https://github.com/wty-yy/RoboGauge","commit":"add2c7ee0185ea8fd93d242f86e1c8cac6e9913b","mujoco":"3.2.3","scope":"unchanged official sim/PD/reset loop and XML; checkpoint controls and CTS ABI adapters"},
+  "rapid_locomotion": {"commit":"f5143ef940e934849c00284e34caf164d6ce7b6e","selected":false,"reason":"official command sampler already includes coupled, boundary, zero and dynamic sampling; user condition for grid is not met"},
+  "project_adaptations": ["Isaac Sim/PhysX instead of upstream mjlab/MuJoCo Warp", "3D velocity command, blind CTS student", "logical learner curriculum iteration collects1 step, whereas Go2RLLab PPO iteration collects24", "validated13 task rewards retained plus source body-height and vertical-speed terms; not complete official15 reward suite", "rigid point payload0..2kg at existing base COM per episode", "flat provider is measured low-speed velocity expert, not source jumping/ducking expert", "teacher/student8192 total samples6144/2048; branch objectives1+1", "native and transfer diagnostics do not gate source iteration curriculum"],
+  "author_results_caveat":"Source terrain README reports multiple stages/restarts; this composition is not claimed an end-to-end reproduction based on source text.",
+  "baseline_checkpoint_sha256":"eb12315e21e0037d81514af43184210276dee515c3722b9817b12cdc90d6fd11"
+}

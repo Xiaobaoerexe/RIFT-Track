@@ -1,0 +1,172 @@
+[
+  {
+    "path": "assets/as2/as2.usd",
+    "bytes": 17205644,
+    "sha256": "b0f287f97ff8b28cfb74884dbcbb9122e51b931541b2d6c2f0ec1138e73b3b91"
+  },
+  {
+    "path": "assets/as2/as2_asset_manifest.json",
+    "bytes": 5029,
+    "sha256": "5b138093a4e9cd2ce06d48203f87468223acfb1ad97e863053b3c8b0e13e4613"
+  },
+  {
+    "path": "assets/as2/as2_constants.py",
+    "bytes": 3024,
+    "sha256": "4e0099a1b3557e049fe2f5679e22bf3f64c061ae0d26c329fb029ef3e78c87e7"
+  },
+  {
+    "path": "assets/as2/as2_env_cfgs.py",
+    "bytes": 5739,
+    "sha256": "4b979f27070295f3f46885f156afd0f5f2e4e27aae5852649a3a343e58b43b6f"
+  },
+  {
+    "path": "assets/as2/asset_parameters.json",
+    "bytes": 8810,
+    "sha256": "d5e5001b9729e6153e78d1e32f23cb52874d4ea6a59da430fa952590f4b50dc6"
+  },
+  {
+    "path": "assets/as2/official/as2_description/meshes/base_link.STL",
+    "bytes": 6311184,
+    "sha256": "4ace66bb12a972a67e1dbd823b55162e6d3931d23ccf56c707370c932f297f92"
+  },
+  {
+    "path": "assets/as2/official/as2_description/meshes/FL_calf.STL",
+    "bytes": 721684,
+    "sha256": "d6bba46f70ec606a6a6dd94365e594f7f449b31a2fdc064f11c4dc6594d9c23e"
+  },
+  {
+    "path": "assets/as2/official/as2_description/meshes/FL_foot.STL",
+    "bytes": 3465284,
+    "sha256": "ddf21582becb4df4ff7bd784c2ec0cb4b569c5c6f8ac96ae53e58f2b52f4950f"
+  },
+  {
+    "path": "assets/as2/official/as2_description/meshes/FL_hip.STL",
+    "bytes": 1383684,
+    "sha256": "7566753929d4b4a34dfe7aa57a2601f7edbc9ecd3b3a6786a2045d8e8d7e3849"
+  },
+  {
+    "path": "assets/as2/official/as2_description/meshes/FL_thigh.STL",
+    "bytes": 634284,
+    "sha256": "ad006344e8cb2ee51791f0b50cf7cb125ad1ae9c53b169a28c2ecddf3cfb3480"
+  },
+  {
+    "path": "assets/as2/official/as2_description/meshes/FR_calf.STL",
+    "bytes": 714184,
+    "sha256": "5abf4370f3a837b27407f156cc2fc1b46b3c450b845b1231bfe32256f9376b45"
+  },
+  {
+    "path": "assets/as2/official/as2_description/meshes/FR_foot.STL",
+    "bytes": 3468484,
+    "sha256": "1f3ae7b8df8ec8a8233761d32fe9ad4c801cff7403f07f495492a2e4c995481f"
+  },
+  {
+    "path": "assets/as2/official/as2_description/meshes/FR_hip.STL",
+    "bytes": 1383384,
+    "sha256": "ab51c738698ae72c95d4aff893a8f42c59ff1c395e12ff88d5cf94413ff9f1da"
+  },
+  {
+    "path": "assets/as2/official/as2_description/meshes/FR_thigh.STL",
+    "bytes": 640384,
+    "sha256": "71d25281826c92fb207e32ea10b53af0cfc5a2583c9766a13ab2bf5159463612"
+  },
+  {
+    "path": "assets/as2/official/as2_description/meshes/RL_calf.STL",
+    "bytes": 722784,
+    "sha256": "f7927f861191efc5cbb0e350bb320d05b7af1599456d301b9eefcf8950bf8f14"
+  },
+  {
+    "path": "assets/as2/official/as2_description/meshes/RL_foot.STL",
+    "bytes": 3465284,
+    "sha256": "5838f87163721303000799d7df5a5fce1eec4447d1db964466a9c009b59cdd86"
+  },
+  {
+    "path": "assets/as2/official/as2_description/meshes/RL_hip.STL",
+    "bytes": 1380684,
+    "sha256": "ae47b3c00b93782747d8d2d90a2e7c0fba508e521743e603c2eb3f261199f7a6"
+  },
+  {
+    "path": "assets/as2/official/as2_description/meshes/RL_thigh.STL",
+    "bytes": 479784,
+    "sha256": "33355396397dc35723c70384f08f50eaabe58d6f04490d77fa688cd6a70aa627"
+  },
+  {
+    "path": "assets/as2/official/as2_description/meshes/RR_calf.STL",
+    "bytes": 715784,
+    "sha256": "b085a9b0d5086ff39993ededdf2bcb39642b130ea5351532026ff34507f97aa2"
+  },
+  {
+    "path": "assets/as2/official/as2_description/meshes/RR_foot.STL",
+    "bytes": 3468484,
+    "sha256": "30795035d326e22c9469efabb60d0cd764c6ba3f76fcfd452e11c1f797882caf"
+  },
+  {
+    "path": "assets/as2/official/as2_description/meshes/RR_hip.STL",
+    "bytes": 1382984,
+    "sha256": "3f99ca33686c23e0c5905606a4fc0291c16935dc3ab6362344b6266b5e06e672"
+  },
+  {
+    "path": "assets/as2/official/as2_description/meshes/RR_thigh.STL",
+    "bytes": 479284,
+    "sha256": "1bcc5881b8b981cfca73f8718c1db6c2398b66fe7bb2fa6fb978cea7c8c7ec7d"
+  },
+  {
+    "path": "assets/as2/official/as2_description/urdf/as2.urdf",
+    "bytes": 21881,
+    "sha256": "76b500f7b8fd5ca619e8b426274064abe9bdc284601d5e17f22a79083188553d"
+  },
+  {
+    "path": "assets/as2/runtime_check.json",
+    "bytes": 46127,
+    "sha256": "6dc37ac9417a8fb16b1d260542e535824855759280a5e8ef49ca933d5bfaf62b"
+  },
+  {
+    "path": "assets/go2/runtime_check.json",
+    "bytes": 51541,
+    "sha256": "d32929f641492fbfd623d273f4118b69630dba93a65a30bbd59e41d25b899986"
+  },
+  {
+    "path": "assets/go2/urdf/go2.urdf",
+    "bytes": 28582,
+    "sha256": "9a3404330f271b042eb6ebb3070c07a7a59e30bf5d04150a525f57935156bd58"
+  },
+  {
+    "path": "assets/go2/urdf/meshes/base.dae",
+    "bytes": 10727399,
+    "sha256": "e52bebbb5c7ff1f6aedee620c9b5b349f6e965360ecc63a9bb743eeff2d0be64"
+  },
+  {
+    "path": "assets/go2/urdf/meshes/calf.dae",
+    "bytes": 1125517,
+    "sha256": "29872fa1a435b92bc2b395fdfa7f0aee26101db3c494681896bd4ef24ee7883c"
+  },
+  {
+    "path": "assets/go2/urdf/meshes/calf_mirror.dae",
+    "bytes": 1125457,
+    "sha256": "79c66be7ed06760bd5001c067a1fb0ac517f639d8b1a5f89be471903b3f359e1"
+  },
+  {
+    "path": "assets/go2/urdf/meshes/foot.dae",
+    "bytes": 506988,
+    "sha256": "ffbd95fd641866ce9bd277aa249b92dafc9148d70131fa2c52709a35ce5b710b"
+  },
+  {
+    "path": "assets/go2/urdf/meshes/hip.dae",
+    "bytes": 4666438,
+    "sha256": "8eddfb2935507bc2fbcb610524baa27c847b2d631188234ff30dd43dad136643"
+  },
+  {
+    "path": "assets/go2/urdf/meshes/thigh.dae",
+    "bytes": 3884121,
+    "sha256": "cf5293814a90b474fa19092b72a8be47ce8e520efa9d68ce11b137f79c7bdec5"
+  },
+  {
+    "path": "assets/go2/urdf/meshes/thigh_mirror.dae",
+    "bytes": 3896560,
+    "sha256": "51754f3ace706c5aa3a84d635f61b621e59fe0d0daebde1ec5d6c342fbf203b3"
+  },
+  {
+    "path": "assets/go2/usd/go2.usd",
+    "bytes": 5734083,
+    "sha256": "c71daf27f23dbfe4358052588722566b6163d721cd290a706de04e7b3cfe3928"
+  }
+]

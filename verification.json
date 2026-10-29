@@ -1,0 +1,39 @@
+{
+  "base_release": "fa3c776af150986776b5c513130c0e7a8b38b4c6",
+  "scope": "dual robot asset/config/entrypoint + documentation consolidation",
+  "cpu_test_summary": "...........s.........s.s..\n----------------------------------------------------------------------\nRan 25 tests in 0.061s\n\nOK (skipped=3)\n",
+  "robot_load_checks": {
+    "go2": {
+      "backend": "isaaclab_physx.assets.articulation.articulation",
+      "nominal_mass_kg": [
+        16.086999893188477,
+        16.086999893188477,
+        16.086999893188477,
+        16.086999893188477
+      ],
+      "control_steps": 50,
+      "falls": 0,
+      "policy_updates": 0,
+      "capability_claim": false
+    },
+    "as2": {
+      "backend": "isaaclab_physx.assets.articulation.articulation",
+      "nominal_mass_kg": [
+        17.639999389648438,
+        17.639999389648438,
+        17.639999389648438,
+        17.639999389648438
+      ],
+      "control_steps": 50,
+      "falls": 0,
+      "policy_updates": 0,
+      "capability_claim": false
+    }
+  },
+  "as2_source_manifest_all_files_verified": true,
+  "new_formal_training_started": false,
+  "previous_go2_run_modified": false,
+  "as2_experts_verified": false,
+  "as2_official_sim2sim_verified": false,
+  "as2_training_updates_tested": false
+}
