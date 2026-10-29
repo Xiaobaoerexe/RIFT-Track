@@ -1,0 +1,2 @@
+assets/** -text
+*.sh text eol=lf
