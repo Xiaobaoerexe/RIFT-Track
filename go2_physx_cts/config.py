@@ -59,8 +59,9 @@ class TrainCfg:
     command_max: tuple = (.5, .3, .8)
     payload_max_kg: float = 0.
     evaluation_interval: int = 5000
-    evaluation_xml: str = ''
+    evaluation_xml: str = ''  # Legacy checkpoint field, ignored by official evaluation.
     evaluation_python: str = ''
+    evaluation_profile: str = 'checkpoint_control'
     adaptive_iterations: bool = True
     compile: bool = True
     device: str = "cuda:0"

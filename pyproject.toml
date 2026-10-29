@@ -5,11 +5,11 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "go2-physx-cts"
 version = "0.1.0"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 dependencies = ["torch", "numpy"]
 
 [tool.setuptools.packages.find]
 include = ["go2_physx_cts*"]
 
 [tool.setuptools.package-data]
-go2_physx_cts = ["assets/*.json"]
+go2_physx_cts = ["robogauge_source.json"]

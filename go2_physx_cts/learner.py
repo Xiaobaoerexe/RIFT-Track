@@ -54,7 +54,6 @@ class Learner:
         self.ou=torch.zeros((cfg.num_envs,12),device=cfg.device)
         self.it=0;self.lr_scale=1.;self.ramp_start=cfg.warmup_iterations;self.actor_frozen_until=0
         self.last_good=None;self.collapse_strikes=0;self.nonfinite=0
-        self.eval_history=[];self.flat_pass_streak=0
         self.counts=dict(collect=0,transitions=0,wm=0,actor=0,critic=0,cts=0)
         self.metrics=[];self.start_time=time.monotonic()
         self.provider_counts=[int((self.source==i).sum()) for i in range(4)]
@@ -172,7 +171,7 @@ class Learner:
                'policy':self.policy.state_dict(),'critic':self.critic.state_dict(),'world_model':self.wm.state_dict(),
                'optimizers':{k:getattr(self,'opt_'+k).state_dict() for k in ('wm','actor','critic','cts')},
                'iteration':self.it,'counts':self.counts,'lr_scale':self.lr_scale,'ramp_start':self.ramp_start,
-               'actor_frozen_until':self.actor_frozen_until,'rng':torch.get_rng_state(),'eval_history':self.eval_history,'flat_pass_streak':self.flat_pass_streak,
+               'actor_frozen_until':self.actor_frozen_until,'rng':torch.get_rng_state(),
                'cuda_rng':torch.cuda.get_rng_state_all() if torch.cuda.is_available() else [],
                'resume_mode':'fresh_simulator_episodes_and_replay; model/optimizer/normalizer_resume',
                'physics':'isaacsim_physx','consts':{k:v.detach().cpu() for k,v in vars(self.env.consts).items()}}
@@ -187,7 +186,7 @@ class Learner:
         if continue_run:
             self.it=ck['iteration'];self.counts=ck['counts'];self.lr_scale=ck['lr_scale'];self.ramp_start=self.it
             self.actor_frozen_until=self.it+self.cfg.warmup_iterations
-            self.eval_history=ck.get('eval_history',[]);self.flat_pass_streak=ck.get('flat_pass_streak',0)
+            # Retired evaluator metadata in immutable checkpoints is ignored.
             torch.set_rng_state(ck['rng'].cpu())
             if ck['cuda_rng']:torch.cuda.set_rng_state_all([v.cpu() for v in ck['cuda_rng']])
         self.last_good=Path(path)
@@ -236,41 +235,26 @@ class Learner:
             if self.it==1 or self.it%self.cfg.save_interval==0 or self.it==end:
                 path=self.save()
                 if self.it>self.cfg.warmup_iterations and not self.collapse_strikes:self.last_good=path
-            if self.cfg.evaluation_xml and self.it%self.cfg.evaluation_interval==0:
+            if self.cfg.evaluation_python and self.it%self.cfg.evaluation_interval==0:
                 path=self.save();self.evaluate_feedback(path)
                 if getattr(self,'stop_requested',False):break
             if self.it==end and iterations is None and self.cfg.adaptive_iterations:
-                #40k is an iteration review point from source defaults, not a wall-time cap.
-                h=self.eval_history
-                improving=len(h)>=2 and h[-1]['score']>max(x['score'] for x in h[:-1])+.01
-                if improving:
-                    end+=20000
-                    with (self.output/'decisions.jsonl').open('a') as f:f.write(json.dumps({'iteration':self.it,'action':'extend_iteration_review','new_review_iteration':end,'reason':'MuJoCo capability still improving'})+'\n')
-                else:
-                    (self.output/'needs_review.json').write_text(json.dumps({'iteration':self.it,'reason':'Iteration review reached without current measured improvement; checkpoint saved','B0':False}))
+                (self.output/'needs_review.json').write_text(json.dumps({'iteration':self.it,'reason':'Iteration review reached; native and official transfer evidence required before extending budget','B0':False}))
         return self.last_good
 
     def evaluate_feedback(self,path):
-        out=self.output/f'eval_{self.it:08d}.json'
-        command=[self.cfg.evaluation_python or sys.executable,'-m','go2_physx_cts.evaluate','--checkpoint',str(path),'--xml',self.cfg.evaluation_xml,'--output',str(out)]
-        proc=subprocess.run(command,capture_output=True,text=True,timeout=600,cwd=Path(__file__).resolve().parents[1])
-        if proc.returncode:
-            (self.output/'evaluation_error.txt').write_text(proc.stdout+'\n'+proc.stderr)
+        from .robogauge_feedback import evaluate_checkpoint
+        out=self.output/f'robogauge_{self.it:08d}'
+        try:
+            evaluate_checkpoint(path,out,self.it,self.cfg.evaluation_python,self.cfg.evaluation_profile)
+        except Exception:
             self.stop_requested=True
-            raise RuntimeError('MuJoCo feedback failed; saved model and stopped rather than train without diagnostics')
-        result=json.loads(out.read_text());m=result['summary']['student']
-        score=m['survival_fraction']-.5*m['xy_rmse']-.25*m['yaw_rmse']
-        self.eval_history.append({'iteration':self.it,'score':score,'summary':result['summary'],'checkpoint':str(path)})
-        self.flat_pass_streak=self.flat_pass_streak+1 if result['flat_gate_pass'] else 0
-        action='continue'
-        if self.cfg.stage=='flat' and self.flat_pass_streak>=2:
-            action='flat_ready_for_terrain';self.stop_requested=True
-            (self.output/'flat_ready.json').write_text(json.dumps({'checkpoint':str(path),'evaluations':self.eval_history[-2:],'B0':False},indent=2))
-        elif len(self.eval_history)>=2 and score<max(x['score'] for x in self.eval_history[:-1])-.15:
-            action='rollback_after_mujoco_degradation';self.rollback(max(self.eval_history[:-1],key=lambda x:x['score'])['checkpoint'])
-        elif self.it>=15000 and len(self.eval_history)>=3 and max(x['score'] for x in self.eval_history[-3:])-min(x['score'] for x in self.eval_history[-3:])<.01 and m['survival_fraction']<.5:
-            action='stop_repeated_capability_failure';self.stop_requested=True
-        with (self.output/'decisions.jsonl').open('a') as f:f.write(json.dumps({'iteration':self.it,'action':action,'evaluation':str(out),'score':score})+'\n')
+            raise
+        self.stop_requested=True
+        (self.output/'needs_review.json').write_text(json.dumps({
+            'iteration':self.it,'evaluation':str(out/'result.json'),
+            'reason':'Official transfer evidence requires native/transfer review before curriculum or rollback decisions',
+            'B0':False},indent=2))
 
     def export(self,path):
         module=copy.deepcopy(StudentExport(self.policy)).eval().cpu()

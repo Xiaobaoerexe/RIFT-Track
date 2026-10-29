@@ -10,11 +10,11 @@ reference repository uses mjlab/MuJoCo Warp; its physics results do not certify
 this port.
 
 Training: python -m go2_physx_cts.supervise --output RUN_DIRECTORY --usd GO2_USD
-          --driver OFFICIAL_MOE_TORCHSCRIPT --xml MUJOCO_FLAT_XML
+          --driver OFFICIAL_MOE_TORCHSCRIPT --evaluation-python ROBOGAUGE_PYTHON
 All paths must identify real assets. The supervisor uses an exclusive file lock.
-Flat training starts cold. A terrain phase can start only after two consecutive
-MuJoCo flat velocity checks pass; its second online expert is the resulting flat
-checkpoint. No upstream chase policy is presented as a velocity skill expert.
+Training remains stopped under the current evaluation-only authorization.
+Official sim2sim measurements require native/transfer review before curriculum
+or rollback decisions. An evaluation alone cannot mark the flat curriculum ready.
 
 Mechanism checks: python -m unittest discover -s tests -v
 Physical/update smoke: python -m go2_physx_cts.train --config CONFIG_JSON
@@ -55,22 +55,46 @@ selection/archive, running normalization, OU noise, actor LR ramp, optimizer
 settings and clips are reproduced. CTS creates an additional20x1024 student
 update schedule. Actual timing includes it.
 
-Formal training has no wall-time cutoff.40k iterations is the source-default
-review budget. Every5000 iterations MuJoCo evaluates both branches and0/1kg
-loads. Improvement can extend the review by20k; measured degradation can roll
-policy/critic back while retaining live WM/data. Repeated severe failure stops
-for inspection. The terrain phase currently uses a flat MuJoCo transfer sentinel;
-this does not certify stair/terrain success. Physical training fall metrics also
-drive the source-style collapse guard.
+There is no wall-time cutoff. The training callback now exports a frozen
+checkpoint and invokes the isolated pinned RoboGauge runtime. After recording
+the official measurements it stops for native/transfer review: the retired
+custom-MuJoCo scores no longer control rollback or terrain promotion.
 
 Checkpoints include all four models/optimizers, normalization and RNG metadata.
 Like the source, resume starts new simulator episodes and fresh replay; it is
 not a bit-identical full-simulator/replay continuation. Old checkpoints are
 intentionally incompatible. No training capability or B0 is claimed by smoke.
 
-MuJoCo diagnostics bind each rigid body's mass, COM and full inertia tensor to
-the actual training USD using assets/go2_usd_inertials.json. Fixed feet/heads
-are aggregated with rigid transforms and the parallel-axis theorem. Nominal
-mass is16.08700025kg; the unmodified legacy XML was15.206408kg. Zero-joint
-body frames were checked against USD. Collision shapes and contact solvers
-remain platform-specific, so inertial alignment does not imply identical physics.
+Sim2sim reference: https://github.com/wty-yy/RoboGauge
+Pinned commit: add2c7ee0185ea8fd93d242f86e1c8cac6e9913b
+Runtime: Python3.11.18, MuJoCo3.2.3, dm-control1.0.23, Torch2.4.1+cu124,
+NumPy1.26.4. Full dependency lock and measured comparisons are in
+research/runs/ROBOGAUGE_MIGRATION_20261029. Do not use the training runtime's
+MuJoCo3.12.0. robogauge_source.json verifies every upstream archive file.
+
+Export in the training Python:
+python -m go2_physx_cts.robogauge_export --checkpoint CHECKPOINT
+       --output EXPORT_DIRECTORY --iteration ITERATION
+Evaluate in the isolated official Python, with this repository on PYTHONPATH:
+python -m go2_physx_cts.robogauge_bridge --exports EXPORT_DIRECTORY
+       --output REPORT_DIRECTORY --iterations ITERATION
+       --profiles official,checkpoint_control --video
+
+BasePipeline.run and MujocoSimulator load/step/PD/reset are unmodified upstream.
+The extensions provide a stateful CTS model ABI, simulator-only teacher inputs,
+fixed3D velocity goals and raw metrics. Student receives45 inputs, keeps450-D
+term-major history internally and embeds frozen normalization. Teacher receives
+45+167 values and is not a deployable blind policy. Exported outputs/history/reset
+are verified against checkpoint golden sequences in both Torch runtimes.
+
+official uses Go2Lab131 PD25/.5, scale.25 and the official default pose/XML.
+checkpoint_control changes only PD/default pose/action scale to checkpoint values;
+it retains the official XML mass, COM, inertia, contacts, joint passive properties,
+limits and motor ctrlrange. Other named profiles isolate individual conflicts.
+No inertial rewriting or private simulator/PD loop remains. Training USD nominal
+mass16.087kg differs from official XML15.206408kg; torque-speed limits, contact
+solvers and initialization also differ. Do not call these physically identical.
+
+The default fixed-command protocol disables optional official noise/delay for
+diagnosis; --official-noise-delay restores both. Both protocols retain official
+startup settling. Neither constitutes full RoboGauge benchmark certification.
