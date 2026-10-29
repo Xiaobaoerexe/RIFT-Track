@@ -1,0 +1,26 @@
+{
+  "repository": "https://github.com/wty-yy/go2_rl_lab",
+  "commit": "6c95d9feef4814c25eb6536e61bb38e1d1d718d4",
+  "files": {
+    "source/go2_rl_lab/go2_rl_lab/tasks/mixed/terrain.py": {
+      "sha256": "d477a0df65e333f51c8f7e70a34ee12efa1a62320fef5731de14b23070dad4b4"
+    },
+    "source/go2_rl_lab/go2_rl_lab/tasks/mixed/terrain_mesh.py": {
+      "sha256": "ab9d9cf5dbb8dc6d95ca2cfbc331e8f49d2eb9ce589277cbf0a76daa7b42405e"
+    },
+    "source/go2_rl_lab/go2_rl_lab/tasks/mixed/mdp/curriculums.py": {
+      "sha256": "042e700493eb810c2511a982c6d1fd4509a7c5a80a849ac31433a4454f055169"
+    },
+    "source/go2_rl_lab/go2_rl_lab/tasks/mixed/env_cfg.py": {
+      "sha256": "ecf41e7d4ecee43aec745c62e2f3a455dce24e88a0498ac96df0e0211a8bfd67"
+    },
+    "source/go2_rl_lab/go2_rl_lab/utils/terrains/terrain.py": {
+      "sha256": "341a15d9a44b7506f4a514d5670f7ced26ab77b6fca67a81013d2649cbd90f02"
+    }
+  },
+  "port_changes": {
+    "official_terrain_heightfield.py": "Exact full terrain.py text, only filesystem newline normalization.",
+    "official_terrain_mesh.py": "Geometry generation through MIXED_MESH_TERRAIN_CFG retained; imports made relative; removed subsequent visual-only rods/USD importer/playback helpers.",
+    "terrain_scene.py": "Uses source default mesh geometry; records normalized discrete column allocation; source distance progression; same physical collision mesh raycast. NumPy RNG locally saved/seeded/restored to make source global-RNG geometry reproducible; float64 index grid prevents float32 arange spacing drift."
+  }
+}

@@ -7,7 +7,7 @@ class TrainCfg:
     num_envs: int = 4096
     buffer_len: int = 1000
     collect_steps: int = 1
-    iterations: int = 40000
+    iterations: int = 60000
     warmup_iterations: int = 300
     wm_hidden: tuple = (1024, 1024, 1024)
     wm_window: int = 8
@@ -20,7 +20,7 @@ class TrainCfg:
     imag_batch: int = 8192
     teacher_fraction: float = .75
     horizon: int = 32
-    actor_microbatch: int = 2048
+    actor_microbatch: int = 8192
     actor_hidden: tuple = (512, 256, 128)
     critic_hidden: tuple = (512, 256, 128)
     cts_updates: int = 20
@@ -44,7 +44,7 @@ class TrainCfg:
     explore_noise: float = .3
     explore_theta: float = 2.
     driver_policy: str = ""
-    driver_frac: float = .1
+    driver_frac: float = 0.
     expert_policy: str = ""
     expert_frac: float = 0.
     allow_missing_flat_expert: bool = False
@@ -55,9 +55,8 @@ class TrainCfg:
     dt: float = .02
     physics_dt: float = .005
     episode_seconds: float = 20.
-    terrain_curriculum_iterations: int = 12000
-    command_max: tuple = (.5, .3, .8)
-    payload_max_kg: float = 0.
+    payload_max_kg: float = 2.
+    reset_critic: bool = False
     evaluation_interval: int = 5000
     evaluation_python: str = ''
     compile: bool = True
@@ -67,14 +66,15 @@ class TrainCfg:
     def from_record(cls, record):
         """Migrate historical configuration metadata without changing checkpoint bytes."""
         values=dict(record)
-        for obsolete in ('evaluation_xml','evaluation_profile','adaptive_iterations'):
+        for obsolete in ('evaluation_xml','evaluation_profile','adaptive_iterations',
+                         'terrain_curriculum_iterations','command_max'):
             values.pop(obsolete,None)
         return cls(**values)
 
     @classmethod
     def terrain(cls, **kwargs):
         return cls(stage="terrain", wm_updates=4, actor_lr_scale=.3,
-                   warmup_iterations=1000, expert_frac=.1, **kwargs)
+                   warmup_iterations=1000, driver_frac=.1, expert_frac=.1, **kwargs)
 
     def validate(self, production=True):
         if self.stage not in ("flat", "terrain"):
@@ -83,6 +83,8 @@ class TrainCfg:
             raise ValueError("Source-aligned collect/H/K contract changed")
         if production and (self.num_envs, self.buffer_len, self.imag_batch, self.wm_batch) != (4096,1000,8192,2048):
             raise ValueError("Production scale must be4096/1000/8192/2048")
+        if production and self.actor_microbatch!=self.imag_batch:
+            raise ValueError('Production uses one8192 imagination cohort so global command-stage activation is shared')
         if self.wm_updates != (2 if self.stage == "flat" else 4):
             raise ValueError("WM updates must match stage recipe")
         if not 0 < self.teacher_fraction < 1:
@@ -95,5 +97,5 @@ class TrainCfg:
             raise ValueError("Flat expert missing; set fraction0 and explicitly acknowledge degraded recipe")
         if self.stage == "terrain" and not self.expert_frac and not self.allow_missing_flat_expert:
             raise ValueError("Terrain recipe lacks its10% flat skill expert")
-        if self.payload_max_kg < 0 or self.payload_max_kg > 1:
-            raise ValueError("Only fixed nonnegative0..1kg payload is supported")
+        if self.payload_max_kg < 0 or self.payload_max_kg > 2:
+            raise ValueError("Only fixed nonnegative0..2kg payload is supported")

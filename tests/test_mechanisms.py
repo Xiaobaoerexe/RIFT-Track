@@ -9,6 +9,8 @@ from go2_physx_cts.world_model import WorldModel
 from go2_physx_cts.task import RobotConsts,reward
 from go2_physx_cts.imagine import Imagination
 from go2_physx_cts.learner import frozen
+from go2_physx_cts.learner import branch_loss,provider_assignment
+from go2_physx_cts.commands import OfficialCommands
 from go2_physx_cts.driver import official_default
 
 torch.set_num_threads(2)
@@ -46,6 +48,7 @@ class Mechanisms(unittest.TestCase):
   c=RobotConsts(torch.zeros(12),torch.ones(12)*.25,torch.ones(12)*25,torch.ones(12)*.5,torch.ones(12)*24,torch.tensor([[-3.,3.]]*12))
   im=Imagination(cfg,c);s=torch.zeros(8,70);s[:,0]=.3;s[:,3]=-1
   seed={'s':s,'pose':torch.zeros(8,3),'a_prev':torch.zeros(8,12),'obs':torch.randn(8,450),'command':torch.ones(8,3)*.3,'timer':torch.ones(8,1)*5,'xi':torch.zeros(8,5)}
+  seed['cmd_state']=OfficialCommands().initial(seed['pose'][:,:2],seed['pose'][:,:2])
   with frozen(wm,critic,policy.student_encoder):
    obj,data=im.rollout(wm,policy,critic,seed,0);(-obj.mean()).backward()
   self.assertTrue(any(p.grad is not None and p.grad.abs().sum()>0 for p in policy.teacher_encoder.parameters()))
@@ -76,5 +79,20 @@ class Mechanisms(unittest.TestCase):
   gb=torch.autograd.grad(b.square().mean(),tuple(p.parameters()),allow_unused=True)
   for x,y in zip(ga,gb):
    if x is not None:self.assertTrue(torch.allclose(x,y,atol=1e-6,rtol=1e-4))
+ def test_branch_loss_microbatch_gradient_equivalence(self):
+  torch.manual_seed(15);x=torch.randn(16,4);w=torch.randn(4,requires_grad=True);sizes=(12,4)
+  expected=branch_loss((x@w).square(),sizes,sizes)
+  ga,=torch.autograd.grad(expected,w)
+  for chunk in (1,3,5,12):
+   w.grad=None
+   for branch,(start,end) in enumerate(((0,12),(12,16))):
+    for lo in range(start,end,chunk):branch_loss((x[lo:min(end,lo+chunk)]@w).square(),branch,sizes).backward()
+   self.assertTrue(torch.allclose(w.grad,ga,atol=1e-6,rtol=1e-6))
+  half=-.5*((x[:12]@w).square().mean()+(x[12:]@w).square().mean())
+  self.assertTrue(torch.allclose(expected,2*half))
+ def test_providers_cover_every_terrain_column(self):
+  src=provider_assignment(4096,.1,.1,.75,'cpu')
+  self.assertEqual(torch.bincount(src.long()).tolist(),[2458,820,409,409])
+  for col in torch.tensor_split(src,20):self.assertEqual(set(col.tolist()),{0,1,2,3})
 
 if __name__=='__main__':unittest.main(verbosity=2)

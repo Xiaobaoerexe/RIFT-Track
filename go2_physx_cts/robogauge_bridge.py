@@ -141,7 +141,9 @@ class CommandGauge:
    result[f'slip_{label}_mean_mps']=float(np.mean(values)) if values else None
    result[f'slip_{label}_p95_mps']=float(np.quantile(values,.95)) if values else None
    result[f'contact_{label}_samples']=len(values)
-  result['pass']=bool(result['survived'] and result['xy_rmse']<.2 and result['yaw_rmse']<.3 and result['height']>.22)
+  tolerance=max(.2,.2*float(np.linalg.norm(self.cfg.command[:2])))
+  result['pass']=bool(result['survived'] and result['xy_rmse']<tolerance and result['yaw_rmse']<.3 and result['height']>.22)
+  result['tracking_xy_tolerance']=tolerance
   return result
 
 class AttachedPipeline(upstream.BasePipeline):
@@ -164,7 +166,9 @@ def evaluate_case(exports,iteration,branch,command,payload,output,seed=17,video=
   value=np.asarray(const[key])
   if value.shape!=(12,) or not np.isfinite(value).all():raise ValueError('Invalid checkpoint control constant: '+key)
  robot.control.p_gains=const['kp'];robot.control.d_gains=const['kd'];robot.control.default_dof_pos=const['default_q'];robot.control.scales.action=np.asarray(const['action_scale'])
- robot.commands.lin_vel_x=[-2.,2.];robot.commands.lin_vel_y=[-.3,.3];robot.commands.ang_vel_yaw=[-.8,.8]
+ robot.commands.lin_vel_x=[-max(2.,abs(command[0])),max(2.,abs(command[0]))]
+ robot.commands.lin_vel_y=[-max(.3,abs(command[1])),max(.3,abs(command[1]))]
+ robot.commands.ang_vel_yaw=[-max(.8,abs(command[2])),max(.8,abs(command[2]))]
  sim.viewer.headless=True;sim.render.save_video=video;sim.domain_rand.base_mass=payload
  sim.domain_rand.action_delay=official_noise_delay;sim.noise.enabled=official_noise_delay
  gauge.gauge_class='CommandGauge';gauge.command=list(command);gauge.duration=10.
@@ -181,15 +185,19 @@ def evaluate_case(exports,iteration,branch,command,payload,output,seed=17,video=
  return result
 
 def main():
- p=argparse.ArgumentParser();p.add_argument('--exports',required=True);p.add_argument('--output',required=True);p.add_argument('--iterations',default='5000,10000,40000');p.add_argument('--forward-only',action='store_true');p.add_argument('--video',action='store_true');p.add_argument('--official-noise-delay',action='store_true');a=p.parse_args()
+ p=argparse.ArgumentParser();p.add_argument('--exports',required=True);p.add_argument('--output',required=True);p.add_argument('--iterations',default='5000,10000,40000');p.add_argument('--forward-only',action='store_true');p.add_argument('--video',action='store_true');p.add_argument('--official-noise-delay',action='store_true')
+ p.add_argument('--payloads',default='0,1,2');p.add_argument('--forward-speeds',default='');a=p.parse_args()
  out=Path(a.output);out.mkdir(parents=True,exist_ok=True)
  (out/'runtime_verification.json').write_text(json.dumps(verify_runtime(a.exports,list(map(int,a.iterations.split(',')))),indent=2))
  commands=[(.5,0,0)] if a.forward_only else [(0,0,0),(.5,0,0),(-.3,0,0),(0,.3,0),(0,0,.8)]
+ for speed in filter(None,a.forward_speeds.split(',')):
+  cmd=(float(speed),0,0)
+  if cmd not in commands:commands.append(cmd)
  rows=[]
  for it in map(int,a.iterations.split(',')):
   for branch in ('teacher','student'):
    for cmd in commands:
-    for payload in ((0.,) if a.forward_only else (0.,1.)):
+    for payload in ((0.,) if a.forward_only else map(float,a.payloads.split(','))):
      row=evaluate_case(a.exports,it,branch,cmd,payload,out,video=a.video,official_noise_delay=a.official_noise_delay);rows.append(row)
      (out/'results.json').write_text(json.dumps({'rows':rows,'training_updates':0,'upstream_commit':UPSTREAM_COMMIT},indent=2));print(json.dumps(row),flush=True)
 if __name__=='__main__':main()
