@@ -238,7 +238,7 @@ class Learner:
             if self.cfg.evaluation_python and self.it%self.cfg.evaluation_interval==0:
                 path=self.save();self.evaluate_feedback(path)
                 if getattr(self,'stop_requested',False):break
-            if self.it==end and iterations is None and self.cfg.adaptive_iterations:
+            if self.it==end and iterations is None:
                 (self.output/'needs_review.json').write_text(json.dumps({'iteration':self.it,'reason':'Iteration review reached; native and official transfer evidence required before extending budget','B0':False}))
         return self.last_good
 
@@ -246,7 +246,7 @@ class Learner:
         from .robogauge_feedback import evaluate_checkpoint
         out=self.output/f'robogauge_{self.it:08d}'
         try:
-            evaluate_checkpoint(path,out,self.it,self.cfg.evaluation_python,self.cfg.evaluation_profile)
+            evaluate_checkpoint(path,out,self.it,self.cfg.evaluation_python)
         except Exception:
             self.stop_requested=True
             raise

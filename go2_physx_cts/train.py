@@ -13,7 +13,7 @@ def main():
     parser.add_argument('--smoke',action='store_true');parser.add_argument('--smoke-iterations',type=int,default=8)
     parser.add_argument('--probe-only',action='store_true');parser.add_argument('--probe-steps',type=int,default=1000)
     add_launcher_args(parser);args=parser.parse_args()
-    cfg=TrainCfg(**json.loads(Path(args.config).read_text()));cfg.validate(production=not args.smoke)
+    cfg=TrainCfg.from_record(json.loads(Path(args.config).read_text()));cfg.validate(production=not args.smoke)
     code_root=Path(__file__).resolve().parents[1]
     version=subprocess.run(['git','-C',str(code_root),'rev-parse','HEAD'],capture_output=True,text=True)
     code_commit=version.stdout.strip() if version.returncode==0 else None

@@ -2,13 +2,13 @@
 import json,subprocess,sys
 from pathlib import Path
 
-def evaluate_checkpoint(checkpoint,output,iteration,official_python,profile='checkpoint_control'):
+def evaluate_checkpoint(checkpoint,output,iteration,official_python):
     if not official_python:
         raise ValueError('An explicit RoboGauge Python3.11/MuJoCo3.2.3 runtime is required')
     root=Path(__file__).resolve().parents[1];out=Path(output).resolve();out.mkdir(parents=True,exist_ok=True)
     commands=[
         [sys.executable,'-m','go2_physx_cts.robogauge_export','--checkpoint',str(checkpoint),'--output',str(out/'exports'),'--iteration',str(iteration)],
-        [official_python,'-m','go2_physx_cts.robogauge_bridge','--exports',str(out/'exports'),'--output',str(out/'official'),'--iterations',str(iteration),'--profiles',profile],
+        [official_python,'-m','go2_physx_cts.robogauge_bridge','--exports',str(out/'exports'),'--output',str(out/'official'),'--iterations',str(iteration)],
     ]
     for i,cmd in enumerate(commands):
         proc=subprocess.run(cmd,cwd=root,capture_output=True,text=True,timeout=1800)

@@ -2,7 +2,7 @@
 
 Only robot observation ABI, fixed command protocol and additional raw metrics are
 extensions. BasePipeline.run, MujocoSimulator.step/update_torque/reset/load remain
-the official implementations. Named physical contrasts are explicitly recorded.
+the official implementations. Checkpoint control constants are mandatory.
 """
 import os
 os.environ.setdefault('MUJOCO_GL','egl')
@@ -24,7 +24,6 @@ from robogauge.utils.logger import logger
 
 UPSTREAM_COMMIT='add2c7ee0185ea8fd93d242f86e1c8cac6e9913b'
 LEGS=('FL','FR','RL','RR')
-PROFILES=('official','checkpoint_control','friction_zero','damping_zero','armature_match','passive_match','friction_one','passive_friction_one','limits_match','dt005','official_pd','official_pose','official_scale')
 
 def verify_runtime(exports,iterations):
  manifest=json.loads((Path(__file__).parent/'robogauge_source.json').read_text())
@@ -150,42 +149,31 @@ class AttachedPipeline(upstream.BasePipeline):
   super().load();self.gauge.sim=self.sim
   if isinstance(self.robot,CTSTeacher):
    self.robot.sim=self.sim;self.robot.training_default=np.asarray(self.robot_cfg.training_default);self.robot.payload=self.sim_cfg.domain_rand.base_mass
-  m=self.sim.mj_model;profile=self.robot_cfg.profile
-  if profile in ('friction_zero','passive_match','passive_friction_one'):m.dof_frictionloss[6:]=0
-  if profile in ('damping_zero','passive_match','passive_friction_one'):m.dof_damping[6:]=0
-  if profile in ('armature_match','passive_match','passive_friction_one'):m.dof_armature[6:]=self.robot_cfg.training_armature
-  if profile=='limits_match':m.jnt_range[1:]=self.robot_cfg.training_limits
   self.loaded=loaded_model(self.sim,self.robot)
   self.robot.reset()
 
-def evaluate_case(exports,iteration,branch,command,payload,profile,output,seed=17,video=False,official_noise_delay=False):
+def evaluate_case(exports,iteration,branch,command,payload,output,seed=17,video=False,official_noise_delay=False):
  if mujoco.__version__!='3.2.3':raise RuntimeError('Use the pinned official MuJoCo3.2.3 runtime; no version bypass.')
- if profile not in PROFILES:raise ValueError(profile)
  torch.set_num_threads(1);torch.set_grad_enabled(False);random.seed(seed);np.random.seed(seed);torch.manual_seed(seed)
  meta=json.loads((Path(exports)/f'{iteration}_metadata.json').read_text());const=meta['consts']
  robot=Go2Lab131Config();sim=MujocoConfig();gauge=FlatGaugeConfig()
  robot.control.model_path=meta['models'][branch]['path'];robot.robot_class='CTSTeacher' if branch=='teacher' else 'Go2'
  robot.control.num_observations=212 if branch=='teacher' else 45
- robot.control.mj2model_dof_indices=list(range(12));robot.training_default=const['default_q'];robot.profile=profile
- robot.training_armature=[.000111842*(6.33*(1.5 if i%3==2 else 1))**2 for i in range(12)]
- robot.training_limits=[[-1.0472,1.0472],[-1.5708,3.4907],[-2.7227,-.83776]]*2+[[-1.0472,1.0472],[-.5236,4.5379],[-2.7227,-.83776]]*2
- if profile!='official':
-  robot.control.p_gains=const['kp'];robot.control.d_gains=const['kd'];robot.control.default_dof_pos=const['default_q'];robot.control.scales.action=np.asarray(const['action_scale'])
- if profile=='official_pd':robot.control.p_gains=[25.]*12;robot.control.d_gains=[.5]*12
- if profile=='official_pose':robot.control.default_dof_pos=Go2Lab131Config().control.default_dof_pos
- if profile=='official_scale':robot.control.scales.action=.25
+ robot.control.mj2model_dof_indices=list(range(12));robot.training_default=const['default_q']
+ for key in ('kp','kd','default_q','action_scale'):
+  value=np.asarray(const[key])
+  if value.shape!=(12,) or not np.isfinite(value).all():raise ValueError('Invalid checkpoint control constant: '+key)
+ robot.control.p_gains=const['kp'];robot.control.d_gains=const['kd'];robot.control.default_dof_pos=const['default_q'];robot.control.scales.action=np.asarray(const['action_scale'])
  robot.commands.lin_vel_x=[-2.,2.];robot.commands.lin_vel_y=[-.3,.3];robot.commands.ang_vel_yaw=[-.8,.8]
  sim.viewer.headless=True;sim.render.save_video=video;sim.domain_rand.base_mass=payload
  sim.domain_rand.action_delay=official_noise_delay;sim.noise.enabled=official_noise_delay
- if profile in ('friction_one','passive_friction_one'):sim.domain_rand.friction=1.
- if profile=='dt005':sim.physics.simulation_dt=.005
  gauge.gauge_class='CommandGauge';gauge.command=list(command);gauge.duration=10.
  upstream.CTSTeacher=CTSTeacher;upstream.CommandGauge=CommandGauge
- tag=f'{iteration}_{branch}_{profile}_{command[0]}_{command[1]}_{command[2]}_load{payload}_s{seed}'
+ tag=f'{iteration}_{branch}_checkpoint_control_{command[0]}_{command[1]}_{command[2]}_load{payload}_s{seed}'
  logger.create('official_cases',tag,console_output=False,parent_log_dir=output)
  pipeline=AttachedPipeline(tag,sim,robot,gauge,SimpleNamespace(seed=seed))
  _,warning,error=pipeline.run();result=pipeline.gauge.summary()
- result.update(iteration=iteration,branch=branch,command=list(command),payload_kg=payload,profile=profile,seed=seed,checkpoint_sha256=meta['checkpoint_sha256'],upstream_commit=UPSTREAM_COMMIT,warning=str(warning) if warning else None,error=str(error) if error else None,training_updates=0,protocol={'physics_dt':sim.physics.simulation_dt,'control_dt':.02,'metric_dt':.02,'duration':10,'ignore_seconds':1,'initial_settle':'official BasePipeline first_reset','noise_enabled':official_noise_delay,'random_action_delay':official_noise_delay},case_dir=str(logger.log_dir))
+ result.update(iteration=iteration,branch=branch,command=list(command),payload_kg=payload,control_contract='checkpoint',seed=seed,checkpoint_sha256=meta['checkpoint_sha256'],upstream_commit=UPSTREAM_COMMIT,warning=str(warning) if warning else None,error=str(error) if error else None,training_updates=0,protocol={'physics_dt':sim.physics.simulation_dt,'control_dt':.02,'metric_dt':.02,'duration':10,'ignore_seconds':1,'initial_settle':'official BasePipeline first_reset','noise_enabled':official_noise_delay,'random_action_delay':official_noise_delay},case_dir=str(logger.log_dir))
  pipeline.loaded['observed_contact_parameters']=list(pipeline.gauge.contact_parameters.values())
  (logger.log_dir/'loaded_parameters.json').write_text(json.dumps(pipeline.loaded,indent=2))
  (logger.log_dir/'metrics.json').write_text(json.dumps(result,indent=2))
@@ -193,16 +181,15 @@ def evaluate_case(exports,iteration,branch,command,payload,profile,output,seed=1
  return result
 
 def main():
- p=argparse.ArgumentParser();p.add_argument('--exports',required=True);p.add_argument('--output',required=True);p.add_argument('--iterations',default='5000,10000,40000');p.add_argument('--profiles',default='checkpoint_control');p.add_argument('--forward-only',action='store_true');p.add_argument('--video',action='store_true');p.add_argument('--official-noise-delay',action='store_true');a=p.parse_args()
+ p=argparse.ArgumentParser();p.add_argument('--exports',required=True);p.add_argument('--output',required=True);p.add_argument('--iterations',default='5000,10000,40000');p.add_argument('--forward-only',action='store_true');p.add_argument('--video',action='store_true');p.add_argument('--official-noise-delay',action='store_true');a=p.parse_args()
  out=Path(a.output);out.mkdir(parents=True,exist_ok=True)
  (out/'runtime_verification.json').write_text(json.dumps(verify_runtime(a.exports,list(map(int,a.iterations.split(',')))),indent=2))
  commands=[(.5,0,0)] if a.forward_only else [(0,0,0),(.5,0,0),(-.3,0,0),(0,.3,0),(0,0,.8)]
  rows=[]
- for profile in a.profiles.split(','):
-  for it in map(int,a.iterations.split(',')):
-   for branch in ('teacher','student'):
-    for cmd in commands:
-     for payload in ((0.,) if a.forward_only else (0.,1.)):
-      row=evaluate_case(a.exports,it,branch,cmd,payload,profile,out,video=a.video,official_noise_delay=a.official_noise_delay);rows.append(row)
-      (out/'results.json').write_text(json.dumps({'rows':rows,'training_updates':0,'upstream_commit':UPSTREAM_COMMIT},indent=2));print(json.dumps(row),flush=True)
+ for it in map(int,a.iterations.split(',')):
+  for branch in ('teacher','student'):
+   for cmd in commands:
+    for payload in ((0.,) if a.forward_only else (0.,1.)):
+     row=evaluate_case(a.exports,it,branch,cmd,payload,out,video=a.video,official_noise_delay=a.official_noise_delay);rows.append(row)
+     (out/'results.json').write_text(json.dumps({'rows':rows,'training_updates':0,'upstream_commit':UPSTREAM_COMMIT},indent=2));print(json.dumps(row),flush=True)
 if __name__=='__main__':main()

@@ -78,7 +78,7 @@ python -m go2_physx_cts.robogauge_export --checkpoint CHECKPOINT
 Evaluate in the isolated official Python, with this repository on PYTHONPATH:
 python -m go2_physx_cts.robogauge_bridge --exports EXPORT_DIRECTORY
        --output REPORT_DIRECTORY --iterations ITERATION
-       --profiles official,checkpoint_control --video
+       --video
 
 BasePipeline.run and MujocoSimulator load/step/PD/reset are unmodified upstream.
 The extensions provide a stateful CTS model ABI, simulator-only teacher inputs,
@@ -87,10 +87,10 @@ term-major history internally and embeds frozen normalization. Teacher receives
 45+167 values and is not a deployable blind policy. Exported outputs/history/reset
 are verified against checkpoint golden sequences in both Torch runtimes.
 
-official uses Go2Lab131 PD25/.5, scale.25 and the official default pose/XML.
-checkpoint_control changes only PD/default pose/action scale to checkpoint values;
-it retains the official XML mass, COM, inertia, contacts, joint passive properties,
-limits and motor ctrlrange. Other named profiles isolate individual conflicts.
+The only control contract reads PD/default pose/action scale from the checkpoint.
+Missing or malformed constants are errors; no fallback to official control defaults.
+The official XML mass, COM, inertia, contacts, joint passive properties, limits
+and motor ctrlrange remain unchanged. Experimental parameter switches are removed.
 No inertial rewriting or private simulator/PD loop remains. Training USD nominal
 mass16.087kg differs from official XML15.206408kg; torque-speed limits, contact
 solvers and initialization also differ. Do not call these physically identical.

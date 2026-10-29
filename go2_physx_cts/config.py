@@ -59,12 +59,17 @@ class TrainCfg:
     command_max: tuple = (.5, .3, .8)
     payload_max_kg: float = 0.
     evaluation_interval: int = 5000
-    evaluation_xml: str = ''  # Legacy checkpoint field, ignored by official evaluation.
     evaluation_python: str = ''
-    evaluation_profile: str = 'checkpoint_control'
-    adaptive_iterations: bool = True
     compile: bool = True
     device: str = "cuda:0"
+
+    @classmethod
+    def from_record(cls, record):
+        """Migrate historical configuration metadata without changing checkpoint bytes."""
+        values=dict(record)
+        for obsolete in ('evaluation_xml','evaluation_profile','adaptive_iterations'):
+            values.pop(obsolete,None)
+        return cls(**values)
 
     @classmethod
     def terrain(cls, **kwargs):
