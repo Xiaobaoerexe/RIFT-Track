@@ -45,7 +45,7 @@ def export_checkpoint(checkpoint,output,iteration):
     out=Path(output).resolve();out.mkdir(parents=True,exist_ok=True)
     path=Path(checkpoint);ck=torch.load(path,map_location='cpu',weights_only=False)
     if ck.get('schema')!=CHECKPOINT_SCHEMA:
-        raise ValueError('Architecture mismatch: export requires the V2 six-expert/shared-Critic-geometry checkpoint')
+        raise ValueError('Architecture mismatch: export requires the shared-Critic-geometry checkpoint and its recorded expert count')
     config=ck['cfg'];period=int(config['depth_period']);control_dt=float(config['dt'])
     if period<=0 or control_dt<=0:raise ValueError('Invalid checkpoint camera/control cadence')
     # BF16 is a training arithmetic mode; deploy the FP32 master weights through

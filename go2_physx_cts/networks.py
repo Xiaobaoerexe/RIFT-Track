@@ -100,8 +100,8 @@ class Teacher(nn.Module):
 
 
 class DenseActionMoE(nn.Module):
-    """Six dense independent action experts; router sees the fused latent."""
-    def __init__(self,hidden=(512,256,128),experts=6,mixed_precision=True):
+    """Three dense independent action experts; router sees the fused latent."""
+    def __init__(self,hidden=(512,256,128),experts=3,mixed_precision=True):
         super().__init__(); self.experts=experts;self.mixed_precision=mixed_precision
         self.router=MLP(32,experts,(128,64),'elu')
         dims=(77,*hidden,12)
@@ -122,7 +122,7 @@ class DenseActionMoE(nn.Module):
 
 
 class Policy(nn.Module):
-    def __init__(self,hidden=(512,256,128),experts=6,mixed_precision=True):
+    def __init__(self,hidden=(512,256,128),experts=3,mixed_precision=True):
         super().__init__();self.mixed_precision=mixed_precision
         self.history_norm=RunningNorm(450); self.single_norm=RunningNorm(45); self.teacher_norm=RunningNorm(st.PRIV_DIM)
         self.teacher_encoder=Teacher(mixed_precision); self.student_encoder=Student(mixed_precision); self.actor=DenseActionMoE(hidden,experts,mixed_precision)

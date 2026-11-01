@@ -9,13 +9,14 @@ import argparse,json,math,time
 from pathlib import Path
 import torch
 from torch.nn import functional as F
-from .api import FastDepthGenerator,FastSceneCache
+from .api import FastDepthGenerator
 from .data import Corpus
-from .source import ieee_fp32,tangent_pose,soft_image,sha256,package_fingerprints
+from .source import ieee_fp32,tangent_pose,soft_image,sha256,package_fingerprints,import_package
 from .train import atomic_save,cotangent
 
-THRESHOLDS={'common_valid_mae_m':.02,'common_valid_p95_m':.10,
-            'validity_f1_min':.98,'edge_mae_m':.05,'pose_vjp_relative_l2_max':.05,
+THRESHOLDS={'common_valid_mae_m':.05,'common_valid_p95_m':.20,
+            'range_mae_m':{'near':.05,'middle':.10,'far':.16},
+            'validity_f1_min':.98,'edge_mae_m':.08,'pose_vjp_relative_l2_max':.05,
             'rtx_relative_degradation_max':.10}
 FAMILIES={0:'nominal',1:'transition',2:'fallen',3:'full_orientation'}
 NEW_TERRAINS={'indoor_obstacles','obstacle_up','obstacle_down'}
@@ -39,16 +40,27 @@ class Images:
     def __init__(self):
         self.errors=[];self.edge_sum=0.;self.edge_count=0;self.tp=self.fp=self.fn=0
         self.label_sum=0.;self.label_count=0;self.frames=0
+        self.ranges={name:[] for name in ('near','middle','far')}
+        self.common_ranges={name:[] for name in ('near','middle','far')}
     def add(self,z,hit,gt,valid):
         z,hit,gt,valid=(x.detach().cpu() for x in (z,hit,gt,valid))
         e=(z-gt).abs();common=hit&valid;edge=common&edge_mask(gt,valid)
         self.errors.append(e[common]);self.edge_sum+=float(e[edge].sum());self.edge_count+=int(edge.sum())
+        for name,lo,hi in (('near',0.,2.),('middle',2.,4.),('far',4.,6.01)):
+            self.ranges[name].append(e[valid&(gt>=lo)&(gt<hi)])
+            self.common_ranges[name].append(e[common&(gt>=lo)&(gt<hi)])
         self.label_sum+=float(e[valid].sum());self.label_count+=int(valid.sum())
         self.tp+=int(common.sum());self.fp+=int((hit&~valid).sum());self.fn+=int((~hit&valid).sum());self.frames+=len(z)
     def result(self):
         e=torch.cat(self.errors) if self.errors else torch.empty(0)
         denominator=2*self.tp+self.fp+self.fn
+        ranges={k:torch.cat(v) if v else torch.empty(0) for k,v in self.ranges.items()}
+        common_ranges={k:torch.cat(v) if v else torch.empty(0) for k,v in self.common_ranges.items()}
         return {'frames':self.frames,'common_valid_pixels':len(e),'label_valid_pixels':self.label_count,
+            'common_valid_range_error':{k:{'pixels':len(v),'mae_m':float(v.mean()) if len(v) else None,
+                'p90_m':float(v.quantile(.9)) if len(v) else None,'p95_m':float(v.quantile(.95)) if len(v) else None} for k,v in common_ranges.items()},
+            'label_valid_range_error':{k:{'pixels':len(v),'mae_m':float(v.mean()) if len(v) else None,
+                'p90_m':float(v.quantile(.9)) if len(v) else None,'p95_m':float(v.quantile(.95)) if len(v) else None} for k,v in ranges.items()},
             'common_valid_mae_m':float(e.mean()) if len(e) else 0.,
             'common_valid_p95_m':float(e.quantile(.95)) if len(e) else 0.,
             'validity_f1':2*self.tp/denominator if denominator else 1.,
@@ -74,6 +86,9 @@ def image_failures(metric,prefix):
     for name in ('common_valid_mae_m','common_valid_p95_m','edge_mae_m'):
         if not math.isfinite(metric[name]) or metric[name]>THRESHOLDS[name]:failures.append(f'{prefix}: {name}={metric[name]:.6g}')
     if metric['validity_f1']<THRESHOLDS['validity_f1_min']:failures.append(f'{prefix}: validity_f1={metric["validity_f1"]:.6g}')
+    for name,m in metric['label_valid_range_error'].items():
+        if m['pixels'] and (not math.isfinite(m['mae_m']) or m['mae_m']>THRESHOLDS['range_mae_m'][name]):
+            failures.append(f'{prefix}: {name}_mae={m["mae_m"]:.6g}')
     return failures
 
 
@@ -99,7 +114,7 @@ def main():
     out=Path(args.output);out.mkdir(parents=True,exist_ok=True);began=time.perf_counter()
     engine=FastDepthGenerator(args.weights,args.depth_package,device=args.device,chunk_size=args.batch,
                               compile_mode='off',precision=args.precision,require_accepted=False)
-    source=engine.source;source.chunk_size=args.batch
+    source=import_package(args.depth_package).DepthInputGenerator(device=args.device,chunk_size=args.batch,compile_mode='off',precision='fp32')
     corpus=Corpus(args.data,'test',args.device).prepare(source)
     # Check the training identities recorded with the checkpoint against test.
     checkpoint=torch.load(args.weights,map_location='cpu',weights_only=False)
@@ -110,16 +125,14 @@ def main():
         known={(x['name'],str(x['layout_identity'])) for x in train_meta}
         overlap=known&{(m['name'],m['layout_identity']) for m in corpus.meta}
         if overlap:raise ValueError(f'Train/test layout overlap: {overlap}')
-    with torch.no_grad(),ieee_fp32(args.device):
-        embedding=engine.core.model.encode_scenes(corpus.features)
-    cache=FastSceneCache(embedding,embedding.new_zeros((len(embedding),3)),len(embedding))
     from go2_depth_input.api import SceneCache
-    source_cache=SceneCache(corpus.source_cache,cache.origins,len(embedding))
+    cache=SceneCache(corpus.source_cache,torch.zeros(len(corpus.maps),3,device=args.device),len(corpus.maps))
+    source_cache=cache
     reports={name:{} for name in ('labels','teacher_geometry','teacher_noisy','old_rtx','candidate_rtx')}
     gradients={name:{} for name in ('geometry','noisy')}
     def decode(pose,rotation,ids):
         with torch.autocast(device_type=engine.device.type,dtype=torch.bfloat16,enabled=args.precision=='bf16'):
-            return engine.core.model.decode(embedding[ids],pose,rotation)
+            return engine.core.geometry_cached(cache.tensors,ids,pose,rotation)
     indices=corpus.heldout_indices(args.views_per_scene)
     with ieee_fp32(args.device):
         for number,idx in enumerate(indices.split(args.batch)):

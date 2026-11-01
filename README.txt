@@ -1,9 +1,10 @@
 Go2 Depth Multitask CTS / SuperMimic-style BPTT
+V3工程实测：完整4096环境单轮5.561584秒（6轮均值），相对V2的6.213263秒缩短约10.5%。正式冷启动授权与测试能力证据分开记录。
 
-当前状态：2026-11-02 V2完整单轮实测6.213263秒，相对25.7608745秒提速4.146倍，未达到10倍启动门槛，未启动正式训练。
-V2授权BF16、6个稠密动作专家、5Hz深度、过去图像缓存、轻量地图/Critic编码、8192融合想象、Critic一遍5批、CTS2×128×64及16步burn-in。学生想象仍2048条且每轮执行。
+最新V3授权：共享Actor改为3个稠密专家；启用经独立精度与可微性验收的compact surface depth。两项通过验证并清理临时文件后直接冷启动120000轮；此前10倍提速门槛已经取消。
+保留BF16、5Hz深度、过去图像缓存、轻量地图/Critic编码、8192融合想象、Critic一遍5批、CTS2×128×64及16步burn-in。学生想象仍2048条且每轮执行。
 可训练特征不跨学生优化器更新缓存；burn-in进入损失段重新建立CNN梯度；GRU原位门投影保留重算。轻量深度模型必须单独训练验收后才能替换。
-原深度BF16位姿VJP未过验收，默认保留FP32；策略/WM/Critic/学生网络BF16已过梯度检查。直接深度候选完成20k离线更新但图像与位姿梯度未过验收，未替换原生成器。详细证据：research/runs/DEPTH_CTS_ACCEL_V2_20261102（本机研究目录）。
+原深度BF16未过验收，观测模块保留FP32；策略/WM/Critic/学生网络BF16保持。V2全局场景压缩候选失败，代码保存在Git历史。V3保留原几何投影和加噪，仅缩小并重训图像修正CNN，不宣称与旧网络VJP逐点等价。新的误差、解析几何、数值求导与完整计时见research/runs/DEPTH_LIGHT_V3_20261102；V2历史证据仍保留。
 
 独立项目副本：/home/abc/Documents/go2_supermimic_lab_depth
 本地源：F:/learning/motion_control/physx_depth
@@ -15,7 +16,7 @@ V2授权BF16、6个稠密动作专家、5Hz深度、过去图像缓存、轻量�
 正式入口（仅干净已提交的版本可启动）：
 python -m go2_physx_cts.supervise --output NEW_RUN_DIRECTORY --usd GO2_USD
   --driver OFFICIAL_MOE_TORCHSCRIPT --reward-calibration REWARD_CALIBRATION_JSON
-  --evaluation-python ROBOGAUGE_PYTHON
+  --evaluation-python ROBOGAUGE_PYTHON --fast-depth-checkpoint ACCEPTED_COMPACT_DEPTH
 
 Isaac Sim/PhysX，4096环境，每轮真实采集1步，Actor更新1次；120000轮，无小时硬上限。
 8192条32步想象：6144教师+2048学生；损失严格为teacher.mean()+student.mean()。
@@ -28,7 +29,7 @@ WM监督8步/2048窗口，平地2次，地形4次。Critic全部有效状态训�
 教师：167维特权MLP32 + 前方2×64×128地图CNN128 + 任务onehot10 -> Linear32+LN。
 学生：450维本体历史8专家MoE32；48×64深度CNN128+当前45维观测 -> GRU256；
 288维融合 -> Linear32+LN。学生参数只接受教师latent MSE蒸馏，不接收回报更新。
-共享Actor：6个稠密动作专家，latent路由，输出12个原始线性动作，无tanh。
+共享Actor：3个稠密动作专家，latent路由，输出12个原始线性动作，无tanh。
 教师编码器与共享Actor接受想象回报梯度；学生冻结时对输入和GRU记忆仍保留导数。
 10个独立任务Critic各含教师/学生两值头，任务内PopArt、归一化Huber。
 Critic输入为物理状态、地图和任务记忆，不使用Actor持有latent，避免价值梯度捷径。

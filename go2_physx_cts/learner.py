@@ -387,7 +387,8 @@ class Learner:
         partial=path.with_suffix('.partial'); torch.save(value,partial); os.replace(partial,path); return path
     def load(self,path,continue_run=False):
         ck=torch.load(path,map_location=self.device,weights_only=False)
-        if ck['schema']!='physx-depth-multitask-v2' or ck['physics']!='isaacsim_physx': raise ValueError('Architecture mismatch; V2 requires a matching six-expert/shared-Critic-geometry checkpoint')
+        if ck['schema']!='physx-depth-multitask-v2' or ck['physics']!='isaacsim_physx': raise ValueError('Architecture mismatch; a matching expert-count/shared-Critic-geometry checkpoint is required')
+        if ck['cfg']['actor_experts']!=self.cfg.actor_experts:raise ValueError('Actor expert count differs from checkpoint')
         for name,expected in ck['consts'].items():
             if not torch.allclose(getattr(self.env.consts,name),expected.to(getattr(self.env.consts,name)),atol=1e-6,rtol=1e-6): raise ValueError('Control constant mismatch: '+name)
         from .task import reward_budget

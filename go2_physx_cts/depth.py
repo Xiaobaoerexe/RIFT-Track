@@ -1,7 +1,7 @@
 """Frozen depth/noise observation module with full-body-pose input derivatives.
 
-The geometry and sensor model is the supplied versioned package. This adapter
-only handles scene sharing, quaternion conversion and explicit replay keys.
+The supplied projection/sensor model uses the accepted compact image refiner.
+This adapter handles scene sharing, quaternion conversion and replay keys.
 """
 from pathlib import Path
 from collections import OrderedDict
@@ -85,21 +85,17 @@ class DepthObservation:
         package=Path(cfg.depth_package)
         if (package/'go2_depth_input').is_dir() and str(package) not in sys.path:
             sys.path.insert(0,str(package))
-        from go2_depth_input import DepthInputGenerator,noise_keys
+        from go2_depth_input import noise_keys
         from go2_depth_input.api import SceneCache
         from go2_depth_input.vendor import camera
         camera_contract=verify_camera_contract(camera)
         self.noise_keys=noise_keys
         self.field=field
-        direct=bool(cfg.fast_depth_checkpoint)
-        if direct:
-            from .fast_depth.api import FastDepthGenerator
-            self.engine=FastDepthGenerator(cfg.fast_depth_checkpoint,str(package),device=cfg.device,
-                chunk_size=max(256,cfg.depth_chunk_size),compile_mode='default' if cfg.compile else 'off',
-                precision=cfg.depth_precision,require_accepted=True)
-        else:
-            self.engine=DepthInputGenerator(device=cfg.device,chunk_size=cfg.depth_chunk_size,
-                compile_mode='default' if cfg.compile else 'off',precision=cfg.depth_precision)
+        if not cfg.fast_depth_checkpoint:raise ValueError('An accepted compact observer is required')
+        from .fast_depth.api import FastDepthGenerator
+        self.engine=FastDepthGenerator(cfg.fast_depth_checkpoint,str(package),device=cfg.device,
+            chunk_size=cfg.depth_chunk_size,compile_mode='default' if cfg.compile else 'off',
+            precision=cfg.depth_precision,require_accepted=True)
         maps,origins=field.depth_atlases()
         maps=maps.to(device=cfg.device)
         origins=origins.to(device=cfg.device,dtype=torch.float32)
@@ -122,21 +118,17 @@ class DepthObservation:
         origins=torch.zeros((len(maps),3),device=cfg.device)
         # Encode in bounded chunks: preparing hundreds of maps in one CNN pass
         # would allocate training-sized activations despite the frozen weights.
-        if direct:
-            self.cache=self.engine.prepare_scenes(maps,origins)
-            cache_bytes=self.cache.embedding.numel()*self.cache.embedding.element_size()
-        else:
-            local,context=[],[]
-            for start in range(0,len(maps),16):
-                cache=self.engine.prepare_scenes(maps[start:start+16],origins[start:start+16])
-                local.append(cache.tensors[4]);context.append(cache.tensors[5])
-            lf=torch.cat(local,0);cf=torch.cat(context,0)
-            owned=maps
-            lv=lf.view(len(maps),128,128,8).permute(0,3,1,2)
-            cv=cf.view(len(maps),64,64,8).permute(0,3,1,2)
-            tensors=(owned,lv,cv,owned.reshape(-1,1),lf,cf)
-            self.cache=SceneCache(tensors,origins.clone(),len(maps))
-            cache_bytes=owned.numel()*4+lf.numel()*4+cf.numel()*4
+        local,context=[],[]
+        for start in range(0,len(maps),16):
+            cache=self.engine.prepare_scenes(maps[start:start+16],origins[start:start+16])
+            local.append(cache.tensors[4]);context.append(cache.tensors[5])
+        lf=torch.cat(local,0);cf=torch.cat(context,0)
+        owned=maps
+        lv=lf.view(len(maps),128,128,8).permute(0,3,1,2)
+        cv=cf.view(len(maps),64,64,8).permute(0,3,1,2)
+        tensors=(owned,lv,cv,owned.reshape(-1,1),lf,cf)
+        self.cache=SceneCache(tensors,origins.clone(),len(maps))
+        cache_bytes=owned.numel()*4+lf.numel()*4+cf.numel()*4
         self.seed=cfg.seed
         self.period=cfg.depth_period
         self.images=CapturedImages(cfg.num_envs*((cfg.buffer_len+cfg.depth_period-1)//cfg.depth_period+2),cfg.device)
@@ -151,8 +143,8 @@ class DepthObservation:
                        'atlas_selection':'full camera frustum XY AABB centre',
                        'scene_origin':'map centre xy, world z offset',
                        'recompute':True,'noise':'explicit stateless per-frame keys',
-                       'cache_bytes':cache_bytes,'engine':'direct_depth' if direct else 'source_ray_generator',
-                       'direct_model':self.engine.metadata if direct else None,
+                       'cache_bytes':cache_bytes,'engine':'compact_surface_depth',
+                       'direct_model':self.engine.metadata,
                        'mount_body_m':[.101958,0.,.327]}
 
     @torch.no_grad()

@@ -25,7 +25,7 @@ class TrainCfg:
     actor_microbatch: int = 8192
     actor_hidden: tuple = (512, 256, 128)
     critic_hidden: tuple = (256, 128)
-    actor_experts: int = 6
+    actor_experts: int = 3
     proprio_experts: int = 8
     task_count: int = 10
     task_context_dim: int = 21
@@ -102,7 +102,7 @@ class TrainCfg:
             raise ValueError('Approved formal budget is 120000 iterations')
         if production and (self.cts_updates,self.cts_batch,self.cts_sequence_steps,self.cts_burnin) != (2,128,64,16):
             raise ValueError('Student sequence contract must be 2 x 128 x (16 burn-in + 64 loss)')
-        if self.actor_experts != 6 or self.proprio_experts != 8 or self.task_count != 10:
+        if self.actor_experts != 3 or self.proprio_experts != 8 or self.task_count != 10:
             raise ValueError('Network expert/task counts changed')
         if self.actor_microbatch <= 0 or self.actor_microbatch > self.imag_batch:
             raise ValueError('Invalid actor microbatch; total cohort remains8192')
@@ -124,3 +124,5 @@ class TrainCfg:
             raise ValueError('Formal launch requires measured reward budgets')
         if production and not self.evaluation_python:
             raise ValueError('Formal launch requires the pinned official evaluation runtime')
+        if production and not self.fast_depth_checkpoint:
+            raise ValueError('V3 formal training requires the accepted compact depth observer')

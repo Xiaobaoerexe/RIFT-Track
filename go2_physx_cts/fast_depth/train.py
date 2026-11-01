@@ -1,175 +1,112 @@
-"""Offline direct-depth fitting with frozen-teacher pose-VJP supervision.
-
-Run the first 100 updates before choosing a longer run budget. No locomotion
-updates are performed by this program, and no training checkpoint is accepted
-for deployment without the separate test-split evaluator.
-"""
-import argparse,json,os,signal,statistics,time
+"""Offline distillation of source image correction with its geometry held fixed."""
+import argparse,json,os,time
 from pathlib import Path
 import torch
 from torch.nn import functional as F
-from .model import DirectDepth,ModelConfig
-from .source import import_package,sha256,ieee_fp32,tangent_pose,soft_image,package_fingerprints
-from .data import Corpus,assert_disjoint
-
+from .model import SurfaceRefiner,ModelConfig,surface_features,refiner_output,decode
+from .source import import_package,sha256,package_fingerprints,ieee_fp32
+from .data import Corpus,assert_disjoint,collision_box_labels
 
 def atomic_save(value,path):
     path=Path(path);tmp=path.with_suffix('.tmp');torch.save(value,tmp);os.replace(tmp,path)
 
-
-def image_objective(z,logit,millimetres):
-    gt=millimetres.float()/1000.;valid=gt>0
-    denom=valid.sum().clamp_min(1)
-    metric=(F.huber_loss(z,gt,delta=.05,reduction='none')*valid).sum()/denom
-    bce=F.binary_cross_entropy_with_logits(logit,valid.float(),reduction='none')
-    # Balance valid and invalid pixels without giving empty classes infinite weight.
-    mask=.5*((bce*valid).sum()/valid.sum().clamp_min(1)+(bce*~valid).sum()/(~valid).sum().clamp_min(1))
-    edge=z.new_zeros(())
-    for dim in (-1,-2):
-        dz=z.diff(dim=dim);dg=gt.diff(dim=dim)
-        vm=valid.narrow(dim,0,valid.shape[dim]-1)&valid.narrow(dim,1,valid.shape[dim]-1)
-        weight=1+4*(dg.abs()>.05)
-        edge+=(F.huber_loss(dz,dg,delta=.05,reduction='none')*vm*weight).sum()/vm.sum().clamp_min(1)
-    return 20*metric+mask+10*edge,{'metric_huber':metric.detach(),'validity_bce':mask.detach(),'edge_huber':edge.detach()}
-
-
 def cotangent(shape,device,generator):
-    # Low-frequency and pixel-wise probes expose global and local derivative
-    # errors. They are fixed when teacher and student are compared.
     n,h,w=shape
-    low=torch.randn((n,1,6,8),generator=generator).to(device)
-    low=F.interpolate(low,size=(h,w),mode='bilinear',align_corners=False)[:,0]
-    high=torch.randn(shape,generator=generator).to(device)
-    c=low+.25*high
-    return c/c.square().sum((-1,-2),keepdim=True).sqrt().clamp_min(1e-8)
-
-
-def pose_supervision(model,source,corpus,d,generator,n=4):
-    """Direct Sobolev VJP plus local finite-pose image response, geometry only."""
-    n=min(n,len(d['pos']));p=d['pos'][:n];r=d['rot'][:n];ids=d['scene'][:n]
-    unique,inv=torch.unique(ids,return_inverse=True)
-    encoded=model.encode_scenes(corpus.features[unique])[inv]
-    delta=torch.zeros((n,6),device=p.device,requires_grad=True)
-    pp,rr=tangent_pose(p,r,delta)
-    tz,tl=source.core.geometry_cached(corpus.source_cache,ids,pp,rr)
-    probe=cotangent(tz.shape,p.device,generator)
-    target=torch.autograd.grad((soft_image(tz,tl)*probe).sum(),delta)[0].detach()
-    delta2=torch.zeros_like(delta,requires_grad=True)
-    pp,rr=tangent_pose(p,r,delta2)
-    sz,sl=model.decode(encoded,pp,rr)
-    student=torch.autograd.grad((soft_image(sz,sl)*probe).sum(),delta2,create_graph=True)[0]
-    scales=target.square().mean(0).clamp_min(1e-8).detach()
-    vjp=((student-target).square()/scales).mean()
-    # Preserve source validity confidence as well as hard labels. Matching only
-    # binary masks can saturate logits and erase their pose derivatives.
-    teacher_fit=F.smooth_l1_loss(sz,tz.detach(),beta=.05)+F.binary_cross_entropy_with_logits(sl,tl.detach().sigmoid())
-    # An independent central perturbation trains response over a finite local
-    # neighbourhood; it does not replace the differential VJP check above.
-    direction=torch.randn((n,6),generator=generator).to(p.device)
-    direction=direction/direction.norm(dim=1,keepdim=True).clamp_min(1e-8)*.005
-    plus=tangent_pose(p,r,direction);minus=tangent_pose(p,r,-direction)
-    with torch.no_grad():
-        ap,lp=source.core.geometry_cached(corpus.source_cache,ids,*plus)
-        am,lm=source.core.geometry_cached(corpus.source_cache,ids,*minus)
-        response=soft_image(ap,lp)-soft_image(am,lm)
-    bp,kp=model.decode(encoded,*plus);bm,km=model.decode(encoded,*minus)
-    paired=F.smooth_l1_loss(soft_image(bp,kp)-soft_image(bm,km),response,beta=.01)
-    return vjp,paired,teacher_fit
-
+    x=F.interpolate(torch.randn(n,1,6,8,generator=generator).to(device),size=(h,w),mode='bilinear',align_corners=False)[:,0]
+    x=x+.25*torch.randn(shape,generator=generator).to(device)
+    return x/x.square().sum((-1,-2),keepdim=True).sqrt().clamp_min(1e-8)
 
 @torch.no_grad()
-def validate(model,corpus,batch=64,per_scene=8):
-    error=valid_count=tp=fp=fn=0
+def prepare_features(corpus,source,per_scene,batch=32):
+    data={k:[] for k in ('image','base','hit','teacher','gt','source')}
     for idx in corpus.heldout_indices(per_scene).split(batch):
-        d=corpus.get(idx);z,l=model(d['features'],d['local_scene'],d['pos'],d['rot'])
-        gt=d['depth'].float()/1000;valid=gt>0;pred=l>0
-        error+=float(((z-gt).abs()*valid).sum());valid_count+=int(valid.sum())
-        tp+=int((pred&valid).sum());fp+=int((pred&~valid).sum());fn+=int((~pred&valid).sum())
-    return {'mae_on_label_valid_m':error/max(valid_count,1),'validity_f1':2*tp/max(2*tp+fp+fn,1)}
+        d=corpus.get(idx);image,base,hit=surface_features(source.core,corpus.source_cache,d['scene'],d['pos'],d['rot'])
+        target=refiner_output(source.core.geometry,image)
+        if not data['image']:
+            a,b=decode(target,base,hit);c,e=source.core.geometry_cached(corpus.source_cache,d['scene'],d['pos'],d['rot'])
+            assert (a-c).abs().max()<2e-5 and (b-e).abs().max()<2e-5,'Source feature split is not equivalent'
+        data['image'].append(image.half());data['base'].append(base);data['hit'].append(hit)
+        labels,box_source=collision_box_labels(corpus,d)
+        data['teacher'].append(target.half());data['gt'].append(labels)
+        data['source'].append(box_source|torch.tensor([corpus.meta[int(i)]['supervision_source']=='rtx' for i in d['scene']],device=image.device))
+    return {k:torch.cat(v).detach() for k,v in data.items()}
 
+def take(data,ids):return {k:v[ids] for k,v in data.items()}
+
+def objective(output,d):
+    target=d['teacher'].float();z,l=decode(output,d['base'],d['hit']);tz,tl=decode(target,d['base'],d['hit'])
+    valid=tl>0;weight=torch.where(tz<2.,3.,torch.where(tz<4.,1.5,1.))
+    metric=((z-tz).abs()*weight*valid).sum()/valid.sum().clamp_min(1)
+    correction=F.smooth_l1_loss(output[:,0].tanh(),target[:,0].tanh(),beta=.02)
+    mask=F.mse_loss(l.sigmoid(),tl.sigmoid())+.01*F.smooth_l1_loss(output[:,1],target[:,1],beta=.2)
+    edge=F.l1_loss(z.diff(dim=-1),tz.diff(dim=-1))+F.l1_loss(z.diff(dim=-2),tz.diff(dim=-2))
+    gt=d['gt'].float()/1000.;rtx=(gt>0)&d['source'][:,None,None]
+    rtx_weight=torch.where(gt<2.,3.,torch.where(gt<4.,1.5,1.))
+    rtx_loss=((z-gt).abs()*rtx*rtx_weight).sum()/rtx.sum().clamp_min(1)
+    return metric+correction*.25+mask+edge*.25+.3*rtx_loss
+
+@torch.no_grad()
+def validate(model,data,batch=64):
+    errs={name:[] for name in ('near','middle','far')};total=0.;count=0
+    for ids in torch.arange(len(data['image']),device=data['image'].device).split(batch):
+        d=take(data,ids);z,l=decode(model(d['image'].float()),d['base'],d['hit'])
+        tz,tl=decode(d['teacher'].float(),d['base'],d['hit']);valid=(tl>0)&(l>0)
+        for name,lo,hi in (('near',0,2),('middle',2,4),('far',4,6.01)):
+            errs[name].append((z-tz).abs()[valid&(tz>=lo)&(tz<hi)].cpu())
+        total+=float(((z-tz).abs()*(tl>0)).sum());count+=int((tl>0).sum())
+    return {'mae_m':total/max(1,count),**{k:float(torch.cat(v).mean()) for k,v in errs.items()}}
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--data',action='append',required=True)
-    p.add_argument('--depth-package',required=True);p.add_argument('--output',required=True)
-    p.add_argument('--steps',type=int,default=100);p.add_argument('--batch',type=int,default=192)
-    p.add_argument('--device',default='cuda:0');p.add_argument('--eval-every',type=int,default=500)
-    p.add_argument('--vjp-every',type=int,default=4);p.add_argument('--vjp-batch',type=int,default=4)
-    p.add_argument('--vjp-weight',type=float,default=.1);p.add_argument('--resume')
-    p.add_argument('--lr',type=float,default=3e-4);p.add_argument('--seed',type=int,default=824)
-    args=p.parse_args()
-    if min(args.steps,args.batch,args.eval_every,args.vjp_every,args.vjp_batch)<=0:raise ValueError('Positive counts required')
-    torch.set_num_threads(8);torch.manual_seed(args.seed)
-    device=torch.device(args.device);out=Path(args.output);out.mkdir(parents=True,exist_ok=True)
-    package=import_package(args.depth_package)
+    p=argparse.ArgumentParser();p.add_argument('--data',action='append',required=True);p.add_argument('--depth-package',required=True)
+    p.add_argument('--output',required=True);p.add_argument('--steps',type=int,default=5000);p.add_argument('--batch',type=int,default=96)
+    p.add_argument('--views-per-scene',type=int,default=32);p.add_argument('--width',type=int,default=8)
+    p.add_argument('--lr',type=float,default=5e-4);p.add_argument('--resume');p.add_argument('--device',default='cuda:0')
+    p.add_argument('--gradient-every',type=int,default=8);args=p.parse_args();torch.set_num_threads(8);torch.manual_seed(825)
+    out=Path(args.output);out.mkdir(parents=True,exist_ok=True);package=import_package(args.depth_package)
     source=package.DepthInputGenerator(device=args.device,compile_mode='off',precision='fp32')
-    train=Corpus(args.data,'train',device).prepare(source);val=Corpus(args.data,'val',device).prepare(source)
-    assert_disjoint(train,val)
-    model=DirectDepth().to(device);opt=torch.optim.AdamW(model.parameters(),lr=args.lr,weight_decay=1e-5)
-    scheduler=torch.optim.lr_scheduler.ReduceLROnPlateau(opt,mode='min',factor=.7,patience=4,min_lr=1e-6)
-    generator=torch.Generator().manual_seed(args.seed)
-    start=0;best=float('inf');stop=False;durations=[]
-    source_sha=sha256(Path(args.depth_package)/'go2_depth_input/assets/weights.pt')
-    source_code=package_fingerprints(args.depth_package)
-    for corpus in (train,val):
-        for bank in corpus.banks:
-            manifest=bank['manifest']
-            if manifest.get('supervision_source')=='frozen_teacher' and manifest.get('source_sha256')!=source_sha:
-                raise ValueError(f'Teacher bank source hash mismatch: {bank["path"]}')
-    if args.resume:
-        ck=torch.load(args.resume,map_location=device,weights_only=False)
-        if ck['source_weights_sha256']!=source_sha:raise ValueError('Source package changed since checkpoint')
-        if ck['model_config']!=model.configuration():raise ValueError('Resume model config mismatch')
-        model.load_state_dict(ck['model']);opt.load_state_dict(ck['optimizer']);scheduler.load_state_dict(ck['scheduler'])
-        generator.set_state(ck['rng'].cpu());start=ck['step'];best=ck['best']
-    config=dict(vars(args),train=train.provenance(),val=val.provenance(),model=model.configuration(),
-                parameters=sum(x.numel() for x in model.parameters()),source_sha256=source_sha,
-                source_code_sha256=source_code,
-                precision='IEEE FP32; no TF32',supervision='RTX and explicitly identified frozen-teacher banks; metric + mask + edge + finite pose response + direct VJP')
+    train=Corpus(args.data,'train',args.device).prepare(source);val=Corpus(args.data,'val',args.device).prepare(source);assert_disjoint(train,val)
+    model=SurfaceRefiner(ModelConfig(args.width)).to(args.device);opt=torch.optim.AdamW(model.parameters(),lr=args.lr,weight_decay=1e-5)
+    source_hash=sha256(Path(args.depth_package)/'go2_depth_input/assets/weights.pt');code_hash=package_fingerprints(args.depth_package)
+    config=dict(vars(args),train=train.provenance(),val=val.provenance(),model=model.configuration(),parameters=sum(p.numel() for p in model.parameters()),
+        extra_supervision='Production-box samples receive exact ray/AABB+surrounding-ground labels in addition to source distillation')
     (out/'config.json').write_text(json.dumps(config,indent=2));print(json.dumps(config),flush=True)
-    def request_stop(*_):
-        nonlocal stop
-        stop=True
-    signal.signal(signal.SIGTERM,request_stop);signal.signal(signal.SIGINT,request_stop)
-    began=time.perf_counter();step=start
-    def sync():
-        if device.type=='cuda':torch.cuda.synchronize(device)
-    with ieee_fp32(device):
+    with ieee_fp32(args.device):
+        training=prepare_features(train,source,args.views_per_scene);validation=prepare_features(val,source,16)
+        print(json.dumps({'features_ready':len(training['image']),'validation':len(validation['image'])}),flush=True)
+        best=float('inf');start=0
+        if args.resume:
+            ck=torch.load(args.resume,map_location=args.device,weights_only=False);model.load_state_dict(ck['model']);opt.load_state_dict(ck['optimizer']);start=ck['step'];best=ck['best']
+            for group in opt.param_groups:group['lr']=args.lr
+            # The resumed supervision recipe may contain newly added physical
+            # labels, so select its own best validation checkpoint explicitly.
+            best=float('inf')
+        began=time.perf_counter()
         for step in range(start+1,args.steps+1):
-            sync();t=time.perf_counter();d=train.batch(args.batch,generator)
-            model.train();opt.zero_grad(set_to_none=True)
-            z,l=model(d['features'],d['local_scene'],d['pos'],d['rot'])
-            loss,parts=image_objective(z,l,d['depth'])
-            if step%args.vjp_every==0:
-                vjp,paired,teacher_fit=pose_supervision(model,source,train,d,generator,args.vjp_batch)
-                loss=loss+args.vjp_weight*vjp+10*paired+.1*teacher_fit
-                parts.update(vjp=vjp.detach(),paired_response=paired.detach(),teacher_fit=teacher_fit.detach())
-            if not torch.isfinite(loss):raise RuntimeError(f'Nonfinite loss at {step}: {parts}')
-            loss.backward();grad=torch.nn.utils.clip_grad_norm_(model.parameters(),1.,error_if_nonfinite=True);opt.step()
-            sync();durations.append(time.perf_counter()-t)
-            if step==start+1 or step%25==0:
-                record={'step':step,'loss':float(loss.detach()),'components':{k:float(v) for k,v in parts.items()},
-                    'gradient_norm':float(grad),'lr':opt.param_groups[0]['lr'],'seconds_per_update_mean':statistics.mean(durations[-100:]),
-                    'seconds_per_update_p50':statistics.median(durations[-100:]),'elapsed_seconds':time.perf_counter()-began,
-                    'peak_cuda_mib':torch.cuda.max_memory_allocated(device)/2**20 if device.type=='cuda' else None}
-                with (out/'training.jsonl').open('a') as f:f.write(json.dumps(record)+'\n')
-                print(json.dumps(record),flush=True)
-            if step%args.eval_every==0 or step==args.steps or stop:
-                model.eval();score=validate(model,val);metric=score['mae_on_label_valid_m'];improved=metric<best
-                best=min(best,metric);scheduler.step(metric)
-                ck={'schema':'direct_depth_v1','model':model.state_dict(),'model_config':model.configuration(),
-                    'source_weights_sha256':source_sha,'optimizer':opt.state_dict(),'scheduler':scheduler.state_dict(),
-                    'source_code_sha256':source_code,
+            ids=torch.randint(len(training['image']),(args.batch,),device=args.device);d=take(training,ids)
+            opt.zero_grad(set_to_none=True);loss=objective(model(d['image'].float()),d)
+            derivative=loss.new_zeros(())
+            if args.gradient_every and step%args.gradient_every==0:
+                # Match the CNN's input sensitivity while the exact ray/terrain
+                # derivative remains shared. This is not a detached pose shortcut.
+                x=d['image'][:4].float().detach().requires_grad_();probe=torch.randn(4,48,64,device=args.device)
+                t=refiner_output(source.core.geometry,x)
+                target=torch.autograd.grad((t[:,0].tanh()*probe).sum()+.05*(t[:,1]*probe).sum(),x)[0].detach()
+                s=model(x);got=torch.autograd.grad((s[:,0].tanh()*probe).sum()+.05*(s[:,1]*probe).sum(),x,create_graph=True)[0]
+                derivative=(got-target).square().sum()/target.square().sum().clamp_min(1e-6)
+                loss=loss+.02*derivative
+            if not torch.isfinite(loss):raise RuntimeError('Nonfinite supervised loss')
+            loss.backward();torch.nn.utils.clip_grad_norm_(model.parameters(),1.,error_if_nonfinite=True);opt.step()
+            if step%500==0 or step==args.steps:
+                model.eval();score=validate(model,validation);improved=score['mae_m']<best;best=min(best,score['mae_m'])
+                ck={'schema':'surface_depth_v2','model':model.state_dict(),'model_config':model.configuration(),'optimizer':opt.state_dict(),
+                    'step':step,'best':best,'source_weights_sha256':source_hash,'source_code_sha256':code_hash,'config':config,
                     'training_layouts':[{'name':m['name'],'layout_identity':m['layout_identity']} for m in train.meta],
-                    'rng':generator.get_state(),'step':step,'best':best,'config':config,'validation':score,
-                    'acceptance':{'passed':False,'reason':'Independent holdout image and VJP acceptance has not passed'}}
+                    'acceptance':{'passed':False},'validation':score}
                 atomic_save(ck,out/'latest.pt')
                 if improved:atomic_save(ck,out/'best.pt')
-                with (out/'validation.jsonl').open('a') as f:f.write(json.dumps({'step':step,**score})+'\n')
-            if stop:break
-    summary={'step':step,'updates_measured':len(durations),'mean_seconds_per_update':statistics.mean(durations) if durations else None,
-             'last100_mean_seconds':statistics.mean(durations[-100:]) if durations else None,
-             'total_seconds_including_validation':time.perf_counter()-began,'accepted':False,'interrupted':stop}
-    (out/'summary.json').write_text(json.dumps(summary,indent=2));print(json.dumps(summary),flush=True)
-
+                record={'step':step,'loss':float(loss),'derivative_loss':float(derivative),'validation':score,'seconds':time.perf_counter()-began}
+                with (out/'training.jsonl').open('a') as f:f.write(json.dumps(record)+'\n')
+                print(json.dumps(record),flush=True);model.train()
+        (out/'summary.json').write_text(json.dumps({'step':step,'seconds':time.perf_counter()-began,'best_mae_m':best},indent=2))
 
 if __name__=='__main__':main()

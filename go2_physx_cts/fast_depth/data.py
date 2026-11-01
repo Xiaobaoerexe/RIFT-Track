@@ -2,7 +2,6 @@
 import json
 from pathlib import Path
 import torch
-from .model import DirectDepth
 
 
 class Corpus:
@@ -50,21 +49,17 @@ class Corpus:
         self.scene_indices = [torch.where(self.data['scene']==i)[0] for i in range(base)]
         if any(len(v)==0 for v in self.scene_indices):
             raise ValueError('Every scene must contain supervision')
-        self.features = None
         self.source_cache = None
 
     def prepare(self, source):
-        """Only frozen source features are cached; trainable compression is never cached."""
-        chunks, features = [], []
+        """Only immutable source terrain features are cached."""
+        chunks = []
         for maps in self.maps.split(16):
             cache = source.prepare_scenes(maps)
-            with torch.no_grad():
-                features.append(DirectDepth.scene_inputs(cache.tensors))
             chunks.append(cache.tensors[:3])
         maps, local, context = (torch.cat([c[i] for c in chunks]) for i in range(3))
         flat = lambda x:x.permute(0,2,3,1).contiguous().reshape(-1,x.shape[1])
         self.source_cache = (maps,local,context,flat(maps[:,None]),flat(local),flat(context))
-        self.features = torch.cat(features).detach()
         return self
 
     def get(self, indices):
@@ -72,8 +67,6 @@ class Corpus:
         d = {k:v[indices].to(self.device) for k,v in self.data.items()}
         unique, inverse = torch.unique(d['scene'], sorted=True, return_inverse=True)
         d['unique_scene'], d['local_scene'] = unique, inverse
-        if self.features is not None:
-            d['features'] = self.features[unique]
         return d
 
     def batch(self, views, generator, scenes=8):
@@ -110,3 +103,30 @@ def assert_disjoint(train, holdout):
     overlap=a&b
     if overlap:
         raise ValueError(f'Train/holdout layout identity overlap: {sorted(overlap)[:8]}')
+
+
+def collision_box_labels(corpus,d):
+    """Independent metric labels from the production AABBs, where supplied.
+
+    These are analytic collision-mesh labels, not rendered RTX or teacher data.
+    Existing RTX samples pass through without replacement.
+    """
+    from go2_depth_input.vendor.camera import rays
+    ray=rays(d['pos'].device).reshape(-1,3)
+    directions=torch.einsum('bij,rj->bri',d['rot'],ray)
+    labels=d['depth'].clone();exact=torch.zeros(len(labels),dtype=torch.bool,device=labels.device)
+    for i,sid in enumerate(d['scene'].tolist()):
+        m=corpus.meta[sid]
+        if 'boxes' not in m:continue
+        boxes=d['pos'].new_tensor(m['boxes']);p=d['pos'][i]+d['pos'].new_tensor(m['centre']);direction=directions[i]
+        safe=torch.where(direction.abs()>1e-8,direction,torch.full_like(direction,1e-8))
+        a=(boxes[:,None,0,:]-p)/safe;b=(boxes[:,None,1,:]-p)/safe
+        entry=torch.minimum(a,b).amax(-1);leave=torch.maximum(a,b).amin(-1)
+        hit=(leave>=entry)&(entry>=.1)&(entry<=6.)
+        depth=torch.where(hit,entry,torch.full_like(entry,100.)).amin(0)
+        plane=-p[2]/safe[:,2];xy=p[None,:2]+direction[:,:2]*plane[:,None]
+        lo=boxes[:,0,:2].amin(0);hi=boxes[:,1,:2].amax(0)
+        hit=((xy<lo)|(xy>hi)).any(-1)&(plane>=.1)&(plane<=6.)
+        depth=torch.minimum(depth,torch.where(hit,plane,torch.full_like(plane,100.)))
+        labels[i]=torch.where(depth<=6.,(depth*1000).round(),0.).reshape(48,64).to(labels.dtype);exact[i]=True
+    return labels,exact

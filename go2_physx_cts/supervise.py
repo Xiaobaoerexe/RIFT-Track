@@ -9,7 +9,7 @@ def main():
     for key in ('output','usd','driver','reward-calibration','evaluation-python'):
         p.add_argument('--'+key,required=True)
     p.add_argument('--actor-microbatch',type=int,default=8192)
-    p.add_argument('--fast-depth-checkpoint',default='')
+    p.add_argument('--fast-depth-checkpoint',required=True)
     a=p.parse_args();out=Path(a.output);out.mkdir(parents=True,exist_ok=False)
     lock_path=Path.home()/'Documents/go2_depth_training.lock'
     with lock_path.open('a') as lock:
