@@ -1,0 +1,1173 @@
+{
+  "status": "PRETRAINING_VALIDATION_PASSED",
+  "tested_at_unix": 1793559472.3104982,
+  "robots": {
+    "go2": {
+      "passed": true,
+      "steady_iteration_seconds": 0.5389620514470153,
+      "timings": [
+        {
+          "start_unix": 1793559170.4380717,
+          "end_unix": 1793559177.006987,
+          "collect": 0.10996723012067378,
+          "wm": 0.13854457600973547,
+          "actor_critic": 6.2294601779431105,
+          "cts": 0.09094108594581485,
+          "total": 6.5689130700193346
+        },
+        {
+          "start_unix": 1793559177.0070472,
+          "end_unix": 1793559177.542102,
+          "collect": 0.11439418303780258,
+          "wm": 0.05976812285371125,
+          "actor_critic": 0.28784710401669145,
+          "cts": 0.07304416317492723,
+          "total": 0.5350535730831325
+        },
+        {
+          "start_unix": 1793559177.5421576,
+          "end_unix": 1793559178.0774312,
+          "collect": 0.11679446301423013,
+          "wm": 0.05951795307919383,
+          "actor_critic": 0.28615940385498106,
+          "cts": 0.0728007210418582,
+          "total": 0.5352725409902632
+        },
+        {
+          "start_unix": 1793559178.0774894,
+          "end_unix": 1793559178.618775,
+          "collect": 0.11869874293915927,
+          "wm": 0.06318826205097139,
+          "actor_critic": 0.2862794848624617,
+          "cts": 0.07311768410727382,
+          "total": 0.5412841739598662
+        },
+        {
+          "start_unix": 1793559178.618838,
+          "end_unix": 1793559179.1586921,
+          "collect": 0.11819000309333205,
+          "wm": 0.061011155834421515,
+          "actor_critic": 0.287575381109491,
+          "cts": 0.07307648193091154,
+          "total": 0.5398530219681561
+        },
+        {
+          "start_unix": 1793559179.1587455,
+          "end_unix": 1793559179.6981852,
+          "collect": 0.11950705293565989,
+          "wm": 0.05987801495939493,
+          "actor_critic": 0.28625242807902396,
+          "cts": 0.07380097289569676,
+          "total": 0.5394384688697755
+        }
+      ],
+      "num_envs": 4096,
+      "imag_batch": 8192,
+      "wm_batch": 2048,
+      "buffer_len": 1000,
+      "peak_torch_allocated_GiB": 19.22296905517578,
+      "peak_torch_reserved_GiB": 20.29296875,
+      "counts": {
+        "collect": 16,
+        "transitions": 65536,
+        "wm": 24,
+        "actor": 6,
+        "critic": 120,
+        "cts": 120
+      },
+      "gradient_ownership": true,
+      "full_model_optimizer_restore": true,
+      "export_max_error": 0.0,
+      "rollback_retains_wm_and_data": true,
+      "adaptive_lr_verification": {
+        "wm": {
+          "component": "wm",
+          "iteration": 6000,
+          "previous": 0.0002,
+          "selected": 0.00026000000000000003,
+          "factor": 1.3,
+          "candidates": [
+            {
+              "lr": 0.00015384615384615385,
+              "validation_error": 4.061734676361084
+            },
+            {
+              "lr": 0.0002,
+              "validation_error": 4.045815467834473
+            },
+            {
+              "lr": 0.00026000000000000003,
+              "validation_error": 4.026472091674805
+            }
+          ]
+        },
+        "critic": {
+          "component": "critic",
+          "iteration": 6000,
+          "previous": 0.0001,
+          "selected": 7.692307692307693e-05,
+          "factor": 1.3,
+          "candidates": [
+            {
+              "lr": 7.692307692307693e-05,
+              "validation_error": 0.021560192108154297
+            },
+            {
+              "lr": 0.0001,
+              "validation_error": 0.02233096957206726
+            },
+            {
+              "lr": 0.00013000000000000002,
+              "validation_error": 0.023778773844242096
+            }
+          ]
+        },
+        "cts": {
+          "component": "cts",
+          "iteration": 6000,
+          "previous": 0.0003,
+          "selected": 0.00023076923076923074,
+          "factor": 1.3,
+          "candidates": [
+            {
+              "lr": 0.00023076923076923074,
+              "validation_error": 0.0019529544515535235
+            },
+            {
+              "lr": 0.0003,
+              "validation_error": 0.0022933483123779297
+            }
+          ]
+        },
+        "actor": {
+          "component": "actor",
+          "iteration": 6000,
+          "previous": 0.0001,
+          "selected": 0.00013000000000000002,
+          "factor": 1.3,
+          "candidates": [
+            {
+              "lr": 7.692307692307693e-05,
+              "heldout_return": 0.5718769431114197,
+              "real_return": 6.735029697418213,
+              "falls_per_env_min": 0.1373291015625,
+              "tracking_rmse": 0.28052884340286255,
+              "accepted": true
+            },
+            {
+              "lr": 0.0001,
+              "heldout_return": 0.5810314416885376,
+              "real_return": 6.826198577880859,
+              "falls_per_env_min": 0.1373291015625,
+              "tracking_rmse": 0.280411034822464,
+              "accepted": true
+            },
+            {
+              "lr": 0.00013000000000000002,
+              "heldout_return": 0.592892050743103,
+              "real_return": 6.940621852874756,
+              "falls_per_env_min": 0.1373291015625,
+              "tracking_rmse": 0.28026705980300903,
+              "accepted": true
+            }
+          ]
+        },
+        "cts_gate": {
+          "native_history": [
+            {
+              "real_return": 6.887322425842285,
+              "falls_per_env_min": 0.0,
+              "tracking_rmse": 0.19151197373867035,
+              "teacher_return": 3.548771858215332,
+              "teacher_success": 0.0
+            }
+          ],
+          "teacher_stable": true,
+          "scope": "fixed native flat cohort, not a sim2sim capability claim"
+        }
+      },
+      "actual_physics": {
+        "physics_backend": "isaaclab_physx.assets.articulation.articulation",
+        "usd_path": "/home/abc/Admin/go2_supermimic_blind/assets/go2/usd/go2.usd",
+        "usd_sha256": "c71daf27f23dbfe4358052588722566b6163d721cd290a706de04e7b3cfe3928",
+        "joint_names": [
+          "FL_hip_joint",
+          "FL_thigh_joint",
+          "FL_calf_joint",
+          "FR_hip_joint",
+          "FR_thigh_joint",
+          "FR_calf_joint",
+          "RL_hip_joint",
+          "RL_thigh_joint",
+          "RL_calf_joint",
+          "RR_hip_joint",
+          "RR_thigh_joint",
+          "RR_calf_joint"
+        ],
+        "body_names": [
+          "base",
+          "FL_hip",
+          "FR_hip",
+          "RL_hip",
+          "RR_hip",
+          "Head_upper",
+          "FL_thigh",
+          "FR_thigh",
+          "RL_thigh",
+          "RR_thigh",
+          "Head_lower",
+          "FL_calf",
+          "FR_calf",
+          "RL_calf",
+          "RR_calf",
+          "FL_foot",
+          "FR_foot",
+          "RL_foot",
+          "RR_foot"
+        ],
+        "torch": "2.11.0+cu130",
+        "total_mass_range_kg": [
+          16.08794593811035,
+          18.086923599243164
+        ],
+        "context_dim": 5,
+        "wm_state_dim": 70,
+        "wm_input_dim": 176,
+        "wm_output_dim": 113,
+        "reward_telemetry_dim": 40,
+        "teacher_input_dim": 167,
+        "critic_input_dim": 169,
+        "student_input_dim": 450,
+        "shared_actor_input_dim": 77,
+        "policy_hz": 50,
+        "physics_hz": 200,
+        "motor": {
+          "default_q": [
+            0.10000000149011612,
+            0.8999999761581421,
+            -1.7999999523162842,
+            -0.10000000149011612,
+            0.8999999761581421,
+            -1.7999999523162842,
+            0.10000000149011612,
+            0.8999999761581421,
+            -1.7999999523162842,
+            -0.10000000149011612,
+            0.8999999761581421,
+            -1.7999999523162842
+          ],
+          "action_scale": [
+            0.3349008560180664,
+            0.3349008560180664,
+            0.2853173315525055,
+            0.3349008560180664,
+            0.3349008560180664,
+            0.2853173315525055,
+            0.3349008560180664,
+            0.3349008560180664,
+            0.2853173315525055,
+            0.3349008560180664,
+            0.3349008560180664,
+            0.2853173315525055
+          ],
+          "kp": [
+            17.691802978515625,
+            17.691802978515625,
+            39.806556701660156,
+            17.691802978515625,
+            17.691802978515625,
+            39.806556701660156,
+            17.691802978515625,
+            17.691802978515625,
+            39.806556701660156,
+            17.691802978515625,
+            17.691802978515625,
+            39.806556701660156
+          ],
+          "kd": [
+            1.1262950897216797,
+            1.1262950897216797,
+            2.5341639518737793,
+            1.1262950897216797,
+            1.1262950897216797,
+            2.5341639518737793,
+            1.1262950897216797,
+            1.1262950897216797,
+            2.5341639518737793,
+            1.1262950897216797,
+            1.1262950897216797,
+            2.5341639518737793
+          ],
+          "effort": [
+            23.700000762939453,
+            23.700000762939453,
+            45.43000030517578,
+            23.700000762939453,
+            23.700000762939453,
+            45.43000030517578,
+            23.700000762939453,
+            23.700000762939453,
+            45.43000030517578,
+            23.700000762939453,
+            23.700000762939453,
+            45.43000030517578
+          ],
+          "soft_limits": [
+            [
+              -0.9424799680709839,
+              0.9424799680709839
+            ],
+            [
+              -1.3177249431610107,
+              3.2376248836517334
+            ],
+            [
+              -2.628453016281128,
+              -0.9320070147514343
+            ],
+            [
+              -0.9424799680709839,
+              0.9424799680709839
+            ],
+            [
+              -1.3177249431610107,
+              3.2376248836517334
+            ],
+            [
+              -2.628453016281128,
+              -0.9320070147514343
+            ],
+            [
+              -0.9424799680709839,
+              0.9424799680709839
+            ],
+            [
+              -0.2705249786376953,
+              4.284825325012207
+            ],
+            [
+              -2.628453016281128,
+              -0.9320070147514343
+            ],
+            [
+              -0.9424799680709839,
+              0.9424799680709839
+            ],
+            [
+              -0.2705249786376953,
+              4.284825325012207
+            ],
+            [
+              -2.628453016281128,
+              -0.9320070147514343
+            ]
+          ]
+        },
+        "payload_model": "rigid point mass at existing base COM, sampled only on reset",
+        "payload_max_kg": 2.0,
+        "curriculum_clock": "learner iterations; collect1; not PPO24-step equivalent",
+        "robot": "go2",
+        "reward_height_target_m": 0.38,
+        "terrain": {
+          "allocation": {
+            "names": [
+              "wave",
+              "slope_up",
+              "slope_down",
+              "rough_slope",
+              "stairs_up",
+              "stairs_down",
+              "obstacles",
+              "flat",
+              "wheels",
+              "small_squares"
+            ],
+            "raw_proportions": [
+              0.05,
+              0.1,
+              0.1,
+              0.05,
+              0.25,
+              0.1,
+              0.1,
+              0.15,
+              0.05,
+              0.05
+            ],
+            "raw_proportion_sum": 1.0,
+            "normalized_proportions": [
+              0.05,
+              0.1,
+              0.1,
+              0.05,
+              0.25,
+              0.1,
+              0.1,
+              0.15,
+              0.05,
+              0.05
+            ],
+            "column_type_ids": [
+              0,
+              1,
+              1,
+              2,
+              2,
+              3,
+              4,
+              4,
+              4,
+              4,
+              4,
+              5,
+              5,
+              6,
+              6,
+              7,
+              7,
+              7,
+              8,
+              9
+            ],
+            "column_counts": [
+              1,
+              2,
+              2,
+              1,
+              5,
+              2,
+              2,
+              3,
+              1,
+              1
+            ],
+            "rows": 10,
+            "columns": 20,
+            "tile_size_m": [
+              9.0,
+              9.0
+            ],
+            "border_width_m": 25.0,
+            "sub_terrain_border_width_m": 0.5,
+            "max_init_terrain_level": 5,
+            "default_geometry_backend": "source_direct_mesh",
+            "seed": 17,
+            "numpy_geometry_seed_scope": "saved_seeded_generated_restored"
+          },
+          "collision_height_map": {
+            "vertices_sha256": "ec6ac949e65f45e3f2179d18cc9c429fd047c2750ab5e810895d80729f55fd94",
+            "faces_sha256": "8a959e418335d68a99f63ea01cc557fd4d766e603ec90202fd5c6339ed62c0fa",
+            "vertex_count": 1139476,
+            "triangle_count": 1940460,
+            "resolution_m": 0.05,
+            "shape": [
+              4601,
+              2801
+            ],
+            "outer_boundary_misses": 0,
+            "collision_bounds": [
+              [
+                -70.0,
+                -115.0,
+                -2.255
+              ],
+              [
+                70.0,
+                115.0,
+                2.2049999237060547
+              ]
+            ]
+          }
+        },
+        "actual_base_mass_range_kg": [
+          7.277945518493652,
+          9.276923179626465
+        ],
+        "reward_scope": "Go2RLLab PhysX15 weights and formulas; As2 height target retained; learned40D reward telemetry; sigmoid contact threshold only in imagination; reward ramps finish3000",
+        "physx_preset": {
+          "gpu_max_rigid_patch_count": 2097152,
+          "gpu_collision_stack_size": 536870912,
+          "enable_external_forces_every_iteration": true
+        }
+      },
+      "providers": [
+        2458,
+        820,
+        409,
+        409
+      ]
+    },
+    "as2": {
+      "passed": true,
+      "steady_iteration_seconds": 0.5737654414842837,
+      "timings": [
+        {
+          "start_unix": 1793558592.5024047,
+          "end_unix": 1793558651.3250015,
+          "collect": 0.09384133317507803,
+          "wm": 0.12680372199974954,
+          "actor_critic": 58.498157570837066,
+          "cts": 0.10379185620695353,
+          "total": 58.82259448221885
+        },
+        {
+          "start_unix": 1793558651.3250914,
+          "end_unix": 1793558651.9009774,
+          "collect": 0.09901728481054306,
+          "wm": 0.0661552120000124,
+          "actor_critic": 0.32258581300266087,
+          "cts": 0.08812645799480379,
+          "total": 0.5758847678080201
+        },
+        {
+          "start_unix": 1793558651.9010587,
+          "end_unix": 1793558652.4797518,
+          "collect": 0.10030873282812536,
+          "wm": 0.06989957205951214,
+          "actor_critic": 0.3209324600175023,
+          "cts": 0.08755132695659995,
+          "total": 0.5786920918617398
+        },
+        {
+          "start_unix": 1793558652.4798405,
+          "end_unix": 1793558653.054699,
+          "collect": 0.10120055009610951,
+          "wm": 0.06567941699177027,
+          "actor_critic": 0.3204027090687305,
+          "cts": 0.08757434599101543,
+          "total": 0.5748570221476257
+        },
+        {
+          "start_unix": 1793558653.0547788,
+          "end_unix": 1793558653.625797,
+          "collect": 0.09861016180366278,
+          "wm": 0.06512168399058282,
+          "actor_critic": 0.31994282314553857,
+          "cts": 0.08734215004369617,
+          "total": 0.5710168189834803
+        },
+        {
+          "start_unix": 1793558653.6258862,
+          "end_unix": 1793558654.1963835,
+          "collect": 0.09933736105449498,
+          "wm": 0.062412992818281054,
+          "actor_critic": 0.321034005144611,
+          "cts": 0.08771147392690182,
+          "total": 0.5704958329442888
+        }
+      ],
+      "num_envs": 4096,
+      "imag_batch": 8192,
+      "wm_batch": 2048,
+      "buffer_len": 1000,
+      "peak_torch_allocated_GiB": 19.201351165771484,
+      "peak_torch_reserved_GiB": 20.28515625,
+      "counts": {
+        "collect": 16,
+        "transitions": 65536,
+        "wm": 24,
+        "actor": 6,
+        "critic": 120,
+        "cts": 120
+      },
+      "gradient_ownership": true,
+      "full_model_optimizer_restore": true,
+      "export_max_error": 0.0,
+      "rollback_retains_wm_and_data": true,
+      "adaptive_lr_verification": {
+        "wm": {
+          "component": "wm",
+          "iteration": 6000,
+          "previous": 0.0002,
+          "selected": 0.00026000000000000003,
+          "factor": 1.3,
+          "candidates": [
+            {
+              "lr": 0.00015384615384615385,
+              "validation_error": 2.3473711013793945
+            },
+            {
+              "lr": 0.0002,
+              "validation_error": 2.3248445987701416
+            },
+            {
+              "lr": 0.00026000000000000003,
+              "validation_error": 2.295950174331665
+            }
+          ]
+        },
+        "critic": {
+          "component": "critic",
+          "iteration": 6000,
+          "previous": 0.0001,
+          "selected": 7.692307692307693e-05,
+          "factor": 1.3,
+          "candidates": [
+            {
+              "lr": 7.692307692307693e-05,
+              "validation_error": 0.24904108047485352
+            },
+            {
+              "lr": 0.0001,
+              "validation_error": 0.25108829140663147
+            },
+            {
+              "lr": 0.00013000000000000002,
+              "validation_error": 0.2561585307121277
+            }
+          ]
+        },
+        "cts": {
+          "component": "cts",
+          "iteration": 6000,
+          "previous": 0.0003,
+          "selected": 0.00023076923076923074,
+          "factor": 1.3,
+          "candidates": [
+            {
+              "lr": 0.00023076923076923074,
+              "validation_error": 0.0021141499746590853
+            },
+            {
+              "lr": 0.0003,
+              "validation_error": 0.002366512781009078
+            }
+          ]
+        },
+        "actor": {
+          "component": "actor",
+          "iteration": 6000,
+          "previous": 0.0001,
+          "selected": 0.00013000000000000002,
+          "factor": 1.3,
+          "candidates": [
+            {
+              "lr": 7.692307692307693e-05,
+              "heldout_return": -5.098339557647705,
+              "real_return": 10.012014389038086,
+              "falls_per_env_min": 0.583648681640625,
+              "tracking_rmse": 0.2733965218067169,
+              "accepted": true
+            },
+            {
+              "lr": 0.0001,
+              "heldout_return": -5.058148384094238,
+              "real_return": 10.011638641357422,
+              "falls_per_env_min": 0.583648681640625,
+              "tracking_rmse": 0.2733263373374939,
+              "accepted": true
+            },
+            {
+              "lr": 0.00013000000000000002,
+              "heldout_return": -5.006587028503418,
+              "real_return": 10.013177871704102,
+              "falls_per_env_min": 0.5950927734375,
+              "tracking_rmse": 0.2732838988304138,
+              "accepted": true
+            }
+          ]
+        },
+        "cts_gate": {
+          "native_history": [
+            {
+              "real_return": 11.049184799194336,
+              "falls_per_env_min": 0.0,
+              "tracking_rmse": 0.17863307893276215,
+              "teacher_return": 5.524393558502197,
+              "teacher_success": 0.5
+            }
+          ],
+          "teacher_stable": true,
+          "scope": "fixed native flat cohort, not a sim2sim capability claim"
+        }
+      },
+      "actual_physics": {
+        "physics_backend": "isaaclab_physx.assets.articulation.articulation",
+        "usd_path": "/home/abc/Admin/go2_supermimic_blind/assets/as2/as2.usd",
+        "usd_sha256": "b0f287f97ff8b28cfb74884dbcbb9122e51b931541b2d6c2f0ec1138e73b3b91",
+        "joint_names": [
+          "FL_hip_joint",
+          "FL_thigh_joint",
+          "FL_calf_joint",
+          "FR_hip_joint",
+          "FR_thigh_joint",
+          "FR_calf_joint",
+          "RL_hip_joint",
+          "RL_thigh_joint",
+          "RL_calf_joint",
+          "RR_hip_joint",
+          "RR_thigh_joint",
+          "RR_calf_joint"
+        ],
+        "body_names": [
+          "base",
+          "FL_hip",
+          "FR_hip",
+          "RL_hip",
+          "RR_hip",
+          "FL_thigh",
+          "FR_thigh",
+          "RL_thigh",
+          "RR_thigh",
+          "FL_calf",
+          "FR_calf",
+          "RL_calf",
+          "RR_calf",
+          "FL_foot",
+          "FR_foot",
+          "RL_foot",
+          "RR_foot"
+        ],
+        "torch": "2.11.0+cu130",
+        "total_mass_range_kg": [
+          17.640945434570312,
+          19.639923095703125
+        ],
+        "context_dim": 5,
+        "wm_state_dim": 70,
+        "wm_input_dim": 176,
+        "wm_output_dim": 113,
+        "reward_telemetry_dim": 40,
+        "teacher_input_dim": 167,
+        "critic_input_dim": 169,
+        "student_input_dim": 450,
+        "shared_actor_input_dim": 77,
+        "policy_hz": 50,
+        "physics_hz": 200,
+        "motor": {
+          "default_q": [
+            -0.10000000149011612,
+            0.8999999761581421,
+            -1.7999999523162842,
+            0.10000000149011612,
+            0.8999999761581421,
+            -1.7999999523162842,
+            -0.10000000149011612,
+            0.8999999761581421,
+            -1.7999999523162842,
+            0.10000000149011612,
+            0.8999999761581421,
+            -1.7999999523162842
+          ],
+          "action_scale": [
+            0.3125,
+            0.3125,
+            0.3125,
+            0.3125,
+            0.3125,
+            0.3125,
+            0.3125,
+            0.3125,
+            0.3125,
+            0.3125,
+            0.3125,
+            0.3125
+          ],
+          "kp": [
+            40.0,
+            40.0,
+            60.0,
+            40.0,
+            40.0,
+            60.0,
+            40.0,
+            40.0,
+            60.0,
+            40.0,
+            40.0,
+            60.0
+          ],
+          "kd": [
+            2.0,
+            2.0,
+            3.0,
+            2.0,
+            2.0,
+            3.0,
+            2.0,
+            2.0,
+            3.0,
+            2.0,
+            2.0,
+            3.0
+          ],
+          "effort": [
+            50.0,
+            50.0,
+            75.0,
+            50.0,
+            50.0,
+            75.0,
+            50.0,
+            50.0,
+            75.0,
+            50.0,
+            50.0,
+            75.0
+          ],
+          "soft_limits": [
+            [
+              -0.7064999938011169,
+              0.7064999938011169
+            ],
+            [
+              -1.7253998517990112,
+              3.2173995971679688
+            ],
+            [
+              -2.669980049133301,
+              -0.9110199213027954
+            ],
+            [
+              -0.7064999938011169,
+              0.7064999938011169
+            ],
+            [
+              -1.7253998517990112,
+              3.2173995971679688
+            ],
+            [
+              -2.669980049133301,
+              -0.9110199213027954
+            ],
+            [
+              -0.7064999938011169,
+              0.7064999938011169
+            ],
+            [
+              -1.025499701499939,
+              3.915499687194824
+            ],
+            [
+              -2.669980049133301,
+              -0.9110199213027954
+            ],
+            [
+              -0.7064999938011169,
+              0.7064999938011169
+            ],
+            [
+              -1.025499701499939,
+              3.915499687194824
+            ],
+            [
+              -2.669980049133301,
+              -0.9110199213027954
+            ]
+          ]
+        },
+        "payload_model": "rigid point mass at existing base COM, sampled only on reset",
+        "payload_max_kg": 2.0,
+        "curriculum_clock": "learner iterations; collect1; not PPO24-step equivalent",
+        "robot": "as2",
+        "reward_height_target_m": 0.3,
+        "terrain": {
+          "allocation": {
+            "names": [
+              "wave",
+              "slope_up",
+              "slope_down",
+              "rough_slope",
+              "stairs_up",
+              "stairs_down",
+              "obstacles",
+              "flat",
+              "wheels",
+              "small_squares"
+            ],
+            "raw_proportions": [
+              0.05,
+              0.1,
+              0.1,
+              0.05,
+              0.25,
+              0.1,
+              0.1,
+              0.15,
+              0.05,
+              0.05
+            ],
+            "raw_proportion_sum": 1.0,
+            "normalized_proportions": [
+              0.05,
+              0.1,
+              0.1,
+              0.05,
+              0.25,
+              0.1,
+              0.1,
+              0.15,
+              0.05,
+              0.05
+            ],
+            "column_type_ids": [
+              0,
+              1,
+              1,
+              2,
+              2,
+              3,
+              4,
+              4,
+              4,
+              4,
+              4,
+              5,
+              5,
+              6,
+              6,
+              7,
+              7,
+              7,
+              8,
+              9
+            ],
+            "column_counts": [
+              1,
+              2,
+              2,
+              1,
+              5,
+              2,
+              2,
+              3,
+              1,
+              1
+            ],
+            "rows": 10,
+            "columns": 20,
+            "tile_size_m": [
+              9.0,
+              9.0
+            ],
+            "border_width_m": 25.0,
+            "sub_terrain_border_width_m": 0.5,
+            "max_init_terrain_level": 5,
+            "default_geometry_backend": "source_direct_mesh",
+            "seed": 17,
+            "numpy_geometry_seed_scope": "saved_seeded_generated_restored"
+          },
+          "collision_height_map": {
+            "vertices_sha256": "ec6ac949e65f45e3f2179d18cc9c429fd047c2750ab5e810895d80729f55fd94",
+            "faces_sha256": "8a959e418335d68a99f63ea01cc557fd4d766e603ec90202fd5c6339ed62c0fa",
+            "vertex_count": 1139476,
+            "triangle_count": 1940460,
+            "resolution_m": 0.05,
+            "shape": [
+              4601,
+              2801
+            ],
+            "outer_boundary_misses": 0,
+            "collision_bounds": [
+              [
+                -70.0,
+                -115.0,
+                -2.255
+              ],
+              [
+                70.0,
+                115.0,
+                2.2049999237060547
+              ]
+            ]
+          }
+        },
+        "actual_base_mass_range_kg": [
+          8.800945281982422,
+          10.799922943115234
+        ],
+        "reward_scope": "Go2RLLab PhysX15 weights and formulas; As2 height target retained; learned40D reward telemetry; sigmoid contact threshold only in imagination; reward ramps finish3000",
+        "physx_preset": {
+          "gpu_max_rigid_patch_count": 2097152,
+          "gpu_collision_stack_size": 536870912,
+          "enable_external_forces_every_iteration": true
+        }
+      },
+      "providers": [
+        3072,
+        1024,
+        0,
+        0
+      ]
+    }
+  },
+  "positive_control_final_coefficients": {
+    "reward_iteration": 3000,
+    "standing": {
+      "vx": -2.620356644911226e-05,
+      "height": 0.20623481273651123,
+      "reward_per_step": 0.025995921343564987,
+      "xy_rmse": 0.35357198119163513,
+      "fall_count": 0,
+      "env_steps": 128000,
+      "seconds": 8.462802417110652
+    },
+    "official": {
+      "vx": 0.48982152342796326,
+      "height": 0.3505897521972656,
+      "reward_per_step": 0.0480804443359375,
+      "xy_rmse": 0.053724370896816254,
+      "fall_count": 0,
+      "env_steps": 128000,
+      "seconds": 8.099374304059893
+    },
+    "flat_expert": {
+      "vx": 0.48842787742614746,
+      "height": 0.28784483671188354,
+      "reward_per_step": 0.05540500953793526,
+      "xy_rmse": 0.013124444521963596,
+      "fall_count": 0,
+      "env_steps": 128000,
+      "seconds": 7.0453148651868105
+    },
+    "expert_motion_pass": true,
+    "reward_order_pass": true,
+    "fixed_episode_mass_checks": 15,
+    "flat_expert_pass": true
+  },
+  "runtime": {
+    "python": "3.12.16 (main, Oct 26 2026, 14:08:45) [Clang 23.1.3 ]",
+    "packages": {
+      "torch": "2.11.0+cu130",
+      "isaacsim-core": "6.2.0.0",
+      "isaaclab": "28.0.0",
+      "isaaclab_physx": "8.0.0",
+      "warp-lang": "1.17.0"
+    }
+  },
+  "old_isaac_packages_remaining": [],
+  "old_source_cleanup": {
+    "old_source_directories_deleted": [
+      "/home/abc/Documents/IsaacLab-2.3.0",
+      "/home/abc/Documents/IsaacSim-5.1.0"
+    ],
+    "other_projects_and_asset_collections": "preserved",
+    "remaining_package_retry": [
+      "isaaclab_rl"
+    ]
+  },
+  "robogauge_chain": "teacher and student exports executed through pinned official chain; untrained smoke policies are NOT capable policies",
+  "robogauge_smoke_result": {
+    "rows": [
+      {
+        "survived": true,
+        "survival_seconds": 10.0,
+        "resets": 0,
+        "samples": 451,
+        "height": 0.20601703548657196,
+        "vx": -3.271492983465171e-05,
+        "vy": 5.6372285972709694e-05,
+        "wz": -0.00017477086263779687,
+        "roll_pitch_tilt": 0.16319466104575248,
+        "xy_rmse": 0.35357652796699807,
+        "yaw_rmse": 0.00017630972686112086,
+        "slip_geometric_mean_mps": 9.405878978810719e-05,
+        "slip_geometric_p95_mps": 0.00015588791885421985,
+        "contact_geometric_samples": 1804,
+        "slip_force_mean_mps": 9.405878978810719e-05,
+        "slip_force_p95_mps": 0.00015588791885421985,
+        "contact_force_samples": 1804,
+        "pass": false,
+        "tracking_xy_tolerance": 0.2,
+        "iteration": 2003,
+        "branch": "teacher",
+        "command": [
+          0.5,
+          0,
+          0
+        ],
+        "payload_kg": 0.0,
+        "control_contract": "checkpoint",
+        "seed": 17,
+        "checkpoint_sha256": "0ac9a7fe83973ded2184233626ae6f17c12be6fca80bc6fe72900d7e51072190",
+        "upstream_commit": "add2c7ee0185ea8fd93d242f86e1c8cac6e9913b",
+        "warning": null,
+        "error": null,
+        "training_updates": 0,
+        "protocol": {
+          "physics_dt": 0.002,
+          "control_dt": 0.02,
+          "metric_dt": 0.02,
+          "duration": 10,
+          "ignore_seconds": 1,
+          "initial_settle": "official BasePipeline first_reset",
+          "noise_enabled": false,
+          "random_action_delay": false
+        },
+        "case_dir": "/home/abc/Admin/blind_prepare/transfer_smoke/official/official_cases/20261102-02-37-50_2003_teacher_checkpoint_control_0.5_0_0_load0.0_s17"
+      },
+      {
+        "survived": true,
+        "survival_seconds": 10.0,
+        "resets": 0,
+        "samples": 451,
+        "height": 0.20597321006367977,
+        "vx": -1.280307827383864e-05,
+        "vy": 3.3122099856924764e-05,
+        "wz": -0.0002134408078323933,
+        "roll_pitch_tilt": 0.1627672852126233,
+        "xy_rmse": 0.353562445790162,
+        "yaw_rmse": 0.00021525249776051548,
+        "slip_geometric_mean_mps": 9.456040681538619e-05,
+        "slip_geometric_p95_mps": 0.00015642028651974242,
+        "contact_geometric_samples": 1804,
+        "slip_force_mean_mps": 9.456040681538619e-05,
+        "slip_force_p95_mps": 0.00015642028651974242,
+        "contact_force_samples": 1804,
+        "pass": false,
+        "tracking_xy_tolerance": 0.2,
+        "iteration": 2003,
+        "branch": "student",
+        "command": [
+          0.5,
+          0,
+          0
+        ],
+        "payload_kg": 0.0,
+        "control_contract": "checkpoint",
+        "seed": 17,
+        "checkpoint_sha256": "0ac9a7fe83973ded2184233626ae6f17c12be6fca80bc6fe72900d7e51072190",
+        "upstream_commit": "add2c7ee0185ea8fd93d242f86e1c8cac6e9913b",
+        "warning": null,
+        "error": null,
+        "training_updates": 0,
+        "protocol": {
+          "physics_dt": 0.002,
+          "control_dt": 0.02,
+          "metric_dt": 0.02,
+          "duration": 10,
+          "ignore_seconds": 1,
+          "initial_settle": "official BasePipeline first_reset",
+          "noise_enabled": false,
+          "random_action_delay": false
+        },
+        "case_dir": "/home/abc/Admin/blind_prepare/transfer_smoke/official/official_cases/20261102-02-37-55_2003_student_checkpoint_control_0.5_0_0_load0.0_s17"
+      }
+    ],
+    "training_updates": 0,
+    "upstream_commit": "add2c7ee0185ea8fd93d242f86e1c8cac6e9913b"
+  },
+  "cpu_tests": {
+    "run": 25,
+    "passed": 22,
+    "skipped": 3
+  },
+  "official_reward_function_numeric_check": "15 terms; maximum absolute difference0 on deterministic synthetic fixtures; real-vs-imagined learned telemetry is not exact",
+  "terminal_transition_check": true,
+  "policy_and_critic_architecture_unchanged": true,
+  "wm_output_change": "73 to113; state70/input176/trunk1024x1024x1024 unchanged",
+  "ordinary_batch_contract": "4096env;1collection;8192x32 imagination;CTS20x1024;Critic5epochs x4minibatches",
+  "course_staging": "flat through2500;flat/slopes through5000;original10terrains afterwards; original level rules",
+  "known_limitations": [
+    "As2 lacks verified external expert and official sim2sim adapter",
+    "contact threshold softened only in imagination",
+    "CTS LR stability gate uses fixed native cohorts",
+    "six-iteration timings exclude compilation warmup; not long-run timing guarantees"
+  ],
+  "test_error_resolved": "initial flat allocation crowded one terrain row; corrected distribution across equivalent flat rows; failed smoke discarded",
+  "lr_exact_tie_tests": {
+    "supervised": "pass",
+    "actor": "pass",
+    "rule": "keep current rate when validation scores are exactly equal"
+  }
+}

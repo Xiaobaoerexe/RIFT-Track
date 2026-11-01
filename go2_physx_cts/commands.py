@@ -19,7 +19,7 @@ TIMER, ACCUMULATION, EPISODE_ELAPSED = 6, slice(7, 9), 9
 LAST_LIMIT, COMMAND_COUNTER, MAX_DISTANCE = 10, 11, 12
 ORIGIN, RANGE_STAGE, LIMIT_STAGE = slice(13, 15), 15, 16
 COMMAND_NAMES = ('lin_vel_x', 'lin_vel_y', 'ang_vel_yaw')
-RANGE_ITERATIONS = (5000, 15000, 25000, 35000, 45000)
+RANGE_ITERATIONS = (5000, 10000, 20000, 30000, 35000)
 RANGE_STAGES = (
     ((-.5, .5), (-.5, .5), (-1., 1.)),
     ((-1., 1.), (-1., 1.), (-2., 2.)),
@@ -168,7 +168,7 @@ class OfficialCommands:
         # stages change at the first resampling event at/after the iteration.
         clock = torch.as_tensor(iteration, device=state.device)
         current_stage = (clock[..., None] >= clock.new_tensor(RANGE_ITERATIONS)).sum(-1)
-        current_limit_stage = (clock >= 25000).long()
+        current_limit_stage = (clock >= 10000).long()
         stage = torch.where(due.any(), current_stage, state[:, RANGE_STAGE]).expand(len(state))
         limit_stage = torch.where(due.any(), current_limit_stage, state[:, LIMIT_STAGE]).expand(len(state))
         global_ranges, ranges = self._ranges(state, position_xy, stage)

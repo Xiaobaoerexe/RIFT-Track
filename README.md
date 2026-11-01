@@ -1,3 +1,5 @@
+> Current blind revision: see [BLIND_REVISION.md](BLIND_REVISION.md). On server175 run ./start_blind_sequence.sh for Go2 then As2. Original release notes below remain historical context.
+
 # Go2 / As2 · PhysX + SuperMimic + CTS
 
 本文件是项目唯一维护的工程说明。配置 JSON、依赖锁、许可证、实验原始记录不是冗余文档，不作删除。参数发生修改后运行 `python tools/build_readme.py`，更新本文的完整源码附录及资产参数。不得把历史记录中的参数当成当前配置。

@@ -43,7 +43,7 @@ def main():
         masses=tensor(env.robot.data.body_mass).sum(-1)
         contract={'physics_backend':type(env.robot).__module__,'usd_path':args.usd,'usd_sha256':hashlib.sha256(Path(args.usd).read_bytes()).hexdigest(),
                   'joint_names':list(env.robot.joint_names),'body_names':list(env.robot.body_names),'torch':torch.__version__,
-                  'total_mass_range_kg':[float(masses.min()),float(masses.max())],'context_dim':5,'wm_state_dim':70,'wm_input_dim':176,'wm_output_dim':73,'teacher_input_dim':167,'critic_input_dim':169,
+                  'total_mass_range_kg':[float(masses.min()),float(masses.max())],'context_dim':5,'wm_state_dim':70,'wm_input_dim':176,'wm_output_dim':113,'reward_telemetry_dim':40,'teacher_input_dim':167,'critic_input_dim':169,
                   'student_input_dim':450,'shared_actor_input_dim':77,'policy_hz':50,'physics_hz':200,
                   'motor':{k:v.tolist() for k,v in vars(env.consts).items()},'payload_model':'rigid point mass at existing base COM, sampled only on reset','payload_max_kg':cfg.payload_max_kg}
         contract['curriculum_clock']='learner iterations; collect1; not PPO24-step equivalent'
@@ -51,7 +51,7 @@ def main():
         contract['reward_height_target_m']=env.profile.reward_height
         contract['terrain']=None if env.field is None else {'allocation':env.terrain_lookup.metadata,'collision_height_map':env.field.metadata}
         contract['actual_base_mass_range_kg']=[float(env.actual_base_mass_kg.min()),float(env.actual_base_mass_kg.max())]
-        contract['reward_scope']='baseline13 plus pinned body-height and vertical-velocity definitions/courses; not full official15-term reward'
+        contract['reward_scope']='Go2RLLab PhysX15 weights and formulas; As2 height target retained; learned40D reward telemetry; sigmoid contact threshold only in imagination; reward ramps finish3000'
         contract['physx_preset']={k:getattr(physics,k) for k in ('gpu_max_rigid_patch_count','gpu_collision_stack_size','enable_external_forces_every_iteration')}
         (out/'physics_contract.json').write_text(json.dumps(contract,indent=2))
         identity={'pid':os.getpid(),'started_unix':time.time(),'backend':type(env.robot).__module__,'mode':'smoke' if args.smoke else 'formal','command':sys.argv,'code_commit':code_commit,'config_sha256':hashlib.sha256(Path(args.config).read_bytes()).hexdigest()}

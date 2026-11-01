@@ -1,7 +1,7 @@
 """One shared online replay for all providers and both actor branches.
 
-Window selection/archive recipe follows pinned upstream train.py. Episode-end
-transitions are excluded as in upstream; simulator reset jumps never become labels.
+Window selection/archive recipe follows pinned upstream train.py. Terminal pre-reset transitions are retained for contact supervision. Windows
+stop after that transition; simulator reset jumps never become labels.
 """
 import torch
 from . import state as st
@@ -11,8 +11,8 @@ class Replay:
     def __init__(self,n,length,device):
         self.n,self.L,self.device=n,length,device;self.ptr=self.size=0
         self.data={}
-        for name,dim,dtype in [('s',70,torch.float32),('pose',3,torch.float32),('a',12,torch.float32),
-                              ('a_prev',12,torch.float32),('obs',450,torch.float16),('relief',77,torch.float16),
+        for name,dim,dtype in [('s',70,torch.float32),('pose',3,torch.float32),('s_next',70,torch.float32),('pose_next',3,torch.float32),('aux_next',st.AUX_DIM,torch.float32),('a',12,torch.float32),
+                              ('a_prev',12,torch.float32),('a_prev2',12,torch.float32),('obs',450,torch.float16),('relief',77,torch.float16),
                               ('command',3,torch.float32),('timer',1,torch.float32),('cmd_state',CMD_STATE_DIM,torch.float32),('done',1,torch.bool),
                               ('source',1,torch.uint8),('episode',1,torch.int32),('xi',st.CONTEXT_DIM,torch.float32)]:
             self.data[name]=torch.zeros((n,length,dim),device=device,dtype=dtype)
@@ -37,17 +37,23 @@ class Replay:
         out={k:v[e,t].float() for k,v in self.data.items()}
         out['env']=e
         return out
-    def windows(self,batch,k,xi):
+    def windows(self,batch,k,xi,env_range=None,env_parity=None):
         if self.size<=k+1:raise ValueError('Not enough contiguous history')
-        e=torch.randint(self.n,(batch,),device=self.device)
+        low,high=(0,self.n) if env_range is None else env_range
+        e=torch.randint(low,high,(batch,),device=self.device)
+        if env_parity is not None:
+            candidates=torch.arange(int(env_parity),self.n,2,device=self.device)
+            e=candidates[torch.randint(len(candidates),(batch,),device=self.device)]
         t=torch.randint(self.size-k,(batch,),device=self.device)
         idx=self.physical(t[:,None]+torch.arange(k+1,device=self.device));ee=e[:,None]
         done=self.data['done'][ee,idx[:,:k],0].float()
-        valid=(1-done).cumprod(1)
+        valid=torch.cat((torch.ones_like(done[:,:1]),(1-done[:,:-1]).cumprod(1)),1)
         # Explicit episode identity catches any accidental writer boundary mismatch.
         ep=self.data['episode'][ee,idx,0]
-        valid*=((ep[:,1:]==ep[:,:1]).float()).cumprod(1)
-        return {'s':self.data['s'][ee,idx],'pose':self.data['pose'][ee,idx],
+        valid*=((ep[:,:k]==ep[:,:1]).float()).cumprod(1)
+        return {'s':torch.cat((self.data['s'][ee,idx[:,:1]],self.data['s_next'][ee,idx[:,:k]]),1),
+                'pose':torch.cat((self.data['pose'][ee,idx[:,:1]],self.data['pose_next'][ee,idx[:,:k]]),1),
+                'aux':self.data['aux_next'][ee,idx[:,:k]],
                 'a':self.data['a'][ee,idx[:,:k]],'a_prev':self.data['a_prev'][ee,idx[:,:k]],
                 'relief':self.data['relief'][ee,idx[:,:k]],'xi':self.data['xi'][e,idx[:,0]],
                 'command':self.data['command'][e,idx[:,0]],'valid':valid}
@@ -57,7 +63,7 @@ class Replay:
 class Archive:
     def __init__(self,capacity,k,device):
         self.cap,self.device,self.ptr,self.size=capacity,device,0,0
-        shapes={'s':(k+1,70),'pose':(k+1,3),'a':(k,12),'a_prev':(k,12),'xi':(st.CONTEXT_DIM,), 'command':(3,), 'valid':(k,),'relief':(k,77)}
+        shapes={'s':(k+1,70),'pose':(k+1,3),'aux':(k,st.AUX_DIM),'a':(k,12),'a_prev':(k,12),'xi':(st.CONTEXT_DIM,), 'command':(3,), 'valid':(k,),'relief':(k,77)}
         self.data={key:torch.zeros((capacity,*shape),device=device,dtype=torch.float16 if key=='relief' else torch.float32) for key,shape in shapes.items()}
     def add(self,w):
         n=min(len(w['s']),self.cap)

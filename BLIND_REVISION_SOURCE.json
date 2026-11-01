@@ -1,0 +1,46 @@
+{
+  "parent_release": "9b2aac61920721c7344ee680b5849a44e163b299",
+  "official_rewards_commit": "6c95d9feef4814c25eb6536e61bb38e1d1d718d4",
+  "official_files": {
+    "source/go2_rl_lab/go2_rl_lab/tasks/mixed/env_cfg.py": {
+      "sha256": "ecf41e7d4ecee43aec745c62e2f3a455dce24e88a0498ac96df0e0211a8bfd67",
+      "matches_inspected_working_source": true
+    },
+    "source/go2_rl_lab/go2_rl_lab/tasks/mixed/mdp/rewards.py": {
+      "sha256": "5be3a599585adbefe72fcb917a6ba9221a3d25d575745ebcb2d1817befc24393",
+      "matches_inspected_working_source": false
+    }
+  },
+  "depth_schedule_source": "/home/abc/Documents/go2_supermimic_lab_depth/go2_physx_cts/schedules.py",
+  "scope": "blind single velocity task, existing10 terrains, no depth, no action MoE, original sample and update batches",
+  "wm_reward_telemetry": [
+    "applied_torque12",
+    "joint_acceleration12",
+    "yaw_frame_foot_xy_velocity8",
+    "log1p_limb_peak_contact_force8"
+  ],
+  "adaptations": [
+    "contact threshold sigmoid only in BPTT",
+    "reward ramps complete at3000",
+    "new earlier command/terrain clock",
+    "native fixed cohort releases CTS LR trials; no As2 RoboGauge certification",
+    "exact LR validation ties prefer current rate; no tie-induced automatic decay"
+  ],
+  "missing_providers": {
+    "go2": "none after revalidating the retained project flat expert; not a manufacturer flat expert",
+    "as2": "no verified As2 external provider; no Go2 substitution"
+  },
+  "isaaclab_commit": "4eac8b68f27e5960d9a9a72f8fb3974d334bfa76",
+  "source_reward_history_difference": "Inspected working tree had fallback prev_prev_action support; pinned source uses env history. New port preserves two prior actions explicitly.",
+  "flat_expert": {
+    "path_on137": "/home/abc/data2/go2_supermimic_lab/runs/GO2_PHYSX_SMCTS_s17_20261029_014053_137/flat/model_00040000.pt",
+    "sha256": "eb12315e21e0037d81514af43184210276dee515c3722b9817b12cdc90d6fd11",
+    "role": "online collection only, never initialization"
+  },
+  "depth_schedule_file_sha256": "510ed9efe699177aaab7801baf9f52690b464c0000ca7cc5540fdec02f802448",
+  "depth_source_commit": "2557b830d6767e4648e9a97871f65184d7d9a7c8",
+  "unchanged_policy_files": {
+    "networks.py": "9dc476a6bb1cb31d3c4938d2f7d5b9703dfa6a5ae0c8b867b3197aa53ddbe630",
+    "moe.py": "c373ce1cd3312de4413bd315f2f063f67502aa62c7b936b356f93dd678e1879f"
+  }
+}

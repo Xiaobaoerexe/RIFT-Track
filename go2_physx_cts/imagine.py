@@ -43,13 +43,15 @@ class Imagination:
         self.reward_height=profile(cfg.robot).reward_height
         self.commands=commands or OfficialCommands(cfg.dt,cfg.episode_seconds)
         self._step_fn=torch.compile(self._step,dynamic=False) if cfg.compile else self._step
-    def _step(self,wm,policy,critic,s,pose,a_prev,hist,cmd_state,xi,branch,iteration,active):
+    def _step(self,wm,policy,critic,s,pose,a_prev,a_prev2,hist,cmd_state,xi,branch,iteration,active):
         cfg=self.cfg;command=self.commands.command(cmd_state)
         rlf=relief(pose,self.field);priv=st.privileged(s,a_prev,command,xi,rlf)
         feature=critic.features(priv,branch)
         a=policy(hist,priv,branch)
-        ns,dp=wm(s,a,a_prev,xi,rlf);np=st.apply_pose_delta(pose,dp)
-        r,_,done=reward(s,ns,a,a_prev,command,self.c,cfg.stage,soft=True,iteration=iteration,pose=np,field=self.field,base_height_target=self.reward_height)
+        ns,dp,aux=wm.forward_reward(s,a,a_prev,xi,rlf);np=st.apply_pose_delta(pose,dp)
+        lookup=self.commands.terrain_lookup
+        on_flat=torch.ones(len(s),device=s.device,dtype=torch.bool) if lookup is None else lookup.query(np[:,:2])==lookup.names.index("flat")
+        r,_,done=reward(s,ns,a,a_prev,command,self.c,cfg.stage,soft=True,iteration=iteration,pose=np,field=self.field,base_height_target=self.reward_height,aux=aux,previous_previous=a_prev2,on_flat=on_flat)
         # An inactive row is still evaluated in the fixed-size compiled graph.
         # Give only that discarded command candidate a safe elapsed time; keep
         # its actual terminal memory frozen, avoiding negative remaining-time
@@ -60,12 +62,12 @@ class Imagination:
         command=self.commands.command(candidate_command)
         nhist=st.push_history(hist,st.frame(ns,a,command,noise=True))
         def select(new,old):return torch.where(active[:,None],new,old)
-        return (select(ns,s),select(np,pose),select(a,a_prev),select(nhist,hist),
+        return (select(ns,s),select(np,pose),select(a,a_prev),select(a_prev,a_prev2),select(nhist,hist),
                 select(candidate_command,cmd_state),torch.where(active,r,torch.zeros_like(r)),
                 torch.where(active,done,torch.zeros_like(done)),feature)
     def rollout(self,wm,policy,critic,seed,branch,iteration=0):
         cfg=self.cfg;s,pose,a_prev,hist=seed['s'],seed['pose'],seed['a_prev'],seed['obs']
-        cmd_state,xi=seed['cmd_state'],seed['xi']
+        cmd_state,xi=seed['cmd_state'],seed['xi'];a_prev2=seed['a_prev2']
         iteration=torch.as_tensor(iteration,device=s.device)
         max_steps=round(cfg.episode_seconds/cfg.dt)
         active=torch.round(cmd_state[:,EPISODE_ELAPSED]/cfg.dt)<max_steps
@@ -74,7 +76,7 @@ class Imagination:
         for _ in range(cfg.horizon):
             valid.append(active)
             timeout=active&(torch.round(cmd_state[:,EPISODE_ELAPSED]/cfg.dt)+1>=max_steps)
-            s,pose,a_prev,hist,cmd_state,r,done,feature=self._step_fn(wm,policy,critic,s,pose,a_prev,hist,cmd_state,xi,branch,iteration,active)
+            s,pose,a_prev,a_prev2,hist,cmd_state,r,done,feature=self._step_fn(wm,policy,critic,s,pose,a_prev,a_prev2,hist,cmd_state,xi,branch,iteration,active)
             features.append(feature)
             rewards.append(r);soft_done.append(done);timeouts.append(timeout)
             active=active&~timeout

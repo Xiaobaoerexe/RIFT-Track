@@ -33,7 +33,7 @@ class Mechanisms(unittest.TestCase):
   b=Replay(4,16,'cpu')
   for t in range(40):
    v={k:torch.zeros(4,x.shape[-1],dtype=x.dtype) for k,x in b.data.items()}
-   v['s'][:]=t;v['xi'][:]=t//4;v['episode'][:]=t//4;v['done'][:]=t%4==3;v['source'][:,0]=torch.arange(4)
+   v['s'][:]=t;v['s_next'][:]=t+.5;v['xi'][:]=t//4;v['episode'][:]=t//4;v['done'][:]=t%4==3;v['source'][:,0]=torch.arange(4)
    b.add(**v)
   w=b.windows(200,8,torch.full((4,5),-9.))
   self.assertTrue(torch.equal(w['xi'][:,0],torch.floor(w['s'][:,0,0]/4)))
@@ -47,7 +47,7 @@ class Mechanisms(unittest.TestCase):
   policy=Policy(cfg.actor_hidden);critic=Critic(cfg.critic_hidden);wm=WorldModel(cfg.wm_hidden)
   c=RobotConsts(torch.zeros(12),torch.ones(12)*.25,torch.ones(12)*25,torch.ones(12)*.5,torch.ones(12)*24,torch.tensor([[-3.,3.]]*12))
   im=Imagination(cfg,c);s=torch.zeros(8,70);s[:,0]=.3;s[:,3]=-1
-  seed={'s':s,'pose':torch.zeros(8,3),'a_prev':torch.zeros(8,12),'obs':torch.randn(8,450),'command':torch.ones(8,3)*.3,'timer':torch.ones(8,1)*5,'xi':torch.zeros(8,5)}
+  seed={'s':s,'pose':torch.zeros(8,3),'a_prev':torch.zeros(8,12),'a_prev2':torch.zeros(8,12),'obs':torch.randn(8,450),'command':torch.ones(8,3)*.3,'timer':torch.ones(8,1)*5,'xi':torch.zeros(8,5)}
   seed['cmd_state']=OfficialCommands().initial(seed['pose'][:,:2],seed['pose'][:,:2])
   with frozen(wm,critic,policy.student_encoder):
    obj,data=im.rollout(wm,policy,critic,seed,0);(-obj.mean()).backward()

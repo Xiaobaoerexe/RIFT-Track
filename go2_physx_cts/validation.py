@@ -8,14 +8,18 @@ from .networks import Policy
 @torch.no_grad()
 def physical_probe(env,driver,steps):
     if driver is None:raise ValueError('Physical positive control requires official driver')
-    result={};mass_checks=0
-    for name in ('standing','official'):
+    env.iteration=3000  # Compare policies using final official reward coefficients.
+    result={'reward_iteration':3000};mass_checks=0
+    from .driver import FlatExpert
+    flat=FlatExpert(env.cfg.expert_policy,env.device) if env.cfg.expert_policy else None
+    modes=('standing','official','flat_expert') if flat is not None else ('standing','official')
+    for name in modes:
         env.reset(env.ids);env._snapshot=env._observe();driver.reset(torch.ones(env.num_envs,device=env.device,dtype=torch.bool))
         env.command_override=env.command.new_tensor([.5,0,0]).expand(env.num_envs,3).clone();env._snapshot=env._observe()
         rows=[];fall=0;began=time.monotonic()
         for i in range(steps):
             old_mass=env.xi[:,4].clone()
-            a=torch.zeros(env.num_envs,12,device=env.device) if name=='standing' else driver.act(env.command)
+            a=torch.zeros(env.num_envs,12,device=env.device) if name=='standing' else flat(env.snapshot()['obs']) if name=='flat_expert' else driver.act(env.command)
             after,done,m=env.step(a);driver.reset(done);fall+=m['falls_all']
             assert torch.equal(old_mass[~done],env.xi[~done,4]),'Mass changed within episode'
             if i%100==0 and env.cfg.payload_max_kg:
@@ -29,6 +33,9 @@ def physical_probe(env,driver,steps):
     result['expert_motion_pass']=result['official']['vx']>.2 and result['official']['height']>.2 and result['official']['fall_count']<env.num_envs*.25
     result['reward_order_pass']=result['official']['reward_per_step']>result['standing']['reward_per_step']
     result['fixed_episode_mass_checks']=mass_checks
+    if flat is not None:
+        result['flat_expert_pass']=result['flat_expert']['vx']>.2 and result['flat_expert']['height']>.2 and result['flat_expert']['fall_count']<env.num_envs*.25 and result['flat_expert']['reward_per_step']>result['standing']['reward_per_step']
+        if not result['flat_expert_pass']:raise RuntimeError('Retained flat expert failed positive control: '+str(result))
     env.command_override=None
     if not result['expert_motion_pass'] or not result['reward_order_pass']:raise RuntimeError(f'Official positive control failed: {result}')
     return result
@@ -37,10 +44,13 @@ def parameter_copy(m):return [p.detach().clone() for p in m.parameters()]
 def changed(m,before):return any(not torch.equal(p,b) for p,b in zip(m.parameters(),before))
 
 def learner_smoke(l,iterations):
+    # Exercise the mature terrain phase and all four WM updates at full scale,
+    # not just the easier flat bootstrap.
+    l.it=max(l.cfg.warmup_iterations+l.cfg.critic_warmup_iterations+l.cfg.actor_ramp_iterations,
+             l.cfg.all_terrain_iteration+500 if l.cfg.stage=='terrain' else 0)
+    l.env.iteration=l.it;l.env.reset(l.env.ids);l.env._snapshot=l.env._observe()
     while l.buf.size<=l.cfg.wm_window+1:l.collect()
     torch.cuda.reset_peak_memory_stats();measures=[]
-    l.it=l.cfg.warmup_iterations+l.cfg.actor_ramp_iterations
-    l.env.iteration=l.it
     l.learning_rates()
     teacher=parameter_copy(l.policy.teacher_encoder);actor=parameter_copy(l.policy.actor);student=parameter_copy(l.policy.student_encoder)
     wm=parameter_copy(l.wm);critic=parameter_copy(l.critic)
@@ -89,6 +99,12 @@ def learner_smoke(l,iterations):
     assert all(len(getattr(l,'opt_'+k).state)>0 for k in ('wm','actor','critic','cts'))
     l.last_good=path;w_before=parameter_copy(l.wm);archive_size=l.archive.size;replay_size=l.buf.size
     assert l.rollback() and not changed(l.wm,w_before) and archive_size==l.archive.size and replay_size==l.buf.size
+    l.it=6000;l.env.iteration=l.it;l.env.reset(l.env.ids);l.env._snapshot=l.env._observe()
+    l.schedule.teacher_stable=True
+    l.learning_rates();adaptive=l.adapt_learning_rates()
+    assert all(k in adaptive for k in ('wm','actor','critic','cts'))
+    assert all(adaptive[k] is not None for k in ('wm','actor','critic','cts'))
+    assert all(torch.isfinite(param).all() for param in l.policy.parameters())
     from .diagnostics import native_diagnostics,model_diagnostics
     levels=l.env.curriculum_state_dict();counts=copy.deepcopy(l.counts)
     native=native_diagnostics(l,steps=100);model=model_diagnostics(l,batch=256)
@@ -99,7 +115,7 @@ def learner_smoke(l,iterations):
     return {'passed':True,'backend':type(l.env.robot).__module__,'num_envs':l.cfg.num_envs,'imag_batch':l.cfg.imag_batch,
             'wm_batch':l.cfg.wm_batch,'buffer_len':l.cfg.buffer_len,'replay_bytes':l.buf.storage_bytes,
             'timings':measures,'peak_allocated_bytes':torch.cuda.max_memory_allocated(),'peak_reserved_bytes':torch.cuda.max_memory_reserved(),
-            'restore_max_error':err,'full_model_optimizer_restore':True,'export_max_error':export_err,'counts':l.counts,'last_stats':stats,
+            'adaptive_lr_verification':adaptive,'restore_max_error':err,'full_model_optimizer_restore':True,'export_max_error':export_err,'counts':l.counts,'last_stats':stats,
             'gradient_ownership':True,'rollback_retains_wm_and_data':True,'wm_loss':wl,'cts_loss':cl,
             'geometry':geometry,'fixed_episode_mass_checks':fixed_mass_checks,
             'diagnostic_smoke':{'native_rows':len(native['rows']),'model_rows':len(model['rows']),

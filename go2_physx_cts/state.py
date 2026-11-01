@@ -1,6 +1,11 @@
 """Source70-D state and45x10 blind CTS interface; no simulator imports."""
 import torch
 STATE_DIM, POSE_DELTA_DIM, CONTEXT_DIM, NUM_JOINTS = 70, 3, 5, 12
+# Reward telemetry predicted by the same dynamics trunk; policy inputs unchanged.
+# Applied torque12, joint acceleration12, yaw-frame foot XY velocity8,
+# log1p(max force norm over last3 physics samples) for thigh/calf8.
+AUX_DIM = 40
+AUX_TORQUE, AUX_ACC, AUX_FEET_VXY, AUX_LOG_FORCE = slice(0,12), slice(12,24), slice(24,32), slice(32,40)
 Z, GRAV, V_YAW, W_B = slice(0,1), slice(1,4), slice(4,7), slice(7,10)
 Q, QD, HIPS, KNEES, FEET = slice(10,22),slice(22,34),slice(34,46),slice(46,58),slice(58,70)
 LEGS = ("FL", "FR", "RL", "RR")

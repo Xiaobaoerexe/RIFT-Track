@@ -8,8 +8,8 @@ class TrainCfg:
     num_envs: int = 4096
     buffer_len: int = 1000
     collect_steps: int = 1
-    iterations: int = 60000
-    warmup_iterations: int = 300
+    iterations: int = 120000
+    warmup_iterations: int = 1000
     wm_hidden: tuple = (1024, 1024, 1024)
     wm_window: int = 8
     wm_batch: int = 2048
@@ -26,14 +26,23 @@ class TrainCfg:
     critic_hidden: tuple = (512, 256, 128)
     cts_updates: int = 20
     cts_batch: int = 1024
-    cts_lr: float = .001
+    cts_lr: float = 3e-4
     cts_balance: float = .01
     critic_epochs: int = 5
     critic_minibatches: int = 4
     lr: float = 2e-4
     actor_lr_scale: float = 1.
-    lr_final_frac: float = .03
-    lr_decay_iterations: int = 30000
+    wm_lr: float = 2e-4
+    teacher_lr: float = 2e-4
+    lr_trial_factor: float = 1.3
+    lr_trial_interval: int = 1000
+    lr_fixed_until: int = 5000
+    wm_lr_bounds: tuple = (2e-5, 5e-4)
+    actor_lr_bounds: tuple = (4e-6, 2e-3)
+    critic_lr_bounds: tuple = (4e-6, 2e-3)
+    cts_lr_bounds: tuple = (1e-5, 3e-4)
+    terrain_start_iteration: int = 2500
+    all_terrain_iteration: int = 5000
     actor_ramp_iterations: int = 1000
     critic_warmup_iterations: int = 500
     grad_clip: float = 1.
@@ -67,6 +76,7 @@ class TrainCfg:
     def from_record(cls, record):
         """Migrate historical configuration metadata without changing checkpoint bytes."""
         values=dict(record)
+        for key in ('lr_final_frac','lr_decay_iterations'):values.pop(key,None)
         for obsolete in ('evaluation_xml','evaluation_profile','adaptive_iterations',
                          'terrain_curriculum_iterations','command_max'):
             values.pop(obsolete,None)
@@ -74,8 +84,7 @@ class TrainCfg:
 
     @classmethod
     def terrain(cls, **kwargs):
-        return cls(stage="terrain", wm_updates=4, actor_lr_scale=.3,
-                   warmup_iterations=1000, driver_frac=.1, expert_frac=.1, **kwargs)
+        return cls(stage="terrain", wm_updates=4, actor_lr_scale=1., driver_frac=.1, expert_frac=.1, **kwargs)
 
     def validate(self, production=True):
         from .robots import profile

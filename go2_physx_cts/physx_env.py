@@ -35,6 +35,7 @@ class PhysXEnv:
         from isaaclab.actuators import DCMotorCfg, IdealPDActuatorCfg
         from .robots import profile,as2_motor_values
         from isaaclab.scene import InteractiveSceneCfg
+        from isaaclab.sensors import ContactSensorCfg
         from isaaclab.utils import configclass,instantiate
         from isaaclab_physx.sim.schemas import PhysxRigidBodyCfg,PhysxArticulationCfg
         self.cfg,self.sim,self.device,self.num_envs=cfg,sim,cfg.device,cfg.num_envs
@@ -48,7 +49,7 @@ class PhysXEnv:
         actuator_args=dict(joint_names_expr=['.*'],stiffness=mapping(kp),damping=mapping(kd),armature=mapping(inertia),friction=0.,actuator_effort_limit=mapping(effort),actuator_velocity_limit=velocity,joint_velocity_limit=velocity)
         actuator=(DCMotorCfg(saturation_effort=mapping(2*effort),**actuator_args) if cfg.robot=='go2' else IdealPDActuatorCfg(**actuator_args))
         robot_cfg=ArticulationCfg(prim_path='{ENV_REGEX_NS}/Robot',joint_ordering=st.JOINT_NAMES,
-            spawn=su.UsdFileCfg(usd_path=usd_path,activate_contact_sensors=False,
+            spawn=su.UsdFileCfg(usd_path=usd_path,activate_contact_sensors=True,
                 rigid_props=PhysxRigidBodyCfg(disable_gravity=False,linear_damping=0.,angular_damping=0.,max_depenetration_velocity=1.),
                 articulation_props=PhysxArticulationCfg(enabled_self_collisions=True,solver_position_iteration_count=4,solver_velocity_iteration_count=0)),
             init_state=ArticulationCfg.InitialStateCfg(pos=(0,0,self.profile.initial_height),joint_pos={'.*L_hip_joint':self.profile.left_hip,'.*R_hip_joint':-self.profile.left_hip,'.*_thigh_joint':.9,'.*_calf_joint':-1.8},joint_vel={'.*':0.}),
@@ -58,11 +59,14 @@ class PhysXEnv:
         class SceneCfg(InteractiveSceneCfg):
             ground=AssetBaseCfg(prim_path='/World/Ground',spawn=su.GroundPlaneCfg(physics_material=su.RigidBodyMaterialCfg(static_friction=1.,dynamic_friction=1.,restitution=0.)))
             robot=robot_cfg
+            contacts=ContactSensorCfg(prim_path="{ENV_REGEX_NS}/Robot/.*",update_period=0.,history_length=3,debug_vis=False)
         scene_cfg=SceneCfg(num_envs=cfg.num_envs,env_spacing=3.,replicate_physics=True)
         if cfg.stage=='terrain':
             from .terrain_scene import terrain_config
             scene_cfg.ground=None;scene_cfg.terrain=terrain_config(cfg.seed)
         self.scene=instantiate(scene_cfg);self.robot=self.scene['robot'];sim.reset()
+        self.sensor=self.scene['contacts']
+        self.contact_ids=[list(self.sensor.body_names).index(f'{leg}_{part}') for part in ('thigh','calf') for leg in st.LEGS]
         if 'isaaclab_physx' not in type(self.robot).__module__:raise RuntimeError(f'Wrong backend: {type(self.robot)}')
         if tuple(self.robot.joint_names)!=st.JOINT_NAMES:raise RuntimeError('Joint ordering mismatch')
         self.consts=RobotConsts(tensor(self.robot.data.default_joint_pos)[0].clone(),scale,kp,kd,effort,tensor(self.robot.data.soft_joint_pos_limits)[0].clone())
@@ -77,6 +81,9 @@ class PhysXEnv:
             self.terrain_lookup=TerrainPositionLookup(self.scene.terrain.cfg.terrain_generator,cfg.device)
             self.terrain_names=self.terrain_lookup.names
             self.terrain_metadata=dict(self.terrain_lookup.metadata,collision_heightfield=self.field.metadata)
+            self._original_terrain_types=self.scene.terrain.terrain_types.clone()
+            self._original_terrain_levels=self.scene.terrain.terrain_levels.clone()
+            self._terrain_phase=torch.full((cfg.num_envs,),-1,dtype=torch.long,device=cfg.device)
         n=cfg.num_envs;dev=cfg.device
         self.xi=torch.zeros(n,st.CONTEXT_DIM,device=dev);self.xi[:,0]=1.
         self.command_sampler=OfficialCommands(cfg.dt,cfg.episode_seconds,terrain_lookup=self.terrain_lookup)
@@ -143,9 +150,26 @@ class PhysXEnv:
         n=len(ids);dev=self.device
         if self.cfg.stage=='terrain':
             terrain=self.scene.terrain
-            # Initial assignments remain the source max-init level5; only completed
-            # training episodes can promote/demote, independent of training iteration.
-            eligible=ids[self.steps[ids]>0]
+            phase=0 if self.iteration<self.cfg.terrain_start_iteration else (1 if self.iteration<self.cfg.all_terrain_iteration else 2)
+            changed=ids[self._terrain_phase[ids]!=phase] if not self.evaluation_mode else ids[:0]
+            if len(changed):
+                if phase<2:
+                    names=('flat',) if phase==0 else ('flat','flat','slope_up','slope_down','rough_slope')
+                    for slot,name in enumerate(names):
+                        selected=changed[changed%len(names)==slot]
+                        columns=(self.terrain_lookup.column_types==self.terrain_names.index(name)).nonzero().flatten()
+                        if not len(columns):raise RuntimeError('Required curriculum terrain missing: '+name)
+                        terrain.terrain_types[selected]=columns[(selected//len(names))%len(columns)]
+                    # Flat rows are physically identical; distribute replicas instead
+                    # of collapsing4096 robots onto one row's few flat tiles.
+                    if phase==0:terrain.terrain_levels[changed]=(changed//len(columns))%terrain.cfg.terrain_generator.num_rows
+                    else:terrain.terrain_levels[changed]=self._original_terrain_levels[changed]
+                else:
+                    terrain.terrain_types[changed]=self._original_terrain_types[changed]
+                    terrain.terrain_levels[changed]=self._original_terrain_levels[changed]
+                self._terrain_phase[changed]=phase
+                terrain.env_origins[changed]=terrain.terrain_origins[terrain.terrain_levels[changed],terrain.terrain_types[changed]]
+            eligible=ids[(self.steps[ids]>0)&~torch.isin(ids,changed)]
             if len(eligible) and not self.evaluation_mode:
                 from .terrain_scene import terrain_level_decisions
                 gen=terrain.cfg.terrain_generator
@@ -164,6 +188,7 @@ class PhysXEnv:
         self.robot.write_joint_position_to_sim_index(position=pos,env_ids=ids)
         self.robot.write_joint_velocity_to_sim_index(velocity=torch.zeros_like(pos),env_ids=ids)
         self.robot.reset(ids)
+        self.sensor.reset(ids)
         self.hist[ids]=0;self.last[ids]=0;self.steps[ids]=0;self.episode[ids]+=1
         self.target_ring[:,ids]=pos;self.delay[ids]=torch.randint(3,(n,),device=dev)
         mask=torch.zeros(self.num_envs,dtype=torch.bool,device=dev);mask[ids]=True
@@ -212,15 +237,36 @@ class PhysXEnv:
 
     def curriculum_state_dict(self):
         return {'terrain_levels':None if self.field is None else self.scene.terrain.terrain_levels.clone(),
-                'max_levels_reached':self._terrain_max_levels.clone()}
+                'max_levels_reached':self._terrain_max_levels.clone(),
+                'terrain_types':None if self.field is None else self.scene.terrain.terrain_types.clone(),
+                'terrain_phase':None if self.field is None else self._terrain_phase.clone()}
 
     def load_curriculum_state_dict(self,state):
         self._terrain_max_levels.copy_(state['max_levels_reached'])
         if self.field is not None and state['terrain_levels'] is not None:
             terrain=self.scene.terrain;terrain.terrain_levels.copy_(state['terrain_levels'])
+            if state.get('terrain_types') is not None:terrain.terrain_types.copy_(state['terrain_types'])
+            if state.get('terrain_phase') is not None:self._terrain_phase.copy_(state['terrain_phase'])
             terrain.env_origins[:]=terrain.terrain_origins[terrain.terrain_levels,terrain.terrain_types]
             self.origins[:]=terrain.env_origins
             self._record_terrain_levels()
+
+    def reward_telemetry(self):
+        d=self.robot.data
+        force=tensor(self.sensor.data.net_forces_w_history).norm(dim=-1).amax(dim=1)[:,self.contact_ids]
+        body_vel=tensor(d.body_link_vel_w)
+        if 'foot' in self.body_ids:
+            feet_v=body_vel[:,self.body_ids['foot'],:3]
+        else:
+            ids=self.body_ids['calf'];pose=tensor(d.body_link_pose_w)[:,ids]
+            offset=torch.zeros_like(pose[:,:,:3]);offset[:,:,2]=-self.profile.calf_length
+            quat=pose[:,:,3:7]
+            offset=quat_inverse(torch.cat((-quat[:,:,:3],quat[:,:,3:]),-1),offset)
+            feet_v=body_vel[:,ids,:3]+torch.cross(body_vel[:,ids,3:],offset,dim=-1)
+        q=tensor(d.root_link_pose_w)[:,3:7]
+        yaw=torch.atan2(2*(q[:,3]*q[:,2]+q[:,0]*q[:,1]),1-2*(q[:,1].square()+q[:,2].square()))
+        feet_xy=st.yaw_inverse(feet_v,yaw[:,None])[:,:,:2].flatten(1)
+        return torch.cat((tensor(d.applied_torque),tensor(d.joint_acc),feet_xy,torch.log1p(force)),1).clone()
 
     @torch.no_grad()
     def step(self,a):
@@ -231,9 +277,10 @@ class PhysXEnv:
             delayed=self.target_ring[(self.ring_ptr-self.delay)%3,self.ids];self.ring_ptr=(self.ring_ptr+1)%3
             self.robot.set_joint_position_target_index(target=delayed)
             self.scene.write_data_to_sim();self.sim.step(render=False);self.scene.update(self.cfg.physics_dt)
-        self.steps+=1;after=self._observe();s=after['s']
+        self.steps+=1;after=self._observe();s=after['s'];after['aux']=self.reward_telemetry()
         r,terms,_=reward(before,s,a,self.last,self.command,self.consts,self.cfg.stage,
-                         iteration=self.iteration,height_above_crop=after['height_above_crop'],base_height_target=self.profile.reward_height)
+                         iteration=self.iteration,height_above_crop=after['height_above_crop'],base_height_target=self.profile.reward_height,
+                         aux=after['aux'],previous_previous=self.hist[:,-24:-12],on_flat=after['terrain_id']==self.terrain_names.index('flat'))
         falls=fell(s);timeout=self.steps>=round(self.cfg.episode_seconds/self.cfg.dt);done=falls|timeout
         if not torch.isfinite(s).all():raise FloatingPointError('Nonfinite PhysX state')
         own=self.own_mask;vb=st.velocity_body(s)

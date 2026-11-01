@@ -18,13 +18,14 @@ def main():
     p.add_argument('--driver',default='')
     p.add_argument('--flat-expert',default='')
     p.add_argument('--evaluation-python',default='')
-    p.add_argument('--iterations',type=int,default=60000)
+    p.add_argument('--iterations',type=int,default=120000)
     p.add_argument('--print-config',action='store_true')
     a=p.parse_args()
     root=Path(__file__).resolve().parents[1]
-    cfg_fn=TrainCfg.terrain if a.stage=='terrain' else TrainCfg
-    cfg=cfg_fn(robot=a.robot,iterations=a.iterations,driver_policy=a.driver,
-               expert_policy=a.flat_expert,evaluation_python=a.evaluation_python,
+    cfg=TrainCfg(robot=a.robot,stage=a.stage,wm_updates=2 if a.stage=='flat' else 4,
+               iterations=a.iterations,driver_policy=a.driver,driver_frac=.1 if a.driver else 0.,
+               expert_policy=a.flat_expert,expert_frac=.1 if a.flat_expert else 0.,
+               allow_missing_flat_expert=True,evaluation_python=a.evaluation_python,
                reset_critic=bool(a.resume and a.stage=='terrain'))
     cfg.validate()
     usd=Path(a.usd) if a.usd else root/'assets'/a.robot/('usd/go2.usd' if a.robot=='go2' else 'as2.usd')
@@ -33,7 +34,7 @@ def main():
         print(json.dumps(dict(config=asdict(cfg),usd=str(usd)),indent=2));return
     # Same lock as the existing supervisor: cannot overlap the current Go2 run.
     import fcntl
-    lock_path=Path.home()/'Documents/go2_supermimic_lab/physx_training.lock'
+    lock_path=root/'physx_training.lock'
     lock_path.parent.mkdir(parents=True,exist_ok=True)
     with lock_path.open('a') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)

@@ -19,3 +19,6 @@ checkpoints/
 .env.*
 *.pem
 *.key
+
+.training.lock
+physx_training.lock

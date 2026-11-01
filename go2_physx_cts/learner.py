@@ -67,7 +67,11 @@ class Learner:
         self.index=torch.arange(cfg.num_envs,device=cfg.device)
         self.source=provider_assignment(cfg.num_envs,cfg.driver_frac,cfg.expert_frac,cfg.teacher_fraction,cfg.device)
         self.ou=torch.zeros((cfg.num_envs,12),device=cfg.device)
-        self.it=0;self.lr_scale=1.;self.ramp_start=cfg.warmup_iterations;self.actor_frozen_until=0
+        self.it=0;self.lr_scale=1.;self.ramp_start=cfg.warmup_iterations;self.actor_frozen_until=cfg.warmup_iterations+cfg.critic_warmup_iterations
+        from .schedules import LearningRateController
+        self.schedule=LearningRateController(cfg)
+        self._critic_trial_data=None
+        self.native_teacher_history=[]
         self.last_good=None;self.collapse_strikes=0;self.nonfinite=0
         self.counts=dict(collect=0,transitions=0,wm=0,actor=0,critic=0,cts=0)
         self.metrics=[];self.start_time=time.monotonic()
@@ -77,12 +81,72 @@ class Learner:
         (self.output/'run_identity.json').write_text(json.dumps({'upstream_commit':UPSTREAM_COMMIT,'physics':'isaacsim_physx','providers':self.provider_counts,'imaginary_branch_samples':[int(cfg.imag_batch*cfg.teacher_fraction),cfg.imag_batch-int(cfg.imag_batch*cfg.teacher_fraction)],'branch_objective_weights':[1.,1.],'branch_loss':'teacher_loss.mean() + student_loss.mean()','replay_tensor_bytes':self.buf.storage_bytes,'expert_missing':not bool(expert),'init':'cold','curriculum_clock':'learner iteration; one real vector step per iteration; not PPO24-step-equivalent'},indent=2))
 
     def learning_rates(self):
-        cfg=self.cfg;t=min(1.,self.it/cfg.lr_decay_iterations)
-        lr=cfg.lr*(cfg.lr_final_frac+(1-cfg.lr_final_frac)*.5*(1+math.cos(math.pi*t)))*self.lr_scale
-        ramp=min(1.,max(0.,self.it-max(self.ramp_start,self.actor_frozen_until,cfg.warmup_iterations))/max(1,cfg.actor_ramp_iterations))
-        for opt,scale in [(self.opt_wm,1),(self.opt_actor,ramp*cfg.actor_lr_scale),(self.opt_critic,1)]:
-            for g in opt.param_groups:g['lr']=lr*scale
-        return {'wm':lr,'actor':lr*ramp*cfg.actor_lr_scale,'critic':lr,'cts':self.cfg.cts_lr,'actor_ramp':ramp}
+        rates=self.schedule.rates(self.it)
+        for name in ('wm','actor','critic','cts'):
+            for group in getattr(self,'opt_'+name).param_groups:group['lr']=rates[name]
+        return rates
+
+    def _wm_window_loss(self,model,w):
+        dp=torch.stack([st.pose_delta(w['pose'][:,j],w['pose'][:,j+1]) for j in range(self.cfg.wm_window)],1)
+        return model.loss(w['s'][:,0],w['a'],w['a_prev'],w['xi'],w['relief'].float(),w['s'][:,1:],dp,w['valid'],w['aux'])
+
+    def _cts_seed_loss(self,model,seed):
+        with torch.no_grad():
+            priv=st.privileged(seed['s'],seed['a_prev'],seed['command'],seed['xi'],seed['relief'])
+            label=self.policy.teacher_encoder(self.policy.teacher_norm(priv))
+            history=self.policy.history_norm(seed['obs'])
+        z,gate=model(history)
+        return (z-label).square().mean()+self.cfg.cts_balance*(gate.mean(0)-1/8).square().mean()
+
+    def adapt_learning_rates(self):
+        cfg=self.cfg
+        if not self.schedule.due('wm',self.it):return {}
+        train=self.buf.windows(cfg.wm_batch,cfg.wm_window,self.env.xi,env_parity=0)
+        val=self.buf.windows(cfg.wm_batch,cfg.wm_window,self.env.xi,env_parity=1)
+        result={'wm':self.schedule.supervised_trial('wm',self.wm,self.opt_wm,
+            lambda model:self._wm_window_loss(model,train),lambda model:self._wm_window_loss(model,val),self.it)}
+        if self._critic_trial_data is not None:
+            x,y=self._critic_trial_data
+            order=torch.randperm(len(x),device=self.device);left,right=torch.tensor_split(order,2)
+            result['critic']=self.schedule.supervised_trial('critic',self.critic,self.opt_critic,
+                lambda model:(model(x[left])-y[left]).square().mean(),
+                lambda model:(model(x[right])-y[right]).square().mean(),self.it)
+        if self.schedule.teacher_stable:
+            train_s=self.buf.seeds(cfg.cts_batch,self.env.xi,source=1)
+            val_s=self.buf.seeds(cfg.cts_batch,self.env.xi,source=1)
+            result['cts']=self.schedule.supervised_trial('cts',self.policy.student_encoder,self.opt_cts,
+                lambda model:self._cts_seed_loss(model,train_s),
+                lambda model:self._cts_seed_loss(model,val_s),self.it,teacher_stable=True)
+        from .diagnostics import native_candidate_probe
+        train_seed=self.buf.seeds(256,self.env.xi);val_seed=self.buf.seeds(256,self.env.xi)
+        split=(192,64)
+        def train_actor(policy):
+            obj,_=self.imag.rollout(self.wm,policy,self.critic,train_seed,split,iteration=self.it)
+            return branch_loss(obj,split,split)
+        def probe_actor(policy):
+            with torch.no_grad():
+                obj,_=self.imag.rollout(self.wm,policy,self.critic,val_seed,split,iteration=self.it)
+                metrics=native_candidate_probe(self,policy)
+                metrics['heldout_return']=float(obj[:192].mean()+obj[192:].mean())
+                return metrics
+        with frozen(self.wm,self.critic,self.policy.student_encoder):
+            result['actor']=self.schedule.actor_trial(self.policy,self.opt_actor,train_actor,probe_actor,self.it)
+        # A permanent fixed low-speed cohort releases CTS adaptation; changing
+        # terrain/command-course performance cannot be mistaken for stabilization.
+        stable_record=native_candidate_probe(self,self.policy,stability=True)
+        self.native_teacher_history=(self.native_teacher_history+[stable_record])[-3:]
+        rows=self.native_teacher_history
+        if len(rows)==3 and all(r['teacher_success']>=.8 for r in rows):
+            returns=[r['teacher_return'] for r in rows]
+            self.schedule.teacher_stable=(max(returns)-min(returns))/max(1.,abs(sum(returns)/3))<.05
+        result['cts_gate']={'native_history':rows,'teacher_stable':self.schedule.teacher_stable,
+            'scope':'fixed native flat cohort, not a sim2sim capability claim'}
+        self.ou.zero_()
+        if self.driver is not None:self.driver.reset(torch.ones(self.cfg.num_envs,dtype=torch.bool,device=self.device))
+        self.metrics=[]
+        self.learning_rates()
+        with (self.output/'lr_trials.jsonl').open('a') as handle:handle.write(json.dumps({'iteration':self.it,**result},allow_nan=False)+'\n')
+        return result
 
     @torch.no_grad()
     def collect(self):
@@ -107,9 +171,9 @@ class Learner:
         after,done,metrics=self.env.step(a)
         self.buf.add(s=before['s'],pose=before['pose'],a=a,a_prev=before['a_prev'],obs=before['obs'],
                      command=before['command'],timer=before['timer'],cmd_state=before['cmd_state'],done=done,relief=before['relief'],
-                     source=self.source,episode=before['episode'],xi=xi)
-        keep=~done
-        if keep.any():self.wm.update_stats(before['s'][keep],a[keep],before['a_prev'][keep],xi[keep],before['relief'][keep],after['s'][keep],st.pose_delta(before['pose'][keep],after['pose'][keep]))
+                     source=self.source,episode=before['episode'],xi=xi,a_prev2=before['obs'][:,-24:-12],s_next=after['s'],pose_next=after['pose'],aux_next=after['aux'])
+        keep=torch.ones_like(done)
+        if keep.any():self.wm.update_stats(before['s'][keep],a[keep],before['a_prev'][keep],xi[keep],before['relief'][keep],after['s'][keep],st.pose_delta(before['pose'][keep],after['pose'][keep]),after['aux'][keep])
         self.policy.update_stats(before['obs'],priv)
         self.ou[done]=0
         if self.driver is not None:self.driver.reset(done)
@@ -118,10 +182,10 @@ class Learner:
 
     def fit_world_model(self):
         losses=[]
-        for _ in range(self.cfg.wm_updates):
+        for _ in range(2 if self.it<self.cfg.terrain_start_iteration else self.cfg.wm_updates):
             w=mixed_windows(self.buf,self.archive,self.cfg,self.env.xi)
             dp=torch.stack([st.pose_delta(w['pose'][:,j],w['pose'][:,j+1]) for j in range(self.cfg.wm_window)],1)
-            loss=self.wm.loss(w['s'][:,0],w['a'],w['a_prev'],w['xi'],w['relief'].float(),w['s'][:,1:],dp,w['valid'])
+            loss=self.wm.loss(w['s'][:,0],w['a'],w['a_prev'],w['xi'],w['relief'].float(),w['s'][:,1:],dp,w['valid'],w['aux'])
             self.opt_wm.zero_grad(set_to_none=True);loss.backward();gn=clip_grad(self.wm.parameters(),self.cfg.grad_clip)
             if scalar_finite(gn) and scalar_finite(loss):self.opt_wm.step();self.counts['wm']+=1
             else:self.nonfinite+=1
@@ -155,6 +219,7 @@ class Learner:
             valid=data['critic_valid'].reshape(-1).bool();x=x[valid];y=y[valid]
         if len(x)<cfg.critic_minibatches:raise RuntimeError('Insufficient valid pre-timeout critic samples')
         self.critic.norm.update(x)
+        self._critic_trial_data=(x.detach(),y.detach())
         losses=[]
         for _ in range(cfg.critic_epochs):
             order=torch.randperm(len(x),device=self.device)
@@ -190,16 +255,18 @@ class Learner:
                'policy':self.policy.state_dict(),'critic':self.critic.state_dict(),'world_model':self.wm.state_dict(),
                'optimizers':{k:getattr(self,'opt_'+k).state_dict() for k in ('wm','actor','critic','cts')},
                'iteration':self.it,'counts':self.counts,'lr_scale':self.lr_scale,'ramp_start':self.ramp_start,
+               'schedule':self.schedule.state_dict(),'native_teacher_history':self.native_teacher_history,
                'curriculum':self.env.curriculum_state_dict(),
                'actor_frozen_until':self.actor_frozen_until,'rng':torch.get_rng_state(),
                'cuda_rng':torch.cuda.get_rng_state_all() if torch.cuda.is_available() else [],
-               'resume_mode':'fresh_simulator_episodes_and_replay; model/optimizer/normalizer_resume',
+               'reward_model_version':2,'resume_mode':'fresh_simulator_episodes_and_replay; model/optimizer/normalizer_resume',
                'physics':'isaacsim_physx','consts':{k:v.detach().cpu() for k,v in vars(self.env.consts).items()}}
         partial=path.with_suffix('.partial');torch.save(value,partial);os.replace(partial,path)
         return path
 
     def load(self,path,continue_run=False):
         ck=torch.load(path,map_location=self.device,weights_only=False)
+        if ck.get('reward_model_version')!=2:raise ValueError('Reward telemetry architecture requires fresh training or version2 checkpoint')
         if ck['schema']!='physx-cts-source-port-v1' or ck['physics']!='isaacsim_physx':raise ValueError('Old/Newton checkpoint forbidden')
         if ck['cfg'].get('robot','go2')!=self.cfg.robot:raise ValueError('Cross-robot checkpoint resume forbidden')
         for name,expected in ck['consts'].items():
@@ -213,6 +280,7 @@ class Learner:
             if k!='critic' or not reset_critic:getattr(self,'opt_'+k).load_state_dict(ck['optimizers'][k])
         if reset_critic:self.actor_frozen_until=self.cfg.warmup_iterations+self.cfg.critic_warmup_iterations
         if continue_run:
+            self.schedule.load_state_dict(ck['schedule']);self.native_teacher_history=ck.get('native_teacher_history',[])
             self.it=ck['iteration'];self.counts=ck['counts'];self.lr_scale=ck['lr_scale'];self.ramp_start=self.it
             self.actor_frozen_until=self.it+self.cfg.warmup_iterations
             # Retired evaluator metadata in immutable checkpoints is ignored.
@@ -234,7 +302,7 @@ class Learner:
         if path is None:return False
         ck=torch.load(path,map_location=self.device,weights_only=False)
         self.policy.load_state_dict(ck['policy']);self.critic.load_state_dict(ck['critic'])
-        self.lr_scale*=.5;self.ramp_start=self.it;self.collapse_strikes=0
+        self.schedule.rollback(self.it);self.lr_scale*=.5;self.ramp_start=self.it;self.collapse_strikes=0
         # Keep the newly trained WM/replay/archive, discard diverging policy moments.
         self.opt_actor=torch.optim.Adam(self.actor_params,lr=self.cfg.lr,betas=(.9,.95))
         self.opt_critic=torch.optim.Adam(self.critic.parameters(),lr=self.cfg.lr)
@@ -275,15 +343,16 @@ class Learner:
             self.collect();stats['wm_loss']=self.fit_world_model()
             if self.it>self.cfg.warmup_iterations:stats.update(self.improve_policy())
             stats['cts_loss']=self.update_cts()
+            if self.it>self.cfg.lr_fixed_until and self.it%self.cfg.lr_trial_interval==0:stats['lr_trials']=self.adapt_learning_rates()
             if self.it==1 or self.it%self.cfg.log_interval==0 or self.it==end:self.log(stats)
             if self.it==1 or self.it%self.cfg.save_interval==0 or self.it==end:
                 path=self.save()
                 if self.it>self.cfg.warmup_iterations and not self.collapse_strikes:self.last_good=path
-            if self.cfg.evaluation_python and self.it%self.cfg.evaluation_interval==0:
+            if self.it%self.cfg.evaluation_interval==0:
                 path=self.save();self.evaluate_feedback(path)
                 if getattr(self,'stop_requested',False):break
             if self.it==end and iterations is None:
-                (self.output/'needs_review.json').write_text(json.dumps({'iteration':self.it,'reason':'Iteration review reached; native and official transfer evidence required before extending budget','B0':False}))
+                (self.output/'training_complete.json').write_text(json.dumps({'iteration':self.it,'reason':'Configured iteration budget completed; capability must be read from measured diagnostics','B0':False}))
         return self.last_good
 
     def evaluate_feedback(self,path):
@@ -291,8 +360,9 @@ class Learner:
         from .diagnostics import native_diagnostics,model_diagnostics
         out=self.output/f'robogauge_{self.it:08d}'
         out.mkdir(parents=True,exist_ok=True)
-        jobs={'native':lambda:native_diagnostics(self),'model':lambda:model_diagnostics(self),
-              'transfer':lambda:evaluate_checkpoint(path,out,self.it,self.cfg.evaluation_python)}
+        jobs={'native':lambda:native_diagnostics(self),'model':lambda:model_diagnostics(self)}
+        if self.cfg.evaluation_python:jobs['transfer']=lambda:evaluate_checkpoint(path,out,self.it,self.cfg.evaluation_python)
+        else:(out/'transfer_unavailable.json').write_text(json.dumps({'robot':self.cfg.robot,'reason':'No verified official sim2sim adapter; native results only'}))
         for name,job in jobs.items():
             try:
                 result=job()

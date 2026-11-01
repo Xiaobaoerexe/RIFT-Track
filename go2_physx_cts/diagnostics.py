@@ -77,3 +77,49 @@ def model_diagnostics(learner,batch=2048):
                     'payload_bin':[a,b],'windows':int(mask.sum()),'state70_raw_mse':float(mse[mask].mean())})
     return {'iteration':learner.it,'rows':rows,'sampling':'uniform replay diagnostic; no sampling-weight changes',
             'note':'Raw mixed-unit state MSE, not a capability gate or normalized reward metric.'}
+
+
+@torch.no_grad()
+def native_candidate_probe(learner,policy,steps=128,stability=False):
+    """Discarded deterministic real-PhysX LR trial, never added to Replay."""
+    env=learner.env;cfg=learner.cfg;n=env.num_envs;dev=env.device
+    index=torch.arange(n,device=dev);teacher=index%2==0
+    commands=torch.tensor([(0.,0.,0.),(.5,0.,0.),(0.,.3,0.),(0.,0.,.8)],device=dev)[(index//2)%4]
+    if not stability:
+        commands=commands.clone();commands[(index//2)%4==1,0]=RANGE_STAGES[sum(learner.it>=v for v in RANGE_ITERATIONS)][0][1]
+    saved_types=saved_levels=saved_origins=None
+    if env.field is not None and stability:
+        terrain=env.scene.terrain
+        saved_types=terrain.terrain_types.clone();saved_levels=terrain.terrain_levels.clone();saved_origins=terrain.env_origins.clone()
+        columns=(env.terrain_lookup.column_types==env.terrain_names.index('flat')).nonzero().flatten()
+        terrain.terrain_types[:]=columns[index%len(columns)];terrain.terrain_levels[:]=(index//len(columns))%terrain.cfg.terrain_generator.num_rows
+        terrain.env_origins[:]=terrain.terrain_origins[terrain.terrain_levels,terrain.terrain_types]
+    env.evaluation_mode=True;env.command_override=commands
+    try:
+        env.reset(env.ids);env.set_payload(env.ids,torch.zeros(n,device=dev));env._snapshot=env._observe()
+        alive=torch.ones(n,device=dev,dtype=torch.bool)
+        returns=torch.zeros(n,device=dev);error=torch.zeros(n,device=dev);yaw_error=torch.zeros(n,device=dev);samples=torch.zeros(n,device=dev)
+        for step in range(steps):
+            before=env.snapshot()
+            priv=st.privileged(before['s'],before['a_prev'],commands,env.xi,before['relief'])
+            action=torch.zeros(n,12,device=dev)
+            for branch,mask in ((0,teacher),(1,~teacher)):action[mask]=policy(before['obs'][mask],priv[mask],branch)
+            after,done,_=env.step(action)
+            from .task import reward
+            r,_,_=reward(before['s'],after['s'],action,before['a_prev'],commands,env.consts,cfg.stage,
+                iteration=learner.it,height_above_crop=after['height_above_crop'],base_height_target=env.profile.reward_height,
+                aux=after['aux'],previous_previous=before['obs'][:,-24:-12],on_flat=after['terrain_id']==env.terrain_names.index('flat'))
+            returns+=r*alive;error+=(st.velocity_body(after['s'])[:,:2]-commands[:,:2]).square().mean(-1)*alive
+            yaw_error+=(after['s'][:,9]-commands[:,2]).square()*alive;samples+=alive
+            alive &= ~done
+        rmse=(error/samples.clamp_min(1)).sqrt()
+        success=alive&(rmse<.2)&((yaw_error/samples.clamp_min(1)).sqrt()<.3)&(after['s'][:,0]>.22)
+        return {'real_return':float(returns[teacher].mean()+returns[~teacher].mean()),
+            'falls_per_env_min':float((~alive).float().mean())*60/(steps*cfg.dt),
+            'tracking_rmse':float(rmse.mean()),'teacher_return':float(returns[teacher].mean()),
+            'teacher_success':float(success[teacher].float().mean())}
+    finally:
+        if saved_types is not None:
+            terrain.terrain_types.copy_(saved_types);terrain.terrain_levels.copy_(saved_levels);terrain.env_origins.copy_(saved_origins)
+        env.command_override=None;env.reset(env.ids);env.evaluation_mode=False
+        env.set_payload(env.ids,torch.rand(n,device=dev)*cfg.payload_max_kg);env._snapshot=env._observe()

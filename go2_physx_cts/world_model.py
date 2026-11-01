@@ -25,7 +25,7 @@ class WorldModel(nn.Module):
   def __init__(self, hidden: tuple[int, ...] = (1024, 1024, 1024)):
     super().__init__()
     in_dim = st.STATE_DIM + 2 * st.NUM_JOINTS + st.CONTEXT_DIM + SCAN_POINTS
-    out_dim = st.STATE_DIM + st.POSE_DELTA_DIM
+    out_dim = st.STATE_DIM + st.POSE_DELTA_DIM + st.AUX_DIM
     self.net = mlp(in_dim, hidden, out_dim)
     self.in_norm = RunningNorm(in_dim)
     # Normalizes the per-step change of s and the pose delta.
@@ -35,17 +35,21 @@ class WorldModel(nn.Module):
   def _inputs(s, a, a_prev, xi, relief):
     return torch.cat([s, a, a_prev, xi, s[:, st.Z] + relief], dim=-1)
 
-  def update_stats(self, s, a, a_prev, xi, relief, s_next, pose_delta) -> None:
+  def update_stats(self, s, a, a_prev, xi, relief, s_next, pose_delta, aux) -> None:
     self.in_norm.update(self._inputs(s, a, a_prev, xi, relief))
-    self.out_norm.update(torch.cat([s_next - s, pose_delta], dim=-1))
+    self.out_norm.update(torch.cat([s_next - s, pose_delta, aux], dim=-1))
 
   def forward(self, s, a, a_prev, xi, relief):
     """relief (B, P): ground under the base minus the ground at each scan point.
     Returns (s_next, pose_delta)."""
     y = self.out_norm.unnormalize(self.net(self.in_norm(self._inputs(s, a, a_prev, xi, relief))))
-    return s + y[:, : st.STATE_DIM], y[:, st.STATE_DIM :]
+    return s + y[:, : st.STATE_DIM], y[:, st.STATE_DIM :st.STATE_DIM+3]
 
-  def loss(self, s0, actions, actions_prev, xi, reliefs, s_targets, pose_targets, valid):
+  def forward_reward(self, s, a, a_prev, xi, relief):
+    y = self.out_norm.unnormalize(self.net(self.in_norm(self._inputs(s,a,a_prev,xi,relief))))
+    return s+y[:,:st.STATE_DIM], y[:,st.STATE_DIM:st.STATE_DIM+3], y[:,st.STATE_DIM+3:]
+
+  def loss(self, s0, actions, actions_prev, xi, reliefs, s_targets, pose_targets, valid, aux_targets):
     """k-step autoregressive loss in normalized output units.
 
     s0 (B, S); actions, actions_prev (B, k, 12); xi (B, C); reliefs (B, k, P) at
@@ -57,8 +61,8 @@ class WorldModel(nn.Module):
     s = s0
     total, denom = 0.0, valid.sum().clamp(min=1.0)
     for j in range(k):
-      s_pred, pose_pred = self(s, actions[:, j], actions_prev[:, j], xi, reliefs[:, j])
-      err = torch.cat([s_pred - s_targets[:, j], pose_pred - pose_targets[:, j]], dim=-1)
+      s_pred, pose_pred, aux_pred = self.forward_reward(s, actions[:, j], actions_prev[:, j], xi, reliefs[:, j])
+      err = torch.cat([s_pred - s_targets[:, j], pose_pred - pose_targets[:, j], aux_pred - aux_targets[:, j]], dim=-1)
       total = total + ((err / scale) ** 2).mean(-1).mul(valid[:, j]).sum()
       s = s_pred
     return total / denom
