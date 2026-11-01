@@ -1,218 +1,171 @@
-"""Functional port of Go2RLLab's pinned mixed-task command sampler.
+"""Task-separated velocity grids using Rapid Locomotion's weighted-cell sampler.
 
-Source: wty-yy/go2_rl_lab 6c95d9feef4814c25eb6536e61bb38e1d1d718d4,
-cmd_utils/rl_gym_cmd.py and tasks/mixed/env_cfg.py:CommandsCfg.
-The caller supplies learner iterations (num_steps_per_iter=1), not physics
-substeps. This module contains no capability gates or grid curriculum.
-
-All command memory is a packed floating tensor suitable for replay. Random
-choices may be supplied explicitly; no state tensor is mutated or detached.
+Grid/within-cell sampling and neighbor expansion are ports of
+Improbable-AI/rapid-locomotion-rl@f5143ef940e934849c00284e34caf164d6ce7b6e,
+mini_gym/envs/base/curriculum.py. Per-terrain macro statistics, downgrade,
+phase caps and .5/.75 thresholds are the explicitly approved project adaptation.
 """
-from itertools import product
 import math
 import torch
+SOURCE_COMMIT='f5143ef940e934849c00284e34caf164d6ce7b6e'
+CMD_STATE_DIM=20
+REQUEST,COMMAND=slice(0,3),slice(3,6)
+TIMER,ACCUMULATION,EPISODE_ELAPSED=6,slice(7,9),9
+LAST_LIMIT,COMMAND_COUNTER,MAX_DISTANCE=10,11,12
+ORIGIN,RANGE_STAGE,LIMIT_STAGE=slice(13,15),15,16
+GRID_BIN,TASK_ID,TERRAIN_ID=17,18,19
+COMMAND_NAMES=('lin_vel_x','lin_vel_y','ang_vel_yaw')
+TERRAIN_NAMES=('wave','slope_up','slope_down','rough_slope','stairs_up','stairs_down','obstacles','flat','wheels','small_squares','gap','indoor_obstacles','obstacle_up','obstacle_down')
+FINAL_TASK_COUNTS=(820,365,365,365,365,365,356,365,365,365)
+TASK_TERRAINS=((7,1,2,3),(7,),(0,6,8,9),(4,),(5,),(10,),(7,0,1,2,3,4,5,6,8,9),(11,),(12,),(13,))
 
-SOURCE_COMMIT = '6c95d9feef4814c25eb6536e61bb38e1d1d718d4'
-CMD_STATE_DIM = 17
-REQUEST, COMMAND = slice(0, 3), slice(3, 6)
-TIMER, ACCUMULATION, EPISODE_ELAPSED = 6, slice(7, 9), 9
-LAST_LIMIT, COMMAND_COUNTER, MAX_DISTANCE = 10, 11, 12
-ORIGIN, RANGE_STAGE, LIMIT_STAGE = slice(13, 15), 15, 16
-COMMAND_NAMES = ('lin_vel_x', 'lin_vel_y', 'ang_vel_yaw')
-RANGE_ITERATIONS = (5000, 15000, 25000, 35000, 45000)
-RANGE_STAGES = (
-    ((-.5, .5), (-.5, .5), (-1., 1.)),
-    ((-1., 1.), (-1., 1.), (-2., 2.)),
-    ((-2., 2.), (-1., 1.), (-3., 3.)),
-    ((-3., 3.), (-1., 1.), (-3., 3.)),
-    ((-4., 4.), (-1., 1.), (-3., 3.)),
-    ((-4.5, 4.2), (-1., 1.), (-3., 3.)),
-)
-TERRAIN_RANGES = {
-    'flat': ((-4.5, 4.2), (-1., 1.), (-3., 3.)),
-    'wave': ((-1.5, 1.5), (-1., 1.), (-1.5, 1.5)),
-    'slope_up': ((-1.5, 1.5), (-1., 1.), (-1.5, 1.5)),
-    'slope_down': ((-1.5, 1.5), (-1., 1.), (-1.5, 1.5)),
-    'rough_slope': ((-1.5, 1.5), (-1., 1.), (-1.5, 1.5)),
-    'stairs_up': ((-1., 1.), (-1., 1.), (-1.5, 1.5)),
-    'stairs_down': ((-1., 1.), (-1., 1.), (-1.5, 1.5)),
-    'obstacles': ((-1., 1.), (-1., 1.), (-1.5, 1.5)),
-    'wheels': ((-2., 1.5), (-1., 1.), (-1.5, 1.5)),
-    'small_squares': ((-1., 1.), (-1., 1.), (-1.5, 1.5)),
-}
-
-
-def zero_command_prob(iteration):
-    """Official linear zero-command ramp: 0 at iteration0, .1 at1500."""
-    if isinstance(iteration, torch.Tensor):
-        return (iteration / 1500.).clamp(0., 1.) * .1
-    return min(max(float(iteration) / 1500., 0.), 1.) * .1
-
+def phase(iteration):return 0 if iteration<2500 else 1 if iteration<5000 else 2 if iteration<8000 else 3
+def task_assignments(n,iteration,device):
+    active=1 if iteration<5000 else 5 if iteration<8000 else 10
+    weights=torch.tensor(FINAL_TASK_COUNTS[:active],dtype=torch.float64)
+    counts=torch.floor(weights/weights.sum()*n).long()
+    remainder=n-int(counts.sum());fractions=weights/weights.sum()*n-counts
+    if remainder:counts[torch.argsort(fractions,descending=True)[:remainder]]+=1
+    return torch.repeat_interleave(torch.arange(active,device=device),counts.to(device))
+def speed_cap(task,iteration):
+    if task==0:
+        return .5 if iteration<5000 else 1. if iteration<10000 else 1.5 if iteration<20000 else 2. if iteration<30000 else 2.5 if iteration<35000 else 3.
+    if task==1:return 1.5 if iteration<10000 else 2.5 if iteration<20000 else 4. if iteration<30000 else 5.
+    return 3.
+def zero_command_prob(iteration):return min(max(float(iteration)/1500.,0.),1.)*.1
 
 def coupled_clip(command):
-    """Apply official priority rules after terrain clipping, without in-place ops."""
-    x, y, yaw = command.unbind(-1)
-    fast = x.abs() > 2.
-    y = torch.where(fast, y.clamp(-.5, .5), y)
-    yaw = torch.where(fast, yaw.clamp(-1., 1.), yaw)
-    turning = yaw.abs() > 2.
-    x = torch.where(turning, x.clamp(-2., 2.), x)
-    y = torch.where(turning, y.clamp(-1., 1.), y)
-    return torch.stack((x, y, yaw), -1)
+    x,y,w=command.unbind(-1);fast=x.abs()>2.
+    return torch.stack((x,torch.where(fast,y.clamp(-.5,.5),y),torch.where(fast,w.clamp(-1.,1.),w)),-1)
 
-
-class GridTerrainLookup:
-    """Official half-open rectangular grid lookup; outside IDs are -1.
-
-    Metadata axes match Isaac terrain grids: rows along x, columns along y.
-    ``origin_xy`` is the lower grid corner, excluding the surrounding border;
-    ``column_ids`` maps each column to an index in ``names``. The PhysX mesh
-    adapter must supply these from its actual generator, not infer from robots.
-    """
-    def __init__(self, origin_xy, tile_size, rows, cols, column_ids, names, device='cpu'):
-        self.origin_xy = torch.as_tensor(origin_xy, device=device, dtype=torch.float32)
-        self.tile_size = torch.as_tensor(tile_size, device=device, dtype=torch.float32)
-        self.rows, self.cols, self.names = int(rows), int(cols), tuple(names)
-        self.column_ids = torch.as_tensor(column_ids, device=device, dtype=torch.long)
-        if (self.column_ids.shape != (self.cols,) or self.origin_xy.shape != (2,)
-                or self.tile_size.shape != (2,) or min(self.rows, self.cols) < 1
-                or not bool((self.tile_size > 0).all())
-                or not bool(((self.column_ids >= 0) & (self.column_ids < len(self.names))).all())):
-            raise ValueError('Invalid terrain grid metadata.')
-
-    def query(self, position_xy):
-        cell = torch.floor((position_xy[..., :2] - self.origin_xy.to(position_xy))
-                           / self.tile_size.to(position_xy)).long()
-        valid = ((cell[..., 0] >= 0) & (cell[..., 0] < self.rows)
-                 & (cell[..., 1] >= 0) & (cell[..., 1] < self.cols))
-        ids = self.column_ids.to(position_xy.device)[cell[..., 1].clamp(0, self.cols - 1)]
-        return torch.where(valid, ids, torch.full_like(ids, -1))
-
+class VelocityGrid:
+    """Checkpointed per-task grid, training-data-only per-terrain statistics."""
+    def __init__(self,device='cpu'):
+        axes=(torch.arange(-10,11,device=device)*.5,torch.arange(-5,6,device=device)*.2,torch.arange(-10,11,device=device)*.1)
+        self.shape=tuple(len(a) for a in axes)
+        self.grid=torch.stack(torch.meshgrid(*axes,indexing='ij'),-1).reshape(-1,3)
+        self.width=self.grid.new_tensor([.5,.2,.1]);g=len(self.grid)
+        self.weights=torch.zeros(10,g,device=device);self.extent=self.grid.new_tensor([[.5,.2,.1]]*10)
+        self.extent[1,0]=1.5
+        self.extent[[5,8,9],0]=1.
+        initial=(self.grid.abs()<=self.extent[0]+1e-6).all(-1)
+        self.weights[:,initial]=1.;self.weights[[5,8,9]]=(((self.grid[:,0]>=1.)&(self.grid[:,0]<=1.)&(self.grid[:,1:].abs()<=self.extent[0,1:]+1e-6).all(-1)).float())
+        self.weights[1,(self.grid[:,0]>=1.)&(self.grid[:,0]<=1.5)&(self.grid[:,1:].abs()<=self.extent[1,1:]+1e-6).all(-1)]=1.
+        self.sum=torch.zeros(10,14,g,device=device);self.count=torch.zeros_like(self.sum)
+        self.last_update=0;self.last_statistics={}
+    def bin_indices(self,command):
+        ix=torch.round(command/self.width).long()+command.new_tensor([10,5,10],dtype=torch.long)
+        ix=torch.maximum(torch.minimum(ix,ix.new_tensor([20,10,20])),torch.zeros_like(ix))
+        return (ix[:,0]*11+ix[:,1])*21+ix[:,2]
+    def state_dict(self):return {k:getattr(self,k).clone() for k in ('weights','extent','sum','count')}|{'last_update':self.last_update,'statistics':self.last_statistics}
+    def load_state_dict(self,s):
+        for k in ('weights','extent','sum','count'):getattr(self,k).copy_(s[k])
+        self.last_update=int(s['last_update']);self.last_statistics=s.get('statistics',{})
+    @torch.no_grad()
+    def record(self,task,terrain,bins,progress,own):
+        mask=own&(task!=6)&(terrain>=0)&(terrain<14)&torch.isfinite(progress)&(bins>=0)
+        idx=(task[mask]*14+terrain[mask])*len(self.grid)+bins[mask]
+        self.sum.view(-1).scatter_add_(0,idx,progress[mask].clamp(0,1));self.count.view(-1).scatter_add_(0,idx,torch.ones_like(progress[mask]))
+    @torch.no_grad()
+    def update(self,iteration):
+        if iteration<self.last_update+1000:return {}
+        result={}
+        for t in range(10):
+            if t==6:continue
+            c=self.count[t];seen=c>0;means=self.sum[t]/c.clamp_min(1)
+            # Standing/low-speed cells cannot alone unlock a new fast frontier.
+            frontier=(self.grid[:,0].abs()>=max(.25,float(self.extent[t,0])-.25))
+            tested=c*frontier[None];perterrain=(self.sum[t]*frontier[None]).sum(-1)/tested.sum(-1).clamp_min(1);terrains=tested.sum(-1)>0
+            if not bool(terrains.any()):continue
+            score=perterrain[terrains].mean();old=self.extent[t].clone()
+            if score>.75:self.extent[t]+=self.width
+            elif score<=.5:self.extent[t]=torch.maximum(self.extent[t]-self.width,self.width)
+            self.extent[t,0].clamp_(max=speed_cap(t,iteration));self.extent[t,1].clamp_(max=1.);self.extent[t,2].clamp_(max=1.)
+            if t in (5,8,9):self.extent[t,0].clamp_(min=1.,max=1.5 if iteration<20000 else 2.)
+            if t==1:self.extent[t,0].clamp_(min=min(speed_cap(1,iteration),max(1.5,float(self.extent[0,0])+.5)))
+            # Same-cell learning remains available; successful neighboring cells
+            # gain weight. Failure retracts only the outer envelope, not low bins.
+            macro=(means*seen).sum(0)/seen.sum(0).clamp_min(1);success=(seen.any(0))&(macro>.75)
+            w=self.weights[t].reshape(self.shape);good=success.reshape(self.shape)
+            neighbors=torch.nn.functional.max_pool3d(good.float()[None,None],3,stride=1,padding=1)[0,0].bool()
+            w.add_(neighbors*.2).clamp_(max=1.)
+            self.weights[t,(self.grid.abs()<=self.width+1e-6).all(-1)]=1.
+            result[str(t)]={'macro_progress':float(score),'terrain_progress':{TERRAIN_NAMES[i]:float(perterrain[i]) for i in terrains.nonzero().flatten().tolist()},'old_extent':old.tolist(),'extent':self.extent[t].tolist()}
+        self.sum.zero_();self.count.zero_();self.last_update=int(iteration);self.last_statistics=result
+        return result
+    def sample(self,task,terrain,iteration,generator=None):
+        # Ten shared distributions, rather than B copies of the entire grid.
+        key=(int(iteration),int(self.last_update))
+        if getattr(self,'_cache_key',None)!=key:
+            caps=self.grid.new_tensor([speed_cap(t,iteration) for t in range(10)])
+            extent=self.extent.clone();extent[:,0]=torch.minimum(extent[:,0],caps)
+            extent[[5,8,9],0]=extent[[5,8,9],0].clamp(min=1.,max=1.5 if iteration<20000 else 2.)
+            extent[[5,8,9],1:]=extent.new_tensor([.15,.1])
+            enabled=(self.grid[None].abs()<=extent[:,None]+1e-6).all(-1)
+            lower=self.extent[0,0].clamp(max=speed_cap(0,iteration))
+            enabled[1]&=self.grid[:,0]>=lower
+            for t in (3,4,5,7,8,9):enabled[t]&=self.grid[:,0]>=0.
+            for t in (5,8,9):enabled[t]&=self.grid[:,0]>=1.
+            weight=self.weights*enabled
+            empty=weight.sum(-1)==0;weight=torch.where(empty[:,None],enabled.float(),weight)
+            self._sample_cdf=weight.cumsum(-1)/weight.sum(-1,keepdim=True).clamp_min(1e-9)
+            self._sample_extent=extent;self._sample_lower=lower;self._cache_key=key
+        n=len(task);u=torch.rand(10,n,device=task.device,generator=generator)
+        choices=torch.searchsorted(self._sample_cdf.contiguous(),u.contiguous()).clamp_max(len(self.grid)-1)
+        ix=choices[task,torch.arange(n,device=task.device)]
+        extent=self._sample_extent[task];sample=self.grid[ix]+(torch.rand(n,3,device=task.device,generator=generator)-.5)*self.width
+        sample=torch.maximum(torch.minimum(sample,extent),-extent)
+        lower=torch.where(task==1,self._sample_lower.expand_as(sample[:,0]),-extent[:,0])
+        forward=(task==3)|(task==4)|(task==5)|(task==7)|(task==8)|(task==9)
+        lower=torch.where(forward,torch.full_like(lower,.2),lower)
+        special=(task==5)|(task==8)|(task==9)
+        lower=torch.where(special,torch.full_like(lower,1.),lower)
+        vx=torch.maximum(sample[:,0],lower)
+        vx=torch.where(special,vx.clamp(min=1.,max=1.5 if iteration<20000 else 2.),vx)
+        vy=torch.where(special,sample[:,1].clamp(-.15,.15),sample[:,1])
+        wz=torch.where(special,sample[:,2].clamp(-.1,.1),sample[:,2])
+        membership=torch.nn.functional.one_hot(task,10)
+        rank=(membership.cumsum(0)*membership).sum(-1)-1;totals=membership.sum(0).clamp_min(1)
+        offset=(torch.rand(10,device=task.device,generator=generator)*totals).long()
+        pure=((rank-offset[task])%totals[task])<torch.ceil(.3*totals[task]).long()
+        vy=torch.where(pure,torch.zeros_like(vy),vy);wz=torch.where(pure,torch.zeros_like(wz),wz)
+        vx=torch.where(task==6,torch.full_like(vx,.5),vx);vy=torch.where(task==6,torch.zeros_like(vy),vy);wz=torch.where(task==6,torch.zeros_like(wz),wz)
+        return coupled_clip(torch.stack((vx,vy,wz),-1)),ix
 
 class OfficialCommands:
-    """One functional command transition for both real and imagined rollouts.
-
-    ``initial``/``reset`` resample without advancing episode time. ``advance``
-    consumes one dt, resamples expired timers, clips requests at the current
-    terrain, and updates displacement. Pass the post-physics XY position.
-    ``random`` is optional [N,8] independent U[0,1) values; unused draws keep
-    shapes static. Compared with upstream this changes RNG consumption, not
-    sampling probabilities. The caller checkpoints its generator/global RNG.
-    """
-    resampling_time = 5.0
-    command_area_length = 8.0
-    num_steps_per_iter = 1
-    limit_vel_prob = .2
-    limit_vel_hold_prob = 0.
-    limit_ang_vel_at_zero_command_prob = .2
-    zero_command_prob = staticmethod(zero_command_prob)
-
-    def __init__(self, dt=.02, episode_seconds=25., terrain_lookup=None):
-        self.dt, self.episode_seconds = float(dt), float(episode_seconds)
-        if not math.isfinite(self.dt) or not math.isfinite(self.episode_seconds) or self.dt <= 0 or self.episode_seconds <= 0:
-            raise ValueError('Positive finite control dt and episode duration required.')
-        self.max_episode_steps = math.ceil(self.episode_seconds / self.dt)
-        self.terrain_lookup = terrain_lookup
-        self.terrain_names = () if terrain_lookup is None else tuple(terrain_lookup.names)
-        if set(self.terrain_names) - set(TERRAIN_RANGES):
-            raise ValueError('Missing official command ranges for terrain names.')
-
-    @staticmethod
-    def command(state):
-        return state[:, COMMAND]
-
-    @staticmethod
-    def timer(state):
-        return state[:, TIMER:TIMER + 1]
-
-    def _ranges(self, state, position_xy, stage):
-        global_ranges = state.new_tensor(RANGE_STAGES)[stage.long()]
-        if self.terrain_lookup is None:
-            return global_ranges, global_ranges
-        ids = self.terrain_lookup.query(position_xy)
-        table = state.new_tensor([TERRAIN_RANGES['flat']] + [TERRAIN_RANGES[name] for name in self.terrain_names])
-        terrain_ranges = table[ids + 1]
-        local = torch.clamp(global_ranges, min=terrain_ranges[..., :1], max=terrain_ranges[..., 1:])
-        return global_ranges, local
-
-    def initial(self, position_xy, origins_xy, iteration=0, *, generator=None, random=None):
-        state = position_xy.new_zeros((len(position_xy), CMD_STATE_DIM))
-        return self.reset(state, torch.ones(len(state), device=state.device, dtype=torch.bool),
-                          position_xy, origins_xy, iteration, generator=generator, random=random)
-
-    def reset(self, state, mask, position_xy, origins_xy, iteration, *, generator=None, random=None):
-        """Reset selected episodes; nonreset rows retain memory and raw requests.
-
-        ``mask`` is [N] bool. A reset triggers the global iteration stage update
-        just as the source manager's _resample does. All rows are re-clipped.
-        """
-        fresh = torch.cat((torch.zeros_like(state[:, :ORIGIN.start]), origins_xy[:, :2],
-                           state[:, RANGE_STAGE:]), -1)
-        base = torch.where(mask[:, None], fresh, state)
-        return self._resample(base, mask, position_xy, iteration, generator=generator, random=random)
-
-    def advance(self, state, position_xy, iteration, *, generator=None, random=None):
-        elapsed = state[:, EPISODE_ELAPSED] + self.dt
-        timer = state[:, TIMER] - self.dt
-        updated = torch.cat((state[:, :TIMER], timer[:, None], state[:, ACCUMULATION],
-                             elapsed[:, None], state[:, LAST_LIMIT:]), -1)
-        result = self._resample(updated, timer <= 0., position_xy, iteration, generator=generator, random=random)
-        distance = torch.linalg.vector_norm(position_xy[:, :2] - result[:, ORIGIN], dim=-1)
-        maximum = torch.maximum(result[:, MAX_DISTANCE], distance)
-        return torch.cat((result[:, :MAX_DISTANCE], maximum[:, None], result[:, ORIGIN.start:]), -1)
-
-    def _resample(self, state, due, position_xy, iteration, *, generator=None, random=None):
-        if state.ndim != 2 or state.shape[1] != CMD_STATE_DIM:
-            raise ValueError('Expected packed command state [N,17].')
-        # Lazy global curriculum activation matches the official manager:
-        # stages change at the first resampling event at/after the iteration.
-        clock = torch.as_tensor(iteration, device=state.device)
-        current_stage = (clock[..., None] >= clock.new_tensor(RANGE_ITERATIONS)).sum(-1)
-        current_limit_stage = (clock >= 25000).long()
-        stage = torch.where(due.any(), current_stage, state[:, RANGE_STAGE]).expand(len(state))
-        limit_stage = torch.where(due.any(), current_limit_stage, state[:, LIMIT_STAGE]).expand(len(state))
-        global_ranges, ranges = self._ranges(state, position_xy, stage)
-        u = torch.rand((len(state), 8), device=state.device, dtype=state.dtype, generator=generator) if random is None else random
-        if u.shape != (len(state), 8):
-            raise ValueError('Command random draws must have shape [N,8].')
-        remaining = (.625 * self.command_area_length
-                     - torch.linalg.vector_norm(state[:, ACCUMULATION], dim=-1) * self.resampling_time).clamp_min(0.)
-        remaining_time = self.max_episode_steps * self.dt - state[:, EPISODE_ELAPSED] + self.dt
-        lower = (remaining / (remaining_time + 1e-9)).clamp_min(0.)
-        negative = (-lower[:, None] - ranges[:, :2, 0]).relu()
-        positive = (ranges[:, :2, 1] - lower[:, None]).relu()
-        draw = u[:, :2] * (negative + positive + 1e-6)
-        xy = torch.where(draw < negative, ranges[:, :2, 0] + draw,
-                         ranges[:, :2, 1] - positive + draw - negative)
-        yaw = ranges[:, 2, 0] + u[:, 2] * (ranges[:, 2, 1] - ranges[:, 2, 0])
-        sampled = torch.cat((xy, yaw[:, None]), -1)
-        limited = u[:, 3] < self.limit_vel_prob
-        early_combos = state.new_tensor(tuple(product((-1, 1), (-1, 1), (-1, 0, 1))))
-        late_combos = state.new_tensor(tuple(product((-1, 1), (0,), (-1, 0, 1))))
-        code = torch.where(limit_stage[:, None].bool(), late_combos[(u[:, 4] * 6).long().clamp_max(5)],
-                           early_combos[(u[:, 4] * 12).long().clamp_max(11)])
-        boundary = torch.where(code < 0, global_ranges[..., 0], global_ranges[..., 1])
-        boundary = torch.where(code == 0, torch.zeros_like(boundary), boundary)
-        # Upstream inverts the newly sampled value when the preceding command
-        # was limited. It does not invert the preceding saved boundary command.
-        limit_value = torch.where(state[:, LAST_LIMIT:LAST_LIMIT + 1].bool(), -sampled, boundary)
-        sampled = torch.where(limited[:, None], limit_value, sampled)
-        max_lin = global_ranges[:, :2].abs().flatten(1).amax(-1)
-        zero_time = (self.episode_seconds - state[:, EPISODE_ELAPSED]
-                     - remaining / (.8 * max_lin + 1e-9)).clamp(0., self.resampling_time)
-        is_zero = ((u[:, 3] >= self.limit_vel_prob)
-                   & (u[:, 3] < self.limit_vel_prob + zero_command_prob(iteration)) & (zero_time > 0.))
-        zero_yaw = torch.where(u[:, 6] < .5, ranges[:, 2, 0], ranges[:, 2, 1])
-        zero_yaw = torch.where(u[:, 5] < self.limit_ang_vel_at_zero_command_prob, zero_yaw, torch.zeros_like(zero_yaw))
-        zero_command = torch.stack((torch.zeros_like(zero_yaw), torch.zeros_like(zero_yaw), zero_yaw), -1)
-        sampled = torch.where(is_zero[:, None], zero_command, sampled)
-        request = torch.where(due[:, None], sampled, state[:, REQUEST])
-        actual = coupled_clip(torch.clamp(request, min=ranges[..., 0], max=ranges[..., 1]))
-        new_timer = torch.where(is_zero, zero_time, torch.full_like(zero_time, self.resampling_time))
-        timer = torch.where(due, new_timer, state[:, TIMER])
-        accumulation = state[:, ACCUMULATION] + torch.where(due[:, None], actual[:, :2], torch.zeros_like(actual[:, :2]))
-        last_limit = torch.where(due, limited.to(state.dtype), state[:, LAST_LIMIT])
-        counter = state[:, COMMAND_COUNTER] + due.to(state.dtype)
-        return torch.cat((request, actual, timer[:, None], accumulation,
-                          state[:, EPISODE_ELAPSED:EPISODE_ELAPSED + 1], last_limit[:, None], counter[:, None],
-                          state[:, MAX_DISTANCE:ORIGIN.stop], stage[:, None], limit_stage[:, None]), -1)
+    """Functional command state shared by real and imagined rollout; task grids own sampling."""
+    resampling_time=5.;num_steps_per_iter=1;zero_command_prob=staticmethod(zero_command_prob)
+    def __init__(self,dt=.02,episode_seconds=25.,terrain_lookup=None):
+        self.dt,self.episode_seconds=float(dt),float(episode_seconds);self.terrain_lookup=terrain_lookup;self.grid=None
+    def _grid(self,device):
+        if self.grid is None:self.grid=VelocityGrid(device)
+        return self.grid
+    def command(self,s):return s[:,COMMAND]
+    def timer(self,s):return s[:,TIMER:TIMER+1]
+    def initial(self,position_xy,origins_xy,iteration=0,*,task_id=None,terrain_id=None,**kw):
+        s=position_xy.new_zeros(len(position_xy),CMD_STATE_DIM)
+        if task_id is not None:s[:,TASK_ID]=task_id
+        if terrain_id is not None:s[:,TERRAIN_ID]=terrain_id
+        return self.reset(s,torch.ones(len(s),device=s.device,dtype=torch.bool),position_xy,origins_xy,iteration,**kw)
+    def reset(self,s,mask,position_xy,origins_xy,iteration,*,task_id=None,terrain_id=None,generator=None,random=None):
+        out=s.clone();out[mask,:17]=0.;out[mask,ORIGIN]=origins_xy[mask,:2]
+        if task_id is not None:out[mask,TASK_ID]=task_id[mask].to(out.dtype)
+        if terrain_id is not None:out[mask,TERRAIN_ID]=terrain_id[mask].to(out.dtype)
+        return self._resample(out,mask,iteration,generator)
+    def _resample(self,s,mask,iteration,generator=None):
+        # Sampling draws are independent of states: no detach on useful state paths.
+        sampled,bins=self._grid(s.device).sample(s[:,TASK_ID].long(),s[:,TERRAIN_ID].long(),iteration,generator)
+        zeros=(torch.rand(len(s),device=s.device,generator=generator)<zero_command_prob(iteration))&(s[:,TASK_ID]==0)
+        sampled=torch.where(zeros[:,None],torch.zeros_like(sampled),sampled);bins=self.grid.bin_indices(sampled)
+        request=torch.where(mask[:,None],sampled,s[:,REQUEST]);out=s.clone();out[:,REQUEST]=request;out[:,COMMAND]=request
+        out[:,TIMER]=torch.where(mask,torch.full_like(s[:,TIMER],self.resampling_time),s[:,TIMER])
+        out[:,ACCUMULATION]=s[:,ACCUMULATION]+torch.where(mask[:,None],request[:,:2],torch.zeros_like(request[:,:2]))
+        out[:,COMMAND_COUNTER]=s[:,COMMAND_COUNTER]+mask;out[:,RANGE_STAGE]=phase(iteration)
+        out[:,GRID_BIN]=torch.where(mask,bins,s[:,GRID_BIN]);return out
+    def advance(self,s,position_xy,iteration,*,generator=None,random=None,task_ids=None,terrain_ids=None):
+        out=s.clone();out[:,TIMER]=s[:,TIMER]-self.dt;out[:,EPISODE_ELAPSED]=s[:,EPISODE_ELAPSED]+self.dt
+        out=self._resample(out,out[:,TIMER]<=0,iteration,generator)
+        out[:,MAX_DISTANCE]=torch.maximum(s[:,MAX_DISTANCE],(position_xy[:,:2]-s[:,ORIGIN]).norm(dim=-1));return out
+    def state_dict(self):return None if self.grid is None else self.grid.state_dict()
+    def load_state_dict(self,s):
+        if s is not None:self._grid(s['weights'].device).load_state_dict(s)

@@ -1,9 +1,44 @@
 {
-  "go2_rl_lab": {"repository":"https://github.com/wty-yy/go2_rl_lab","commit":"6c95d9feef4814c25eb6536e61bb38e1d1d718d4","scope":"CTS branch means, command sampler and iteration stages, mixed direct mesh, distance terrain progression, two reward definitions/courses"},
-  "go2_supermimic": {"repository":"https://github.com/Zhengtianjin/go2-supermimic","commit":"d9eee9b3f248e5300e636c433255db2c1c3e086a","scope":"shared replay, persistent terrain10% driver+10% flat expert, WM/BPTT cadence, priorities/archive, OU, normalization, optimizers, ramp/collapse and new-stage resume"},
-  "robogauge": {"repository":"https://github.com/wty-yy/RoboGauge","commit":"add2c7ee0185ea8fd93d242f86e1c8cac6e9913b","mujoco":"3.2.3","scope":"unchanged official sim/PD/reset loop and XML; checkpoint controls and CTS ABI adapters"},
-  "rapid_locomotion": {"commit":"f5143ef940e934849c00284e34caf164d6ce7b6e","selected":false,"reason":"official command sampler already includes coupled, boundary, zero and dynamic sampling; user condition for grid is not met"},
-  "project_adaptations": ["Isaac Sim/PhysX instead of upstream mjlab/MuJoCo Warp", "3D velocity command, blind CTS student", "logical learner curriculum iteration collects1 step, whereas Go2RLLab PPO iteration collects24", "validated13 task rewards retained plus source body-height and vertical-speed terms; not complete official15 reward suite", "rigid point payload0..2kg at existing base COM per episode", "flat provider is measured low-speed velocity expert, not source jumping/ducking expert", "teacher/student8192 total samples6144/2048; branch objectives1+1", "native and transfer diagnostics do not gate source iteration curriculum"],
-  "author_results_caveat":"Source terrain README reports multiple stages/restarts; this composition is not claimed an end-to-end reproduction based on source text.",
-  "baseline_checkpoint_sha256":"eb12315e21e0037d81514af43184210276dee515c3722b9817b12cdc90d6fd11"
+  "parent_training_commit": "fa3c776af150986776b5c513130c0e7a8b38b4c6",
+  "go2_rl_lab": {
+    "repository": "https://github.com/wty-yy/go2_rl_lab",
+    "commit": "6c95d9feef4814c25eb6536e61bb38e1d1d718d4",
+    "scope": "CTS shared Actor and distillation ownership, dense terrain recipe, official reward ingredients and distance curriculum"
+  },
+  "go2_supermimic": {
+    "repository": "https://github.com/Zhengtianjin/go2-supermimic",
+    "commit": "d9eee9b3f248e5300e636c433255db2c1c3e086a",
+    "scope": "shared Replay starts, 8-step WM, 32-step BPTT, TD-lambda, source priorities/FIFO archive, OU, optimizer/clipping and collapse rollback"
+  },
+  "robogauge": {
+    "repository": "https://github.com/wty-yy/RoboGauge",
+    "commit": "add2c7ee0185ea8fd93d242f86e1c8cac6e9913b",
+    "mujoco": "3.2.3",
+    "scope": "unchanged simulation/PD/reset loop and robot XML; expanded perceptive ABI"
+  },
+  "rapid_locomotion": {
+    "repository": "https://github.com/Improbable-AI/rapid-locomotion-rl",
+    "commit": "f5143ef940e934849c00284e34caf164d6ce7b6e",
+    "file": "mini_gym/envs/base/curriculum.py",
+    "selected": true,
+    "scope": "weighted cells, within-cell draws, successful neighbor expansion; explicit project downgrade/macro terrain score adaptations"
+  },
+  "cts_moe_paper": {
+    "arxiv": "2606.19633v1",
+    "source_level": "paper; no author training code acquired",
+    "scope": "depth CNN+GRU fusion, task teacher input, dense action experts and task critics; adaptations specified in BUILD_CONTRACT.txt"
+  },
+  "project_adaptations": [
+    "Isaac Sim/PhysX, three-dimensional velocity commands, ten tasks",
+    "8 action experts and 8 proprio experts; student params distillation-only",
+    "6144 teacher/2048 student imagined trajectories, equal branch mean weights1+1",
+    "frozen supplied depth generator/noise0.1.0 and25Hz recurrent observations",
+    "new approved task geometries, calibrated rewards and full-pose physical WM",
+    "120000 learner iterations, task/terrain/velocity curricula separated",
+    "bounded validation LR trials, not PPO KL",
+    "rigid payload0..1.2kg per episode",
+    "available official collection task1..5 only; missing skill experts explicit",
+    "cold initialization; old baseline checkpoint NOT loaded"
+  ],
+  "evidence_boundary": "Source facts and paper results do not certify this new composition. Full-stack smoke proves execution and stated invariants, not learned locomotion."
 }

@@ -1,79 +1,139 @@
-"""Frozen native/model diagnostics. No curriculum or transfer-based rollback."""
+"""Matched fixed-difficulty PhysX probes, separate from official transfer results."""
+import copy,hashlib,json
 import torch
 from . import state as st
-from .commands import RANGE_ITERATIONS,RANGE_STAGES,TERRAIN_RANGES,coupled_clip
+from .terrain import geometry_crop
 
-def terrain_ids(env,xy):
-    lookup=env.command_sampler.terrain_lookup
-    return (torch.zeros(len(xy),device=xy.device,dtype=torch.long),('flat',)) if lookup is None else (lookup.query(xy),lookup.names)
+def _ids(snapshot,key):return snapshot[key].reshape(-1).long()
 
 @torch.no_grad()
-def native_diagnostics(learner,steps=500):
-    env,p=learner.env,learner.policy;dev=env.device;n=env.num_envs
-    stage=sum(learner.it>=v for v in RANGE_ITERATIONS)
-    current=RANGE_STAGES[stage][0][1];adjacent=RANGE_STAGES[min(stage+1,len(RANGE_STAGES)-1)][0][1]
-    commands=torch.tensor([(0,0,0),(.5,0,0),(-.3,0,0),(0,.3,0),(0,0,.8),(current,0,0),(adjacent,0,0)],device=dev)
-    index=torch.arange(n,device=dev);ci=index%len(commands);payload=(index//len(commands)%3).float()
-    rows=[];env.evaluation_mode=True
+def _native_probe(learner,policy,steps,per_task=24,high_speed=None):
+    env=learner.env;dev=env.device;n=env.num_envs
+    course=copy.deepcopy(env.curriculum_state_dict());was_eval=env.evaluation_mode
+    command_override=env.command_override;rows=[]
+    devices=[torch.device(dev).index or 0] if str(dev).startswith('cuda') else []
     try:
+        env.evaluation_mode=True
+        env.set_diagnostic_levels(0)
         for branch in (0,1):
-            env.command_override=None;env.reset(env.ids);env.set_payload(env.ids,payload)
-            snap=env._observe();kind,names=terrain_ids(env,snap['pose'][:,:2])
-            table=commands.new_tensor([TERRAIN_RANGES['flat']]+[TERRAIN_RANGES[name] for name in names])
-            limits=table[kind+1];cmd=coupled_clip(commands[ci].clamp(min=limits[...,0],max=limits[...,1]))
-            env.command_override=cmd;env.command=cmd.clone();env._snapshot=env._observe()
-            alive=torch.ones(n,device=dev,dtype=torch.bool);samples=torch.zeros(n,device=dev)
-            sums=torch.zeros(n,6,device=dev)
-            for i in range(steps):
-                b=env.snapshot();priv=st.privileged(b['s'],b['a_prev'],cmd,env.xi,b['relief'])
-                action=p(b['obs'],priv,branch);after,done,_=env.step(action)
-                alive &= ~done
-                if i>=50:
-                    s=after['s'];v=st.velocity_body(s)
-                    value=torch.stack(((v[:,:2]-cmd[:,:2]).square().mean(-1),(s[:,9]-cmd[:,2]).square(),s[:,0],v[:,0],v[:,1],s[:,9]),-1)
-                    sums+=value*alive[:,None];samples+=alive
-            means=sums/samples.clamp_min(1)[:,None];xy=means[:,0].sqrt();yaw=means[:,1].sqrt()
-            # Preserve historical low-speed thresholds; higher-speed results are
-            # diagnostics with a20%-command tolerance, never a course gate.
-            tolerance=torch.maximum(torch.full_like(xy,.2),.2*cmd[:,:2].norm(dim=-1))
-            success=alive&(samples>0)&(xy<tolerance)&(yaw<.3)&(means[:,2]>.22)
-            for k in kind.unique().tolist():
-                for c in range(len(commands)):
-                    for load in (0,1,2):
-                        mask=(kind==k)&(ci==c)&(payload==load)
-                        if not mask.any():continue
-                        m=means[mask]
-                        rows.append({'branch':('teacher','student')[branch],'terrain':'border' if k<0 else names[k],
-                            'case':('standing','forward_low','reverse_low','lateral_low','turn_low','current_speed','adjacent_speed')[c],
-                            'payload_kg':load,'command':cmd[mask][0].tolist(),'trials':int(mask.sum()),
-                            'survival_fraction':float(alive[mask].float().mean()),'success_fraction':float(success[mask].float().mean()),
-                            'xy_rmse':float(xy[mask].mean()),'yaw_rmse':float(yaw[mask].mean()),
-                            'height':float(m[:,2].mean()),'vx':float(m[:,3].mean()),'vy':float(m[:,4].mean()),'wz':float(m[:,5].mean()),
-                            'task_ratio_target':.8,'adjacent_failure_allowance':.5,'automatic_course_gate':False})
+            # Identical terrain, payload, command and initialization across
+            # candidates; this clock does not advance the training curriculum.
+            with torch.random.fork_rng(devices=devices):
+                torch.manual_seed(76119)
+                if devices:torch.cuda.manual_seed_all(76119)
+                env.command_override=None;env.reset(env.ids)
+                snap=env._observe();tasks=_ids(snap,'task_ids')
+                chosen=[]
+                for task in range(10):chosen.append((tasks==task).nonzero().flatten()[:per_task])
+                index=torch.cat(chosen);nt=len(index)
+                payload=torch.zeros(n,device=dev);payload[index]=(torch.arange(nt,device=dev)%3)*.6
+                env.set_payload(env.ids,payload)
+                commands=torch.tensor([[.5,0,0],[0,0,0],[.5,.2,.3]],device=dev)
+                cmd=commands[torch.arange(n,device=dev)%3].clone()
+                cmd[tasks==1]=torch.tensor([1.5 if high_speed is None else high_speed,0,0],device=dev)
+                cmd[(tasks==5)|(tasks==8)|(tasks==9)]=torch.tensor([.8,0,0],device=dev)
+                env.command_override=cmd;env.command=cmd.clone();env._snapshot=env._observe()
+                hidden=torch.zeros(nt,256,device=dev);image=torch.zeros(nt,1,48,64,device=dev)
+                live=torch.ones(nt,device=dev,dtype=torch.bool);returns=torch.zeros(nt,device=dev)
+                error=torch.zeros(nt,device=dev);yaw_error=error.clone();height=torch.zeros(nt,device=dev);slip=torch.zeros(nt,device=dev)
+                counts=torch.zeros(nt,device=dev);failures=torch.zeros(nt,device=dev,dtype=torch.bool)
+                success=torch.zeros(nt,device=dev,dtype=torch.bool)
+                for j in range(steps):
+                    full=env.snapshot();b={k:v[index] for k,v in full.items() if torch.is_tensor(v) and v.ndim and len(v)==n}
+                    # Depth at25Hz, recurrent controller at50Hz. No stale image
+                    # from another pose or replay trajectory is substituted.
+                    if branch==1 and j%2==0:
+                        image=learner.depth.render(b['pose'],b['scene_ids'],j,0,index,mode='inference')
+                    priv=st.privileged(b['s'],b['a_prev'],b['command'],b['xi'],b['relief'])
+                    act,hidden,_,_=policy.step(b['obs'].float(),priv,branch,depth=image,hidden=hidden,
+                        height=geometry_crop(b['s'],b['pose'],env.field,kind='teacher'),task_ids=tasks[index])
+                    action=torch.zeros(n,12,device=dev);action[index]=act
+                    after,done,_=env.step(action)
+                    s=after['s'][index];v=st.velocity_body(s)
+                    returns+=after['reward'][index]*live
+                    error+=(v[:,:2]-cmd[index,:2]).square().sum(-1)*live
+                    yaw_error+=(s[:,9]-cmd[index,2]).square()*live
+                    height+=s[:,0]*live;counts+=live
+                    tele=after['telemetry'];feet=tele['foot_velocity'][index]
+                    support=tele['contact_prob'][index,:4]
+                    slip+=(feet[...,:2].norm(dim=-1)*support).sum(-1)/support.sum(-1).clamp_min(1)*live
+                    failures|=live&after['terminated'][index].bool()
+                    success|=live&(after['task_context'][index,3]>=.99)
+                    live&=~done[index]
+                for task in tasks[index].unique().tolist():
+                    mask=tasks[index]==task;den=counts[mask].clamp_min(1)
+                    trial_xy=(error[mask]/den).sqrt();trial_yaw=(yaw_error[mask]/den).sqrt()
+                    tolerance=torch.maximum(torch.full_like(trial_xy,.2),.2*cmd[index][mask,:2].norm(dim=-1))
+                    mastered=(~failures[mask])&(counts[mask]>=steps*.95)&(trial_xy<tolerance)&(trial_yaw<.3)
+                    if task in (5,6,8,9):mastered=(~failures[mask])&success[mask]
+                    rows.append({'task_id':task,'branch':('teacher','student')[branch],'trials':int(mask.sum()),
+                        'mean_return':float(returns[mask].mean()),'survival_fraction':float((~failures[mask]).float().mean()),
+                        'success_fraction':float(success[mask].float().mean()),
+                        'own_success_rate':float(mastered.float().mean()),
+                        'tracking_rmse':float((error[mask]/den).sqrt().mean()),
+                        'height':float((height[mask]/den).mean()),'foot_slip_mps':float((slip[mask]/den).mean()),
+                        'falls_per_env_min':float(failures[mask].sum()/mask.sum()/(steps*env.cfg.dt)*60),
+                        'difficulty':'fixed level0; recovery fixedlevel5','seconds':steps*env.cfg.dt})
     finally:
-        env.command_override=None;env.reset(env.ids)
-        env.set_payload(env.ids,torch.rand(n,device=dev)*env.cfg.payload_max_kg)
-        env.evaluation_mode=False;env._snapshot=env._observe()
-        learner.ou.zero_()
-        if learner.driver is not None:learner.driver.reset(torch.ones(n,device=dev,dtype=torch.bool))
-    return {'iteration':learner.it,'rows':rows,'duration_seconds':steps*env.cfg.dt,
-            'note':'Frozen native diagnostics on current terrain levels; each trial is one env. No replay or optimizer updates. High-speed thresholds are diagnostic, not source-certified capability criteria.'}
+        env.load_curriculum_state_dict(course);env.command_override=command_override
+        env.evaluation_mode=True;env.reset(env.ids,advance_curriculum=False)
+        env.evaluation_mode=was_eval;env._snapshot=env._observe()
+        learner.reset_rollout_state()
+    count=sum(r['trials'] for r in rows)
+    def mean(key):return sum(r[key]*r['trials'] for r in rows)/max(count,1)
+    teacher=[r for r in rows if r['branch']=='teacher']
+    cohort=hashlib.sha256(json.dumps([(r['task_id'],r['trials'],r['seconds']) for r in teacher]).encode()).hexdigest()
+    task_records={str(t):{'own_success_rate':sum(r['own_success_rate'] for r in rows if r['task_id']==t)/2}
+                  for t in sorted(set(r['task_id'] for r in rows))}
+    fixed={'kind':'teacher_fixed_eval','valid':bool(teacher),'cohort_id':cohort,
+           'success_rate':sum(r['own_success_rate'] for r in teacher)/max(1,len(teacher)),
+           'return':sum(r['mean_return'] for r in teacher)/max(1,len(teacher)),'iteration':learner.it}
+    return {'iteration':learner.it,'rows':rows,'real_return':mean('mean_return'),'tasks':task_records,'teacher_fixed_eval':fixed,
+            'falls_per_env_min':mean('falls_per_env_min'),'tracking_rmse':mean('tracking_rmse'),
+            'protocol':'fixed seed76119, matched task/payload/commands, no replay or optimizer writes',
+            'training_episode_reset_after_probe':True}
+
+def native_candidate_probe(learner,policy):return _native_probe(learner,policy,steps=150,per_task=24)
+def native_diagnostics(learner,steps=500):
+    result=_native_probe(learner,learner.policy,steps,per_task=24)
+    if learner.it>=5000:
+        from .commands import speed_cap
+        speed=float(speed_cap(1,learner.it))
+        probe=_native_probe(learner,learner.policy,steps,per_task=24,high_speed=speed)
+        result['high_speed_probe']={'command_vx':speed,'rows':[r for r in probe['rows'] if r['task_id']==1],
+                                   'used_for_student_stability':False}
+    return result
 
 @torch.no_grad()
 def model_diagnostics(learner,batch=2048):
-    w=learner.buf.windows(batch,learner.cfg.wm_window,learner.env.xi)
-    s=w['s'][:,0];errors=[]
+    windows=learner.buf.windows(batch,learner.cfg.wm_window)
+    loss,terms=learner.wm.loss(windows,learner.env.field,learner.env.consts.default_q,return_terms=True)
+    state=windows['s'][:,0];pose=windows['pose'][:,0];initial=state.clone()
+    error=torch.zeros(len(state),device=state.device);baseline=error.clone();den=error.clone()
     for j in range(learner.cfg.wm_window):
-        s,_=learner.wm(s,w['a'][:,j],w['a_prev'][:,j],w['xi'],w['relief'][:,j].float())
-        errors.append((s-w['s'][:,j+1]).square().mean(-1))
-    err=torch.stack(errors,1);valid=w['valid'];mse=(err*valid).sum(-1)/valid.sum(-1).clamp_min(1)
-    kind,names=terrain_ids(learner.env,w['pose'][:,0,:2]);speed=w['command'][:,:2].norm(dim=-1)
-    rows=[]
-    for k in kind.unique().tolist():
-        for lo,hi in ((0,.5),(.5,1.),(1.,2.),(2.,5.)):
-            for a,b in ((0.,1.),(1.,2.01)):
-                mask=(kind==k)&(speed>=lo)&(speed<hi)&(w['xi'][:,4]>=a)&(w['xi'][:,4]<b)&(valid.sum(-1)>0)
-                if mask.any():rows.append({'terrain':'border' if k<0 else names[k],'command_speed_bin':[lo,hi],
-                    'payload_bin':[a,b],'windows':int(mask.sum()),'state70_raw_mse':float(mse[mask].mean())})
-    return {'iteration':learner.it,'rows':rows,'sampling':'uniform replay diagnostic; no sampling-weight changes',
-            'note':'Raw mixed-unit state MSE, not a capability gate or normalized reward metric.'}
+        xi=windows['xi'][:,j] if windows['xi'].ndim==3 else windows['xi']
+        raw,dp,_=learner.wm.predict(state,windows['a'][:,j],windows['a_prev'][:,j],xi,
+            geometry_crop(state,pose,learner.env.field,kind='world_model'),pose)
+        pose=st.apply_pose_delta(pose,dp);state=st.reconcile_state(raw,pose,learner.env.field,learner.env.consts.default_q)
+        target=windows['s_next'][:,j];valid=windows['valid'][:,j]
+        error+=(state[:,4:10]-target[:,4:10]).square().mean(-1)*valid
+        baseline+=(initial[:,4:10]-target[:,4:10]).square().mean(-1)*valid;den+=valid
+    tasks=windows['task_ids'][:,0].reshape(-1).long()
+    previous=getattr(learner,'_model_validation_history',{});current={};records={}
+    for task in tasks.unique().tolist():
+        mask=(tasks==task)&(den>0)
+        if not mask.any():continue
+        mse=float((error[mask]/den[mask]).mean());naive=float((baseline[mask]/den[mask]).mean())
+        old=previous.get(str(task));valid=bool(torch.isfinite(error[mask]).all()) and mse<naive
+        # Source-data improvement over persistence is an interpretable model
+        # check. Two non-degrading diagnostics, together with real capability,
+        # are required before supported external providers may begin fading.
+        stable=old is not None and mse<=old*1.1
+        records[str(task)]={'valid':valid,'stable':stable,'velocity_mse':mse,'persistence_velocity_mse':naive,
+                            'windows':int(mask.sum()),'comparison':'8-step velocity prediction better than frozen initial state; <=10% regression from previous check'}
+        current[str(task)]=mse
+    learner._model_validation_history={**previous,**current}
+    return {'iteration':learner.it,'loss':float(loss),'rows':[{'component':k,'normalized_loss':float(v)} for k,v in terms.items()],
+            'task_validation':records,
+            'sampling':'held-out sampled windows; no optimizer or curriculum updates',
+            'note':'Normalized supervised errors are model checks, not locomotion capability.'}

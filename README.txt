@@ -1,138 +1,87 @@
-Go2 PhysX CTS / source-aligned SuperMimic port
+Go2 Depth Multitask CTS / SuperMimic-style BPTT
 
-Implementation reference: https://github.com/Zhengtianjin/go2-supermimic
-Pinned commit: d9eee9b3f248e5300e636c433255db2c1c3e086a
-UPSTREAM.json binds the downloaded source files to verified Git blob SHA1 and SHA256.
+当前状态：用户要求完成准备后暂不启动训练，先讨论进一步加速；正式启动处于等待状态。
 
-This is an independent implementation. It does not import the retired Newton
-SMCTS package. Required physics is Isaac Lab3 with Isaac Sim6.2 / PhysX. The
-reference repository uses mjlab/MuJoCo Warp; its physics results do not certify
-this port.
+独立项目副本：/home/abc/Documents/go2_supermimic_lab_depth
+本地源：F:/learning/motion_control/physx_depth
+数据和权重：/home/abc/data2/go2_supermimic_lab_depth
+父训练提交：fa3c776af150986776b5c513130c0e7a8b38b4c6
+旧项目与历史实验不修改；本版全部网络冷初始化，深度/加噪包冻结。
+完整实施契约见 BUILD_CONTRACT.txt，源码依据见 CURRICULUM_SOURCE.json。
 
-Training: python -m go2_physx_cts.supervise --output RUN_DIRECTORY --usd GO2_USD
-          --driver OFFICIAL_MOE_TORCHSCRIPT --resume VALIDATED_FLAT_CHECKPOINT
-          --evaluation-python ROBOGAUGE_PYTHON
-All paths must identify real assets. The supervisor uses an exclusive file lock.
-The2026-10-29 direct instruction authorizes implementation, validation and formal
-mixed-terrain training from the validated40000-iteration flat checkpoint.
-Official sim2sim measurements require native/transfer review before curriculum
-or rollback decisions. An evaluation alone cannot mark the flat curriculum ready.
+正式入口（仅干净已提交的版本可启动）：
+python -m go2_physx_cts.supervise --output NEW_RUN_DIRECTORY --usd GO2_USD
+  --driver OFFICIAL_MOE_TORCHSCRIPT --reward-calibration REWARD_CALIBRATION_JSON
+  --evaluation-python ROBOGAUGE_PYTHON
 
-Mechanism checks: python -m unittest discover -s tests -v
-Physical/update smoke: python -m go2_physx_cts.train --config CONFIG_JSON
-                      --output SCRATCH --usd GO2_USD --smoke
-Official/standing positive control: same command plus --probe-only.
+Isaac Sim/PhysX，4096环境，每轮真实采集1步，Actor更新1次；120000轮，无小时硬上限。
+8192条32步想象：6144教师+2048学生；损失严格为teacher.mean()+student.mean()。
+分块仅改变执行内存安排，不改变分支分母、轨迹总数或优化器更新数量。
+Replay每环境1000步，保存真实终止前状态；事件前2秒参与稀有窗口保留。
+WM监督8步/2048窗口，平地2次，地形4次。Critic沿用5epoch×4 minibatch。
+学生独立Adam，每轮2次，256序列，每条32步burn-in+64步蒸馏。
 
-The production contract is4096 envs, collect1, actor1, replay1000/env,
-8192 imagined starts x32steps, WM2048 windows x8steps,2 WM updates on flat and4
-on terrain. Teacher/student imagination allocation is6144/2048, with exact
-teacher_loss.mean() + student_loss.mean() and no factor0.5. Microbatch losses
-use full branch denominators; clipping occurs after accumulation. Production
-uses one fused8192 batch. Both branches sample all data providers.
-Only teacher encoder and shared actor are optimized by imagined return. The
-student encoder receives latent distillation on real student-source histories.
-The frozen critic has physical inputs, not actor-owned latent inputs. Freezing
-parameters does not cut state/action input gradients.
+网络及梯度：
+教师：167维特权MLP32 + 前方2×64×128地图CNN128 + 任务onehot10 -> Linear32+LN。
+学生：450维本体历史8专家MoE32；48×64深度CNN128+当前45维观测 -> GRU256；
+288维融合 -> Linear32+LN。学生参数只接受教师latent MSE蒸馏，不接收回报更新。
+共享Actor：8个稠密动作专家，latent路由，输出12个原始线性动作，无tanh。
+教师编码器与共享Actor接受想象回报梯度；学生冻结时对输入和GRU记忆仍保留导数。
+10个独立任务Critic各含教师/学生两值头，任务内PopArt、归一化Huber。
+Critic输入为物理状态、地图和任务记忆，不使用Actor持有latent，避免价值梯度捷径。
+WM：1024×3主干，物理/动作/上下文MLP，局部2×41×49地图CNN；完整xyz+xyzw位姿，
+预测位姿变化、状态、接触/力矩/足速；FK一致性。没有额外Transformer或视觉预测头。
 
-Replay contains every provider's real executed actions and episode context.
-There is no expert-action cloning loss and no separate WM-only reference pool.
-Flat default has no external provider, matching the source flat recipe.
-Terrain recipe: mixed-terrain MoE10% plus this task's validated flat expert10%.
-The latter provides velocity skills, not demonstrated jumping/ducking skills.
+深度接口：固定go2_depth_input0.1.0，25.6m/512×512图集缓存，FP32，25Hz，重算反传。
+图集中心间距12m，按完整相机视锥的世界XY包围盒中心选图；实际图集/场地越界显式报错。
+完整机身旋转×固定相机安装变换；输出光轴米制深度0.1..6m，无效0。
+噪声key与episode/相机帧/轨迹绑定。想象不复制真实轨迹后续图像，不detach预测位姿。
+二值有效性/孔洞沿用包中的平滑直通替代梯度，不宣称硬事件精确可微。
+几何/噪声模型均冻结。深度包自身证据不等于新多任务控制能力实测。
 
-Task adaptations: body-frame(vx,vy,wz) commands, blind45x10 CTS history,
-167-D privileged teacher,169-D physical/branch critic,70-D model state,
-176-D WM input /73-D output. The fifth context entry is fixed0..2kg rigid payload
-at the original base COM, sampled only at episode reset. Actions are linear,
-unsquashed12-D joint targets with source PD/motor scales. The deployed export
-requires the corresponding default pose, scales and PD in physics_contract.json.
+任务（编号从1开始；代码ID从0开始）：
+1 flat/slope_up/slope_down/rough_slope速度；2 flat高速；
+3 wave/obstacles/wheels/small_squares速度；4上楼梯；5下楼梯；6跨沟；
+7恢复；8室内避障；9跳上障碍；10跳下障碍。
+0..2500仅任务1平地，2500..5000任务1平地40%/三坡各20%，
+5000..8000任务1..5，8000后环境数[820,365,365,365,365,365,356,365,365,365]。
+WM预热1000，Critic1000..1500，Actor1500..2500渐入；新任务Critic再适配500轮。
+任务1速度上限：.5@1500，1@5000，1.5@10000，2@20000，2.5@30000，3@35000。
+任务2上限：1.5@5000，2.5@10000，4@20000，5@30000；其余普通任务最高3。
+跨沟/跳上/跳下使用可行的前进命令1..1.5，20000后最高2，横向/转向限制为.15/.1。
+恢复命令.5m/s，无速度网格，固定level5，50%平地+50%九类原非平地。
+每任务独立Rapid来源速度网格，每1000轮仅使用本项目教师/学生转移，按地形分别统计。
+进度=沿指令方向实际位移/同期指令要求位移；特殊任务使用成功率。
+<=50%回退，>75%扩展，增量vx.5/vy.2/wz.1；保留低速且至少30%纯vx。
+普通地形进度<50%降级、>=60%升级；gap按成功；恢复不升降。
+负重0..1.2kg，原质心刚性点质量，episode内不变。
 
-The nominal contact coefficient is1 and COM randomization is zero in this first
-port. Source sliding/spinning/rolling friction and COM randomization are not
-claimed reproduced: PhysX contact parameters differ from MuJoCo. Encoder-bias
-randomization is also not claimed. The terrain geometry is copied from pinned Go2RLLab's default direct mesh
-backend (10x20 tiles,9x9m, max-init level5). Raw proportions are normalized
-by the source generator; actual column allocation is recorded. A0.05m
-differentiable height map is raycast from the actual PhysX collision mesh.
-Real body-height reward uses direct collision rays; map error is measured.
+奖励：以用户交接文件及后续覆盖意见为准，十任务独立目标，共用约束系数不整体缩小。
+官方策略在完整20秒平地episode含起步实测标定，标定文件为正式启动必填资产。
+成功只记一次，完成后继续速度跟踪且停止未完成时间扣分；正奖励预算独立于负惩罚。
+真实PhysX用硬碰撞/硬成功；想象使用连续接触/累计完成概率，保留可用一阶梯度。
+高度/垂直速度两系数于3000轮结束渐变。
 
-The source's WM, autoregressive loss, TD(lambda), soft survival, rare-window
-selection/archive, running normalization, OU noise, actor LR ramp, optimizer
-settings and clips are reproduced. CTS creates an additional20x1024 student
-update schedule. Actual timing includes it.
+学习率：不使用PPO KL。WM/Actor/Critic起点2e-4，教师1e-4，学生3e-4。
+5000后固定数据和模型/Adam状态比较eta/1.3、eta、1.3eta有界候选。
+WM范围2e-5..5e-4，Actor/Critic4e-6..2e-3。Actor须同时通过想象与固定PhysX小队列。
+教师在原生及官方迁移固定队列稳定后，学生才开放1e-5..3e-4的序列验证调节。
+保留训练恶化回退，保留WM/Replay，不采用相位前已降到最低的余弦衰减。
+官方采集仅任务1..5有可用专家，各10%；缺少高速>4、跨沟/恢复/避障/跳跃专家。
+自身能力与WM验证连续稳定后，各任务官方比例在5000轮渐退。
+所有实际执行转移共享Replay和想象起点，不直接模仿专家动作。
 
-There is no wall-time cutoff. Initial review is60000 learner iterations,
-covering the last velocity stage at45000 plus15000 iterations. Every5000
-iterations, frozen native and official RoboGauge diagnostics run separately;
-they do not automatically stop the run or change the official curriculum.
-Training-collapse rollback remains the pinned source mechanism. Diagnostic
-runtime failures are logged as errors, not misreported as policy collapse.
-After60000, evidence review is required to extend the iteration budget.
+诊断：每5000轮原生PhysX、世界模型和RoboGauge分别记录。官方迁移失败不自动等同原生停滞。
+RoboGauge add2c7ee0185ea8fd93d242f86e1c8cac6e9913b：Python3.11、MuJoCo3.2.3、
+dm-control1.0.23、Torch2.4.1+cu124。启动校验156个源文件哈希与导出golden序列。
+官方BasePipeline及MujocoSimulator保持原样；适配器扩展深度/GRU/教师地图与任务观测。
+PD/默认姿态/动作缩放读取checkpoint，保留官方XML被动参数，不静默改物理参数。
+旧USD和官方XML仍有质量、扭矩速度曲线、接触求解器等差异，不宣称物理完全一致。
+新任务几何使用训练同一组box转换MJCF。固定恢复迁移覆盖六种平地姿态；
+非平地恢复由原生诊断覆盖，未声称完整官方非平地恢复验收。
+恢复fixtures是版本化正式评测协议，不引用临时文件。学生实际深度由MuJoCo射线+冻结噪声产生。
 
-Checkpoints include all four models/optimizers, normalization and RNG metadata.
-Like the source, resume starts new simulator episodes and fresh replay; it is
-not a bit-identical full-simulator/replay continuation. Old checkpoints are
-not Newton-compatible; the validated PhysX baseline is compatible. No training capability or B0 is claimed by smoke.
-
-Sim2sim reference: https://github.com/wty-yy/RoboGauge
-Pinned commit: add2c7ee0185ea8fd93d242f86e1c8cac6e9913b
-Runtime: Python3.11.18, MuJoCo3.2.3, dm-control1.0.23, Torch2.4.1+cu124,
-NumPy1.26.4. Full dependency lock and measured comparisons are in
-research/runs/ROBOGAUGE_MIGRATION_20261029. Do not use the training runtime's
-MuJoCo3.12.0. robogauge_source.json verifies every upstream archive file.
-
-Export in the training Python:
-python -m go2_physx_cts.robogauge_export --checkpoint CHECKPOINT
-       --output EXPORT_DIRECTORY --iteration ITERATION
-Evaluate in the isolated official Python, with this repository on PYTHONPATH:
-python -m go2_physx_cts.robogauge_bridge --exports EXPORT_DIRECTORY
-       --output REPORT_DIRECTORY --iterations ITERATION
-       --video
-
-BasePipeline.run and MujocoSimulator load/step/PD/reset are unmodified upstream.
-The extensions provide a stateful CTS model ABI, simulator-only teacher inputs,
-fixed3D velocity goals and raw metrics. Student receives45 inputs, keeps450-D
-term-major history internally and embeds frozen normalization. Teacher receives
-45+167 values and is not a deployable blind policy. Exported outputs/history/reset
-are verified against checkpoint golden sequences in both Torch runtimes.
-
-The only control contract reads PD/default pose/action scale from the checkpoint.
-Missing or malformed constants are errors; no fallback to official control defaults.
-The official XML mass, COM, inertia, contacts, joint passive properties, limits
-and motor ctrlrange remain unchanged. Experimental parameter switches are removed.
-No inertial rewriting or private simulator/PD loop remains. Training USD nominal
-mass16.087kg differs from official XML15.206408kg; torque-speed limits, contact
-solvers and initialization also differ. Do not call these physically identical.
-
-The default fixed-command protocol disables optional official noise/delay for
-diagnosis; --official-noise-delay restores both. Both protocols retain official
-startup settling. Neither constitutes full RoboGauge benchmark certification.
-
-Curriculum reference: wty-yy/go2_rl_lab
-6c95d9feef4814c25eb6536e61bb38e1d1d718d4. Velocity stages are5000,15000,25000,
-35000,45000 learner iterations. One iteration collects1 step here, unlike the
-source PPO24 steps; this is a declared clock adaptation, not equal physical
-experience. Final flat requests reach[-4.5,4.2]m/s; slopes/waves<=1.5,
-stairs/obstacles<=1, wheels[-2,1.5]. Source command sampling includes extreme,
-zero, pivot and dynamic requests. There is no additional Rapid grid curriculum.
-All command memory is17-D Replay state and is advanced by the same code in
-real collection and imagination. Terrain progression uses distance, not time.
-
-Reward scope follows approved item20: the validated13-term velocity task is
-retained and two source definitions/courses are added. Body-frame vertical
-velocity squared: weight-2 to0 by1500; crop-relative body height squared
-(target.38m): weight-1 to-10 by5000. Their ratios to tracking2/1 match source.
-This is not the complete official15-term PPO reward suite. It does not invent
-a contact prediction head or change model dimensions. Critic resets once at
-this reward-stage change: WM warmup1000, additional critic warmup500, then
-actor ramp1000. Actor terrain lr multiplier.3 and source cosine30k retained.
-
-The pinned PhysX preset uses2,097,152 rigid patches and512MiB collision stack,
-with external forces each iteration. Default buffer overflow observed in an
-early smoke was rejected and corrected before formal launch. Episode time limits
-truncate imagined prefixes with value bootstrap; later critic samples are masked.
-
-Source facts, author experiment reports, local synthetic/source comparisons,
-and this project's measured robot results must remain separately labeled.
-The released SuperMimic terrain result used several stages/restarts; it is not
-proof that this blind CTS/PhysX composition will reproduce it in one run.
+保存：网络/优化器/归一化/任务网格/奖励标定/学习率/课程/随机状态及来源。
+恢复运行重新开始物理episode及Replay，与上游一致，不声称仿真逐位续接。
+训练产物在data2。临时测试脚本、旧测试接口、冒烟权重/视频/导出在正式启动前删除。
+源码事实、论文/作者训练记录、本项目验证、实际控制能力必须分别陈述。

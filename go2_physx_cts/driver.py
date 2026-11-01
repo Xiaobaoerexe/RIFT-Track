@@ -1,7 +1,6 @@
-"""Pinned upstream MoE-CTS driver adapted only to our simulator state API."""
+"""Official reference provider with the verified control/observation mapping."""
 import torch
 from . import state as st
-from .networks import Policy
 
 def official_default(device):
     return torch.tensor([(.1 if leg[1]=='L' else -.1) if j=='hip' else (.8 if leg[0]=='F' else 1.) if j=='thigh' else -1.5 for leg in st.LEGS for j in ('hip','thigh','calf')],device=device)
@@ -22,13 +21,3 @@ class MoeCtsDriver:
         self.last=p.actor(torch.cat((z,p.single_obs_normalizer(one)),-1))
         return (self.default+.25*self.last-self.env.consts.default_q)/self.env.consts.action_scale
     def reset(self,done):self.hist[done]=0;self.last[done]=0
-
-class FlatExpert:
-    def __init__(self,path,device):
-        ck=torch.load(path,map_location=device,weights_only=False)
-        if ck.get('schema')!='physx-cts-source-port-v1' or ck['cfg']['stage']!='flat':
-            raise ValueError('Terrain expert must be this velocity task\'s flat checkpoint')
-        self.policy=Policy(tuple(ck['cfg']['actor_hidden'])).to(device).eval()
-        self.policy.load_state_dict(ck['policy'])
-    @torch.no_grad()
-    def __call__(self,hist):return self.policy(hist,None,1)

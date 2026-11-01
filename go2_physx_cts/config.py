@@ -1,40 +1,52 @@
-"""Explicit source-aligned defaults; task and CTS adaptations are named."""
-from dataclasses import dataclass
+"""Approved depth multitask training contract; one active implementation."""
+from dataclasses import dataclass, fields
 
 @dataclass
 class TrainCfg:
-    stage: str = "flat"
+    stage: str = 'multitask'
     num_envs: int = 4096
     buffer_len: int = 1000
     collect_steps: int = 1
-    iterations: int = 60000
-    warmup_iterations: int = 300
+    iterations: int = 120000
+    warmup_iterations: int = 1000
+    critic_warmup_iterations: int = 500
+    actor_ramp_iterations: int = 1000
     wm_hidden: tuple = (1024, 1024, 1024)
     wm_window: int = 8
     wm_batch: int = 2048
-    wm_updates: int = 2
     wm_prioritized_frac: float = .25
     wm_archive_frac: float = .25
     archive_size: int = 100000
     archive_keep_prob: float = .02
+    event_history_steps: int = 100
     imag_batch: int = 8192
     teacher_fraction: float = .75
     horizon: int = 32
-    actor_microbatch: int = 8192
+    actor_microbatch: int = 2048
     actor_hidden: tuple = (512, 256, 128)
     critic_hidden: tuple = (512, 256, 128)
-    cts_updates: int = 20
-    cts_batch: int = 1024
-    cts_lr: float = .001
-    cts_balance: float = .01
+    actor_experts: int = 8
+    proprio_experts: int = 8
+    task_count: int = 10
+    task_context_dim: int = 21
+    cts_updates: int = 2
+    cts_batch: int = 256
+    cts_sequence_steps: int = 64
+    cts_burnin: int = 32
+    cts_lr: float = 3e-4
     critic_epochs: int = 5
     critic_minibatches: int = 4
+    critic_microbatch: int = 4096
     lr: float = 2e-4
-    actor_lr_scale: float = 1.
-    lr_final_frac: float = .03
-    lr_decay_iterations: int = 30000
-    actor_ramp_iterations: int = 1000
-    critic_warmup_iterations: int = 500
+    wm_lr: float = 2e-4
+    teacher_lr: float = 1e-4
+    lr_trial_factor: float = 1.3
+    lr_trial_interval: int = 1000
+    lr_fixed_until: int = 5000
+    wm_lr_bounds: tuple = (2e-5, 5e-4)
+    actor_lr_bounds: tuple = (4e-6, 2e-3)
+    critic_lr_bounds: tuple = (4e-6, 2e-3)
+    cts_lr_bounds: tuple = (1e-5, 3e-4)
     grad_clip: float = 1.
     grad_clip_elem: float = .1
     gamma: float = .99
@@ -43,11 +55,9 @@ class TrainCfg:
     explore_frac: float = .25
     explore_noise: float = .3
     explore_theta: float = 2.
-    driver_policy: str = ""
-    driver_frac: float = 0.
-    expert_policy: str = ""
-    expert_frac: float = 0.
-    allow_missing_flat_expert: bool = False
+    driver_policy: str = ''
+    driver_frac: float = .1
+    provider_fade_iterations: int = 5000
     collapse_falls: float = 3.
     log_interval: int = 50
     save_interval: int = 1000
@@ -55,47 +65,50 @@ class TrainCfg:
     dt: float = .02
     physics_dt: float = .005
     episode_seconds: float = 20.
-    payload_max_kg: float = 2.
-    reset_critic: bool = False
+    payload_max_kg: float = 1.2
+    reward_calibration: str = ''
     evaluation_interval: int = 5000
     evaluation_python: str = ''
+    depth_package: str = '/home/abc/Documents/go2_supermimic_runtime/depth_input'
+    depth_chunk_size: int = 32
+    depth_period: int = 2
     compile: bool = True
-    device: str = "cuda:0"
+    device: str = 'cuda:0'
+
+    def wm_updates_for(self, iteration):
+        return 2 if iteration < 2500 else 4
 
     @classmethod
     def from_record(cls, record):
-        """Migrate historical configuration metadata without changing checkpoint bytes."""
-        values=dict(record)
-        for obsolete in ('evaluation_xml','evaluation_profile','adaptive_iterations',
-                         'terrain_curriculum_iterations','command_max'):
-            values.pop(obsolete,None)
-        return cls(**values)
-
-    @classmethod
-    def terrain(cls, **kwargs):
-        return cls(stage="terrain", wm_updates=4, actor_lr_scale=.3,
-                   warmup_iterations=1000, driver_frac=.1, expert_frac=.1, **kwargs)
+        unknown = set(record) - {f.name for f in fields(cls)}
+        if unknown:
+            raise ValueError('Obsolete or unknown configuration fields: ' + ', '.join(sorted(unknown)))
+        return cls(**record)
 
     def validate(self, production=True):
-        if self.stage not in ("flat", "terrain"):
-            raise ValueError("Unknown stage")
-        if self.collect_steps != 1 or self.horizon != 32 or self.wm_window != 8:
-            raise ValueError("Source-aligned collect/H/K contract changed")
+        if self.stage != 'multitask':
+            raise ValueError('Only the approved depth multitask architecture is supported')
+        if (self.collect_steps, self.horizon, self.wm_window) != (1, 32, 8):
+            raise ValueError('Collect/H/K contract must remain 1/32/8')
         if production and (self.num_envs, self.buffer_len, self.imag_batch, self.wm_batch) != (4096,1000,8192,2048):
-            raise ValueError("Production scale must be4096/1000/8192/2048")
-        if production and self.actor_microbatch!=self.imag_batch:
-            raise ValueError('Production uses one8192 imagination cohort so global command-stage activation is shared')
-        if self.wm_updates != (2 if self.stage == "flat" else 4):
-            raise ValueError("WM updates must match stage recipe")
-        if not 0 < self.teacher_fraction < 1:
-            raise ValueError("Both CTS branches required")
-        if not 0 <= self.driver_frac + self.expert_frac < 1:
-            raise ValueError("Invalid data source fractions")
-        if self.driver_frac and not self.driver_policy:
-            raise ValueError("Continuous mixed-terrain expert missing; no silent fallback")
-        if self.expert_frac and not self.expert_policy:
-            raise ValueError("Flat expert missing; set fraction0 and explicitly acknowledge degraded recipe")
-        if self.stage == "terrain" and not self.expert_frac and not self.allow_missing_flat_expert:
-            raise ValueError("Terrain recipe lacks its10% flat skill expert")
-        if self.payload_max_kg < 0 or self.payload_max_kg > 2:
-            raise ValueError("Only fixed nonnegative0..2kg payload is supported")
+            raise ValueError('Formal scale must be 4096/1000/8192/2048')
+        if production and self.iterations != 120000:
+            raise ValueError('Approved formal budget is 120000 iterations')
+        if production and (self.cts_updates,self.cts_batch,self.cts_sequence_steps,self.cts_burnin) != (2,256,64,32):
+            raise ValueError('Student sequence contract must be 2 x 256 x (32 burn-in + 64 loss)')
+        if self.actor_experts != 8 or self.proprio_experts != 8 or self.task_count != 10:
+            raise ValueError('Network expert/task counts changed')
+        if self.actor_microbatch <= 0 or self.actor_microbatch > self.imag_batch:
+            raise ValueError('Invalid actor microbatch; total cohort remains8192')
+        if self.teacher_fraction != .75:
+            raise ValueError('Imagination split must remain6144teacher/2048student, equal branch means')
+        if not 0 <= self.driver_frac < 1 or (self.driver_frac and not self.driver_policy):
+            raise ValueError('A declared official collection provider must exist')
+        if not 0 <= self.payload_max_kg <= 1.2:
+            raise ValueError('Payload must remain0..1.2kg and fixed within each episode')
+        if self.depth_period != 2:
+            raise ValueError('Approved visual cadence is25Hz at50Hz control')
+        if production and not self.reward_calibration:
+            raise ValueError('Formal launch requires measured reward budgets')
+        if production and not self.evaluation_python:
+            raise ValueError('Formal launch requires the pinned official evaluation runtime')
