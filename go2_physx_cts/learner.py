@@ -13,6 +13,7 @@ from .imagine import Imagination,flat_ids
 from .terrain import relief,geometry_crop
 from .depth import DepthObservation
 from .schedules import LearningRateController,ProviderSchedule
+from .sequence_execution import depth_sequence_features,batched_apply,ENCODING_CHUNK
 
 
 @contextmanager
@@ -244,11 +245,20 @@ class Learner:
         for _ in range(cfg.critic_epochs):
             order=torch.randperm(len(x),device=self.device)
             for ids in torch.tensor_split(order,cfg.critic_minibatches):
-                # Microbatch accumulation preserves each complete minibatch mean.
+                # Group once per original minibatch, then run larger single-task
+                # blocks. Its members, denominator, clipping and Adam step stay
+                # unchanged; the random permutation is still drawn once/epoch.
                 self.opt_critic.zero_grad(set_to_none=True); total=x.new_zeros((),dtype=torch.float64)
-                for sub in ids.split(getattr(cfg,'critic_microbatch',4096)):
-                    loss=self.critic.loss(x[sub],y[sub],geometry=geometry,geometry_indices=geometry_indices[sub]); (loss*len(sub)/len(ids)).backward()
-                    total.add_(loss.detach().double()*len(sub)/len(ids))
+                task_ids=x[ids,-1].long(); grouped=ids[torch.argsort(task_ids,stable=True)]
+                task_counts=torch.bincount(task_ids,minlength=len(self.critic.tasks)).tolist()
+                offset=0
+                for task,count in enumerate(task_counts):
+                    block=grouped[offset:offset+count]; offset+=count
+                    for sub in block.split(getattr(cfg,'critic_microbatch',4096)):
+                        if not len(sub): continue
+                        loss=self.critic.loss_for_task(x[sub],y[sub],task,geometry=geometry,geometry_indices=geometry_indices[sub])
+                        (loss*len(sub)/len(ids)).backward()
+                        total.add_(loss.detach().double()*len(sub)/len(ids))
                 cgn=clip_grad(self.critic.parameters(),cfg.grad_clip)
                 total=float(total)
                 if scalar_finite(cgn) and math.isfinite(total): self.opt_critic.step(); self.counts['critic']+=1
@@ -270,32 +280,37 @@ class Learner:
     def sequence_loss(self,student,sequence,training=True):
         cfg=self.cfg; total=sequence['obs'].shape[1]; b=len(sequence['obs'])
         hidden=sequence['obs'].new_zeros((b,256),dtype=torch.float32)
-        cached_depth=None; previous_key=None; losses=[]; masks=[]
-        for j in range(total):
-            item={k:v[:,j] for k,v in sequence.items() if torch.is_tensor(v) and v.ndim>=2 and v.shape[1]==total}
-            item['trajectory_ids']=sequence['trajectory_ids']
-            key=torch.cat((item['depth_frame_index'],item['episode'],item['depth_scene_ids']),-1)
-            refresh=torch.ones(b,dtype=torch.bool,device=self.device) if previous_key is None else (key!=previous_key).any(-1)
-            with torch.no_grad():
-                if cached_depth is None: cached_depth=sequence['obs'].new_zeros((b,1,48,64),dtype=torch.float32)
-                ids=refresh.nonzero().flatten()
-                if len(ids): cached_depth[ids]=self.depth.render(item['depth_pose'][ids],flat_ids(item['depth_scene_ids'])[ids],
-                    flat_ids(item['depth_frame_index'])[ids],flat_ids(item['episode'])[ids],sequence['trajectory_ids'][ids],mode='inference')
-                hist=self.policy.history_norm(item['obs'].float()); single=self.policy.single_norm(st.single_from_history(item['obs'].float()))
-                if j>=cfg.cts_burnin:
-                    priv=st.privileged(item['s'],item['a_prev'],item['command'],item['xi'],item['relief'])
-                    height=geometry_crop(item['s'],item['pose'],self.env.field,kind='teacher')
-                    label=self.policy.teacher_latent(priv,height,flat_ids(item['task_ids']))
-            previous_key=key
-            # clone prevents later25Hz cache writes from changing saved tensors.
-            depth=cached_depth.clone(); reset=item['reset'].reshape(-1).bool()
-            if j<cfg.cts_burnin:
-                with torch.no_grad(): _,_,hidden=student(hist,single,depth,hidden,reset)
-            else:
-                fn=lambda hist,single,depth,hidden,reset:student(hist,single,depth,hidden,reset)
-                z,_,hidden=checkpoint(fn,hist,single,depth,hidden,reset,use_reentrant=False) if training else student(hist,single,depth,hidden,reset)
-                losses.append((z-label).square().mean(-1)); masks.append(item['valid'].reshape(-1).float())
-        loss=torch.stack(losses,1); mask=torch.stack(masks,1)
+        burn=cfg.cts_burnin;steps=total-burn
+        # Replay inputs are already known: batch all nonrecurrent operations,
+        # while preserving ordered GRU resets and the exact32-step burn-in.
+        with torch.no_grad():
+            single=self.policy.single_norm(st.single_from_history(sequence['obs'].float().reshape(b*total,-1))).reshape(b,total,-1)
+            burn_features=depth_sequence_features(student,self.depth,sequence,0,burn)
+            for j in range(burn):
+                hidden=student.advance_memory(single[:,j],burn_features[:,j],hidden,sequence['reset'][:,j].reshape(-1).bool())
+            history=self.policy.history_norm(sequence['obs'][:,burn:].float().reshape(b*steps,-1))
+            fields={k:sequence[k][:,burn:].reshape(b*steps,*sequence[k].shape[2:])
+                for k in ('s','a_prev','command','xi','relief','pose','task_ids')}
+            labels=[]
+            for lo in range(0,b*steps,ENCODING_CHUNK):
+                item={k:v[lo:lo+ENCODING_CHUNK] for k,v in fields.items()}
+                priv=st.privileged(item['s'],item['a_prev'],item['command'],item['xi'],item['relief'])
+                height=geometry_crop(item['s'],item['pose'],self.env.field,kind='teacher')
+                labels.append(self.policy.teacher_latent(priv,height,flat_ids(item['task_ids'])))
+            label=torch.cat(labels).reshape(b,steps,-1)
+        del burn_features
+        # Separate invocation deliberately rebuilds a differentiable feature at
+        # the burn-in/loss boundary even if the captured camera frame is held.
+        # No encoded feature survives this call or either CTS optimizer step.
+        depth_features=depth_sequence_features(student,self.depth,sequence,burn,total,training=training)
+        proprio=batched_apply(lambda hist:student.moe(hist)[0],history,training=training).reshape(b,steps,-1)
+        losses=[]
+        for j in range(steps):
+            reset=sequence['reset'][:,burn+j].reshape(-1).bool()
+            args=(proprio[:,j],single[:,burn+j],depth_features[:,j],hidden,reset)
+            z,hidden=checkpoint(student.fuse_features,*args,use_reentrant=False) if training else student.fuse_features(*args)
+            losses.append((z-label[:,j]).square().mean(-1))
+        loss=torch.stack(losses,1);mask=sequence['valid'][:,burn:].reshape(b,steps).float()
         return (loss*mask).sum()/mask.sum().clamp_min(1)
     def update_cts(self):
         losses=[]

@@ -6,9 +6,11 @@ observations, proprioception, recurrent memory, task completion or pose.
 """
 import torch
 from torch.utils.checkpoint import checkpoint
+from .activation import matrix_checkpoint
 from . import state as st
 from .terrain import relief,geometry_crop
 from .task import task_reward,ELAPSED,EPISODE_LIMIT
+from .sequence_execution import depth_sequence_features
 
 
 def time_limit_return(rewards,soft_done,timeout,values,gamma,valid_start=None):
@@ -43,9 +45,9 @@ class Imagination:
         self.cfg,self.c,self.field,self.commands,self.depth=cfg,consts,field,commands,depth
         # Only the deterministic differentiable core is compiled. Random command
         # draws and observation noise retain their original eager RNG ordering.
-        self._core_fn=self._core
+        self._core_fn=matrix_checkpoint(self._core)
         if cfg.compile:
-            compiled=torch.compile(self._core,dynamic=False,fullgraph=True)
+            compiled=torch.compile(self._core_fn,dynamic=False,fullgraph=True)
             # Replay starts, first recursive states and later recurrent states
             # have different input requires_grad patterns. Teacher, student,
             # warmup and mixed LR probes share this code object's bounded cache.
@@ -61,24 +63,22 @@ class Imagination:
     def burnin(self,policy,sequence):
         """Rebuild current-encoder memory from exact25Hz camera captures."""
         b,t=sequence['obs'].shape[:2]; hidden=sequence['obs'].new_zeros((b,256),dtype=torch.float32)
-        depth=hidden.new_zeros((b,1,48,64)); previous=None
+        features=depth_sequence_features(policy.student_encoder,self.depth,sequence,0,t)
+        obs=sequence['obs'].float().reshape(b*t,-1)
+        singles=policy.single_norm(st.single_from_history(obs)).reshape(b,t,-1)
         for j in range(t):
-            item={k:v[:,j] for k,v in sequence.items() if torch.is_tensor(v) and v.ndim>=2 and v.shape[1]==t}
-            key=torch.cat((item['depth_frame_index'],item['episode'],item['depth_scene_ids']),-1)
-            refresh=torch.ones(b,dtype=torch.bool,device=hidden.device) if previous is None else (key!=previous).any(-1)
-            ids=refresh.nonzero().flatten()
-            if len(ids):
-                depth[ids]=self.depth.render(item['depth_pose'][ids],flat_ids(item['depth_scene_ids'])[ids],
-                    flat_ids(item['depth_frame_index'])[ids],flat_ids(item['episode'])[ids],sequence['trajectory_ids'][ids],mode='inference')
-            previous=key
-            _,_,new=policy.student_latent(item['obs'].float(),depth,hidden,item['reset'].reshape(-1).bool())
-            hidden=torch.where(item['valid'].reshape(-1,1).bool(),new,hidden)
+            new=policy.student_encoder.advance_memory(singles[:,j],features[:,j],hidden,sequence['reset'][:,j].reshape(-1).bool())
+            hidden=torch.where(sequence['valid'][:,j].reshape(-1,1).bool(),new,hidden)
         return hidden
-    def _core(self,wm,policy,s,pose,a_prev,a_prev2,hist,cmd_state,xi,hidden,context,depth,branch,tasks,terrains,iteration):
+    def encode_depth(self,policy,images):
+        # A held feature is shared by both control steps without detaching its
+        # capture-pose derivative. Recompute its CNN only once during backward.
+        return checkpoint(policy.student_encoder.encode_depth,images,use_reentrant=False) if torch.is_grad_enabled() else policy.student_encoder.encode_depth(images)
+    def _core(self,wm,policy,s,pose,a_prev,a_prev2,hist,cmd_state,xi,hidden,context,depth_features,branch,tasks,terrains,iteration):
         command=self.commands.command(cmd_state)
         priv=st.privileged(s,a_prev,command,xi,relief(pose,self.field))
         height=geometry_crop(s,pose,self.field,kind='teacher') if branch!=1 else s.new_zeros((len(s),2,1,1))
-        a,nhidden,_,_=policy.step(hist,priv,branch,depth=depth,hidden=hidden,height=height,task_ids=tasks)
+        a,nhidden,_,_=policy.step(hist,priv,branch,depth=None,depth_features=depth_features,hidden=hidden,height=height,task_ids=tasks)
         raw,dp,telemetry=wm.predict(s,a,a_prev,xi,geometry_crop(s,pose,self.field,kind='world_model'),pose)
         np=st.apply_pose_delta(pose,dp); ns=st.reconcile_state(raw,np,self.field,self.c.default_q)
         lookup=getattr(self.commands,'terrain_lookup',None)
@@ -87,9 +87,9 @@ class Imagination:
             context=context,pose0=pose,pose=np,telemetry=telemetry,previous2=a_prev2,
             iteration=iteration,field=self.field,soft=True)
         return ns,np,a,nhidden,ncontext,r,done
-    def _step(self,wm,policy,s,pose,a_prev,a_prev2,hist,cmd_state,xi,hidden,context,depth,branch,tasks,terrains,iteration,reward_iteration,active):
+    def _step(self,wm,policy,s,pose,a_prev,a_prev2,hist,cmd_state,xi,hidden,context,depth_features,branch,tasks,terrains,iteration,reward_iteration,active):
         ns,np,a,nhidden,ncontext,r,done=self._core_fn(wm,policy,s,pose,a_prev,a_prev2,hist,cmd_state,xi,
-            hidden,context,depth,branch,tasks,terrains,reward_iteration)
+            hidden,context,depth_features,branch,tasks,terrains,reward_iteration)
         ncmd=self.commands.advance(cmd_state,np[:,:2],iteration,task_ids=tasks,terrain_ids=terrains)
         nhist=st.push_history(hist,st.frame(ns,a,self.commands.command(ncmd),noise=True))
         def select(new,old): return torch.where(active[:,None],new,old)
@@ -102,7 +102,7 @@ class Imagination:
         tasks,terrains=flat_ids(seed['task_ids']),flat_ids(seed['terrain_ids'])
         frame=flat_ids(seed['frame_index']); b=len(s)
         reward_iteration=torch.as_tensor(iteration,device=s.device,dtype=s.dtype)
-        hidden=s.new_zeros((b,256)); depth=s.new_zeros((b,1,48,64))
+        hidden=s.new_zeros((b,256)); depth_features=s.new_zeros((b,128))
         nteacher=branch[0] if isinstance(branch,tuple) else (b if branch==0 else 0)
         student=slice(nteacher,b)
         if nteacher<b:
@@ -110,7 +110,8 @@ class Imagination:
             hidden=torch.cat((hidden[:nteacher],self.burnin(policy,prefix)),0)
             subset={k:v[student] for k,v in seed.items() if torch.is_tensor(v)}
             view=dict(subset,scene_ids=subset['depth_scene_ids'])
-            depth=torch.cat((depth[:nteacher],self.render(subset['depth_pose'],view,subset['depth_frame_index'])),0)
+            encoded=self.encode_depth(policy,self.render(subset['depth_pose'],view,subset['depth_frame_index']))
+            depth_features=torch.cat((depth_features[:nteacher],encoded),0)
         active=context[:,ELAPSED]<context[:,EPISODE_LIMIT]; valid_start=active.to(s.dtype)
         rewards=[]; soft_done=[]; timeouts=[]; valid=[]; features=[]; values=[s.new_zeros(b)]
         for t in range(cfg.horizon):
@@ -127,15 +128,16 @@ class Imagination:
                 if ids.numel():
                     subset={k:v[ids] for k,v in seed.items() if torch.is_tensor(v)}
                     if self.field is not None: subset['scene_ids']=self.field.scene_ids(pose[ids])
-                    new=self.render(pose[ids],subset,(frame+t)[ids])
-                    depth=depth.index_copy(0,ids,new)
-            args=(s,pose,a_prev,a_prev2,hist,cmd_state,xi,hidden,context,depth)
-            # Bind active for recomputation; loop-variable capture would replay a
-            # different mask in backward after the rollout has advanced.
+                    new=self.encode_depth(policy,self.render(pose[ids],subset,(frame+t)[ids]))
+                    depth_features=depth_features.index_copy(0,ids,new)
+            args=(s,pose,a_prev,a_prev2,hist,cmd_state,xi,hidden,context,depth_features)
+            # The core owns selective activation storage inside torch.compile.
+            # Command/noise/history operations retain their ordinary small graph;
+            # a second outer checkpoint would discard the selected expensive work.
             current_active=active
             def step(*args,current_active=current_active):
                 return self._step(wm,policy,*args,branch,tasks,terrains,iteration,reward_iteration,current_active)
-            out=checkpoint(step,*args,use_reentrant=False,preserve_rng_state=True)
+            out=step(*args)
             s,pose,a_prev,a_prev2,hist,cmd_state,hidden,context,r,done=out
             rewards.append(r); soft_done.append(done); timeouts.append(timeout)
             active=active&~timeout

@@ -57,11 +57,20 @@ class Student(nn.Module):
         self.moe=MoE(8,450,(512,256,256),32,'elu')
         self.depth_encoder=DepthEncoder(); self.gru=nn.GRUCell(128+45,256)
         self.fusion=nn.Sequential(nn.Linear(288,32),nn.LayerNorm(32))
-    def forward(self,history,single,depth,hidden,reset=None):
+    def encode_depth(self,depth):
+        return self.depth_encoder(depth)
+    def advance_memory(self,single,depth_features,hidden,reset=None):
         if reset is not None: hidden=hidden*(~reset.bool()).to(hidden.dtype)[:,None]
+        return self.gru(torch.cat((depth_features,single),-1),hidden)
+    def fuse_features(self,proprio,single,depth_features,hidden,reset=None):
+        hidden=self.advance_memory(single,depth_features,hidden,reset)
+        return self.fusion(torch.cat((proprio,hidden),-1)),hidden
+    def forward_features(self,history,single,depth_features,hidden,reset=None):
         proprio,gates=self.moe(history)
-        hidden=self.gru(torch.cat((self.depth_encoder(depth),single),-1),hidden)
-        return self.fusion(torch.cat((proprio,hidden),-1)),gates,hidden
+        z,hidden=self.fuse_features(proprio,single,depth_features,hidden,reset)
+        return z,gates,hidden
+    def forward(self,history,single,depth,hidden,reset=None):
+        return self.forward_features(history,single,self.encode_depth(depth),hidden,reset)
 
 
 class Teacher(nn.Module):
@@ -100,18 +109,20 @@ class Policy(nn.Module):
         self.teacher_encoder=Teacher(); self.student_encoder=Student(); self.actor=DenseActionMoE(hidden)
     def teacher_latent(self,priv,height,task_ids):
         return self.teacher_encoder(self.teacher_norm(priv),height,task_ids)
-    def student_latent(self,hist,depth,hidden,reset=None):
-        return self.student_encoder(self.history_norm(hist),self.single_norm(st.single_from_history(hist)),depth,hidden,reset)
-    def step(self,hist,priv,branch,*,depth,hidden,height,task_ids,reset=None):
+    def student_latent(self,hist,depth,hidden,reset=None,depth_features=None):
+        if depth_features is None:depth_features=self.student_encoder.encode_depth(depth)
+        return self.student_encoder.forward_features(self.history_norm(hist),self.single_norm(st.single_from_history(hist)),depth_features,hidden,reset)
+    def step(self,hist,priv,branch,*,depth,hidden,height,task_ids,reset=None,depth_features=None):
         single=self.single_norm(st.single_from_history(hist))
         if isinstance(branch,tuple):
             n=branch[0]
             zt=self.teacher_latent(priv[:n],height[:n],task_ids[:n])
-            zs,g,hs=self.student_latent(hist[n:],depth[n:],hidden[n:],None if reset is None else reset[n:])
+            zs,g,hs=self.student_latent(hist[n:],None if depth is None else depth[n:],hidden[n:],None if reset is None else reset[n:],
+                None if depth_features is None else depth_features[n:])
             z=torch.cat((zt,zs)); nh=torch.cat((hidden[:n],hs))
         elif branch==0:
             z=self.teacher_latent(priv,height,task_ids); nh=hidden; g=None
-        else: z,g,nh=self.student_latent(hist,depth,hidden,reset)
+        else: z,g,nh=self.student_latent(hist,depth,hidden,reset,depth_features)
         return self.actor(z,single),nh,z,g
     def forward(self,hist,priv,branch,*,depth,hidden,height,task_ids):
         return self.step(hist,priv,branch,depth=depth,hidden=hidden,height=height,task_ids=task_ids)[0]
@@ -190,6 +201,30 @@ class Critic(nn.Module):
         out=flat.new_zeros(len(flat))
         if values: out=out.index_copy(0,order,torch.cat(values))
         return out.reshape(x.shape[:-1])
+    def forward_for_task(self,x,task,normalized=False,geometry=None,geometry_indices=None):
+        """Execute an already grouped task block without redispatching its rows.
+
+        The caller owns grouping within the original optimization minibatch.
+        Parameters, normalization and teacher/student head selection are identical
+        to forward; no task losses or optimizer updates are combined or dropped.
+        """
+        from .terrain import geometry_crop
+        flat,physical,pose,branch,_=self.decode(x)
+        if geometry is not None and x.requires_grad:
+            raise ValueError('Detached geometry cache is forbidden on the Actor state-gradient path')
+        if geometry is None:
+            height=geometry_crop(physical[:,:st.STATE_DIM],pose,self.field,kind='teacher')
+        else:
+            take=torch.arange(len(flat),device=x.device) if geometry_indices is None else geometry_indices
+            height=torch.stack((geometry[0][take],geometry[1][take].to(physical.dtype)),1)
+        val=self._value_fn(self.tasks[task],self.norm(physical),height).gather(1,branch[:,None]).squeeze(1)
+        if not normalized: val=val*self.pop_scale[task,branch]+self.pop_mean[task,branch]
+        return val.reshape(x.shape[:-1])
+    def loss_for_task(self,x,targets,task,geometry=None,geometry_indices=None):
+        _,_,_,branch,_=self.decode(x)
+        y=(targets.reshape(-1)-self.pop_mean[task,branch])/self.pop_scale[task,branch]
+        value=self.forward_for_task(x,task,normalized=True,geometry=geometry,geometry_indices=geometry_indices)
+        return F.smooth_l1_loss(value.reshape(-1),y)
     @torch.no_grad()
     def prepare_geometry(self,x,chunk_size=2048):
         """Ephemeral exact input cache for TD fitting, never learned features."""

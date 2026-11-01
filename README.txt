@@ -1,6 +1,8 @@
 Go2 Depth Multitask CTS / SuperMimic-style BPTT
 
 当前状态：用户要求完成准备后暂不启动训练，先讨论进一步加速；正式启动处于等待状态。
+2026-11-02已授权的五项执行优化：burn-in仅推进GRU、held深度CNN特征复用、Replay非循环部分按批量/时间分块、核心矩阵结果选择性保存、Critic原minibatch内部按任务分组。
+训练批量/长度/更新次数及精度配置不因此改变。缓存不跨学生优化器更新；burn-in进入损失段重新建立CNN梯度；GRU原位门投影保留重算。
 
 独立项目副本：/home/abc/Documents/go2_supermimic_lab_depth
 本地源：F:/learning/motion_control/physx_depth
