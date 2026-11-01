@@ -8,13 +8,15 @@ def main():
     p=argparse.ArgumentParser()
     for key in ('output','usd','driver','reward-calibration','evaluation-python'):
         p.add_argument('--'+key,required=True)
-    p.add_argument('--actor-microbatch',type=int,default=2048)
+    p.add_argument('--actor-microbatch',type=int,default=8192)
+    p.add_argument('--fast-depth-checkpoint',default='')
     a=p.parse_args();out=Path(a.output);out.mkdir(parents=True,exist_ok=False)
     lock_path=Path.home()/'Documents/go2_depth_training.lock'
     with lock_path.open('a') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
         cfg=TrainCfg(driver_policy=a.driver,reward_calibration=a.reward_calibration,
-                     actor_microbatch=a.actor_microbatch,evaluation_python=a.evaluation_python)
+                     actor_microbatch=a.actor_microbatch,evaluation_python=a.evaluation_python,
+                     fast_depth_checkpoint=a.fast_depth_checkpoint)
         cfg.validate(production=True)
         config=out/'config.json';config.write_text(json.dumps(asdict(cfg),indent=2))
         command=[sys.executable,'-m','go2_physx_cts.train','--config',str(config),

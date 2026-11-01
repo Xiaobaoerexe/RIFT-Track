@@ -44,7 +44,7 @@ def depth_sequence_features(student,depth,sequence,start,stop,training=False,chu
     for lo in range(0,len(capture_rows),chunk_size):
         part=slice(lo,lo+chunk_size)
         with torch.no_grad():
-            images=depth.render(pose[part],scene[part],frame[part],episode[part],trajectories[part],mode='inference')
+            images=depth.captured(pose[part],scene[part],frame[part],episode[part],trajectories[part])
         feature=checkpoint(student.encode_depth,images,use_reentrant=False) if training and torch.is_grad_enabled() else student.encode_depth(images)
         features.append(feature)
     encoded=torch.cat(features,0)

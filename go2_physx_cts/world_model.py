@@ -9,19 +9,30 @@ from torch.nn import functional as F
 from . import state as st
 from .networks import RunningNorm, GeometryEncoder, mlp
 from .terrain import geometry_crop
+from .precision import network_autocast
+
+
+def supervised_loss(model,window,field,default_q):
+    """Compilation boundary for one unchanged autoregressive supervision update.
+
+    Keep the module itself unwrapped so parameter ownership, running statistics
+    and checkpoint keys remain identical. Diagnostics may call model.loss with
+    return_terms directly without compiling a second full supervision graph.
+    """
+    return model.loss(window,field,default_q)
 
 
 class WorldModel(nn.Module):
     contact_dim=14
-    def __init__(self,hidden=(1024,1024,1024)):
-        super().__init__()
+    def __init__(self,hidden=(1024,1024,1024),mixed_precision=True):
+        super().__init__();self.mixed_precision=mixed_precision
         self.physical_norm=RunningNorm(st.STATE_DIM+4)
         self.action_norm=RunningNorm(25)
         self.context_norm=RunningNorm(st.CONTEXT_DIM)
         self.physical_encoder=mlp(st.STATE_DIM+4,(128,),128)
         self.action_encoder=mlp(25,(64,),64)
         self.context_encoder=mlp(st.CONTEXT_DIM,(32,),32)
-        self.geometry_encoder=GeometryEncoder(128)
+        self.geometry_encoder=GeometryEncoder(128,mixed_precision=mixed_precision)
         self.output_dim=st.STATE_DIM+st.POSE_DELTA_DIM
         self.net=mlp(352,hidden,self.output_dim+24+self.contact_dim)
         self.out_norm=RunningNorm(self.output_dim)
@@ -38,7 +49,10 @@ class WorldModel(nn.Module):
         if telemetry is not None:
             self.telemetry_norm.update(torch.cat((telemetry['applied_torque'],telemetry['foot_velocity'].reshape(-1,12)),-1))
     def predict(self,s,a,a_prev,xi,local_map,pose):
-        y=self.net(self._features(s,a,a_prev,xi,local_map,pose))
+        with network_autocast(s,self.mixed_precision):y=self.net(self._features(s,a,a_prev,xi,local_map,pose))
+        # Autoregressive integration, contact probabilities and all supervised
+        # losses operate onFP32 physical quantities, not accumulated BF16 state.
+        y=y.float()
         physical=self.out_norm.unnormalize(y[:,:self.output_dim])
         auxiliary=self.telemetry_norm.unnormalize(y[:,self.output_dim:self.output_dim+24])
         logits=y[:,self.output_dim+24:]

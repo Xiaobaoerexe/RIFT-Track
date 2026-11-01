@@ -64,6 +64,7 @@ class CTSPerceptive(Go2):
   state=torch.load(root/'go2_depth_input/assets/weights.pt',map_location='cpu',weights_only=True)
   self.depth_noise.load_state_dict(state['noise']);self.depth_noise.freeze()
   self.height_cache={};self.last_depth_frame=-1;self.depth_image=np.zeros((48,64),dtype=np.float32)
+  self.depth_time_origin=None;self.depth_episode=-1
   m=self.sim.mj_model
   # Geometry groups affect ray inclusion only; collision bits/materials remain
   # untouched. Excluding all robot links implements the agreed no-self-view.
@@ -79,7 +80,12 @@ class CTSPerceptive(Go2):
   try:yield
   finally:m.geom_group[:]=self.original_geom_groups
  def reset(self):
-  super().reset();self.last_depth_frame=-1
+  super().reset();self.last_depth_frame=-1;self.depth_time_origin=None
+  self.depth_episode=getattr(self,'depth_episode',-1)+1
+ def depth_capture_step(self,sim_time):
+  if self.depth_time_origin is None:self.depth_time_origin=float(sim_time)
+  control_step=int((float(sim_time)-self.depth_time_origin)/self.cfg.perception_control_dt+1e-6)
+  return (control_step//self.cfg.depth_period)*self.cfg.depth_period
  def height(self,xy):
   shape=xy.shape[:-1];points=np.asarray(xy).reshape(-1,2);grid=points/.05
   floor=np.floor(grid).astype(np.int64);frac=grid-floor;values=[]
@@ -107,7 +113,7 @@ class CTSPerceptive(Go2):
    mujoco.mj_multiRay(self.sim.mj_model,self.sim.mj_data,origin,unit.ravel(),self.ray_groups,1,-1,geoms,distances,len(unit),12.)
   z=distances/norm;valid=(distances>=0)&(z>=.1)&(z<=6.)
   image=torch.from_numpy(np.clip(z,.1,6.).reshape(1,48,64)).float();mask=torch.from_numpy(valid.reshape(1,48,64)).float()
-  keys=noise_keys(torch.tensor([self.cfg.eval_seed]),frame,episode_ids=0)
+  keys=noise_keys(torch.tensor([self.cfg.eval_seed]),frame,episode_ids=self.depth_episode)
   with torch.no_grad():
    noisy=self.depth_noise(image,torch.ones(1,dtype=torch.long),geometry_valid=mask,random=fields_from_keys(keys),hole_strength=2.)['depth']
   self.depth_image=noisy[0].numpy();self.last_depth_frame=frame;return self.depth_image
@@ -124,7 +130,9 @@ class CTSPerceptive(Go2):
    if min(ids)<0:raise ValueError(f'Missing anatomical {part} frames')
    points.append(yaw_inverse(d.xpos[ids]-pos,yaw).reshape(-1))
   if self.cfg.branch=='student':
-   obs[45:]=self.depth(pos,R,int(sim_data.sim_time/.04+1e-6)).reshape(-1)
+   # Use the checkpoint's control-frame clock; resetting the robot forces a
+   # fresh frame and starts a new camera phase just as a real training episode.
+   obs[45:]=self.depth(pos,R,self.depth_capture_step(sim_data.sim_time)).reshape(-1)
    return obs
   ground_z=float(self.height(pos[None,:2])[0])
   state=np.concatenate(([pos[2]-ground_z],get_projected_gravity(sim_data.proprio.imu.quat),vy,wb,sim_data.proprio.joint.pos-self.training_default,sim_data.proprio.joint.vel,*points))
@@ -265,10 +273,15 @@ def evaluate_case(exports,iteration,branch,command,payload,output,seed=17,video=
  if mujoco.__version__!='3.2.3':raise RuntimeError('Use the pinned official MuJoCo3.2.3 runtime; no version bypass.')
  torch.set_num_threads(1);torch.set_grad_enabled(False);random.seed(seed);np.random.seed(seed);torch.manual_seed(seed)
  meta=json.loads((Path(exports)/f'{iteration}_metadata.json').read_text());const=meta['consts']
+ if meta.get('schema')!='depth_cts_export_v2' or meta.get('architecture_version')!='physx-depth-multitask-v2':
+  raise ValueError('Architecture mismatch: official bridge requires the versioned V2 export')
  robot=Go2Lab131Config();sim=MujocoConfig();gauge=FlatGaugeConfig()
  robot.control.model_path=meta['models'][branch]['path'];robot.robot_class='CTSPerceptive'
  robot.control.num_observations=meta['models'][branch]['input_dim']
  robot.depth_package=meta['depth_package'];robot.branch=branch;robot.task_id=task_id;robot.eval_seed=seed
+ camera=meta['camera'];robot.depth_period=int(camera['depth_period']);robot.perception_control_dt=float(camera['control_dt'])
+ if robot.depth_period<=0 or abs(robot.perception_control_dt-.02)>1e-9:raise ValueError('Unsupported checkpoint perception/control cadence')
+ if abs(float(camera['rate_hz'])-1/(robot.depth_period*robot.perception_control_dt))>1e-6:raise ValueError('Inconsistent exported camera rate')
  if task_map is not None:
   gauge.assets.terrain_xmls=[task_map['xml']];gauge.assets.terrain_spawn_pos=task_map.get('spawn',[0,0,0])
   gauge.assets.terrain_name=f"depth_task{task_id}_level{task_map.get('level',0)}"
@@ -299,10 +312,11 @@ def evaluate_case(exports,iteration,branch,command,payload,output,seed=17,video=
  logger.create('official_cases',tag,console_output=False,parent_log_dir=output)
  pipeline=AttachedPipeline(tag,sim,robot,gauge,SimpleNamespace(seed=seed))
  _,warning,error=pipeline.run();result=pipeline.gauge.summary()
- result.update(iteration=iteration,branch=branch,fixture_label=fixture,command=list(command),payload_kg=payload,control_contract='checkpoint',seed=seed,checkpoint_sha256=meta['checkpoint_sha256'],upstream_commit=UPSTREAM_COMMIT,warning=str(warning) if warning else None,error=str(error) if error else None,training_updates=0,protocol={'physics_dt':sim.physics.simulation_dt,'control_dt':.02,'depth_dt':.04,'metric_dt':.02,'duration':10,'ignore_seconds':1,'initial_settle':'recorded PhysX recovery pose' if task_id==6 else 'official BasePipeline first_reset','depth':'actual MuJoCo ray geometry + frozen supplied noise model','noise_enabled':official_noise_delay,'random_action_delay':official_noise_delay},case_dir=str(logger.log_dir))
+ result.update(iteration=iteration,branch=branch,fixture_label=fixture,command=list(command),payload_kg=payload,control_contract='checkpoint',seed=seed,checkpoint_sha256=meta['checkpoint_sha256'],upstream_commit=UPSTREAM_COMMIT,warning=str(warning) if warning else None,error=str(error) if error else None,training_updates=0,protocol={'physics_dt':sim.physics.simulation_dt,'control_dt':robot.perception_control_dt,'depth_dt':robot.depth_period*robot.perception_control_dt,'metric_dt':.02,'duration':10,'ignore_seconds':1,'initial_settle':'recorded PhysX recovery pose' if task_id==6 else 'official BasePipeline first_reset','depth':'actual MuJoCo ray geometry + frozen supplied noise model','noise_enabled':official_noise_delay,'random_action_delay':official_noise_delay},case_dir=str(logger.log_dir))
  pipeline.loaded['observed_contact_parameters']=list(pipeline.gauge.contact_parameters.values())
  pipeline.loaded['perception']={'mount':pipeline.robot.mount.tolist(),'optical_axes':'right/down/forward',
-     'depth_hz':25,'height_query_resolution_m':.05,'history':'term-major45x10','gru_reset':'official robot.reset',
+     'depth_hz':float(camera['rate_hz']),'depth_period':robot.depth_period,'noise_key_frame':'episode_control_step',
+     'height_query_resolution_m':.05,'history':'term-major45x10','gru_reset':'official robot.reset',
      'geometry':'actual loaded MuJoCo ray intersections','self_geometry_excluded':True,
      'noise_weights_sha256':hashlib.sha256((Path(robot.depth_package)/'go2_depth_input/assets/weights.pt').read_bytes()).hexdigest()}
  (logger.log_dir/'loaded_parameters.json').write_text(json.dumps(pipeline.loaded,indent=2))

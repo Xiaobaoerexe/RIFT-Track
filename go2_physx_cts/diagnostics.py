@@ -40,9 +40,9 @@ def _native_probe(learner,policy,steps,per_task=24,high_speed=None):
                 success=torch.zeros(nt,device=dev,dtype=torch.bool)
                 for j in range(steps):
                     full=env.snapshot();b={k:v[index] for k,v in full.items() if torch.is_tensor(v) and v.ndim and len(v)==n}
-                    # Depth at25Hz, recurrent controller at50Hz. No stale image
+                    # Checkpoint camera cadence, recurrent controller at50Hz. No stale image
                     # from another pose or replay trajectory is substituted.
-                    if branch==1 and j%2==0:
+                    if branch==1 and j%learner.cfg.depth_period==0:
                         image=learner.depth.render(b['pose'],b['scene_ids'],j,0,index,mode='inference')
                     priv=st.privileged(b['s'],b['a_prev'],b['command'],b['xi'],b['relief'])
                     act,hidden,_,_=policy.step(b['obs'].float(),priv,branch,depth=image,hidden=hidden,

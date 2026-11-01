@@ -37,6 +37,6 @@ def evaluate_checkpoint(checkpoint,output,iteration,official_python):
         'success_rate':sum(bool(r['pass']) for r in teacher)/max(1,len(teacher)),
         'return':sum(scores)/max(1,len(scores)),'iteration':iteration,
         'metric':'diagnostic score: survival - xy_RMSE - 0.5*yaw_RMSE; NOT training reward return',
-        'depth_contract':'actual MuJoCo geometry with frozen noise at25Hz'}
+        'depth_contract':'actual MuJoCo geometry with frozen noise at checkpoint camera cadence'}
     (out/'result.json').write_text(json.dumps(result,indent=2))
     return result

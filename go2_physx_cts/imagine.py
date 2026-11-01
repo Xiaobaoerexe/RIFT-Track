@@ -61,7 +61,7 @@ class Imagination:
                                  flat_ids(seed['trajectory_ids']),mode='recompute')
     @torch.no_grad()
     def burnin(self,policy,sequence):
-        """Rebuild current-encoder memory from exact25Hz camera captures."""
+        """Rebuild current-encoder memory from exact configured5Hz captures."""
         b,t=sequence['obs'].shape[:2]; hidden=sequence['obs'].new_zeros((b,256),dtype=torch.float32)
         features=depth_sequence_features(policy.student_encoder,self.depth,sequence,0,t)
         obs=sequence['obs'].float().reshape(b*t,-1)
@@ -71,13 +71,16 @@ class Imagination:
             hidden=torch.where(sequence['valid'][:,j].reshape(-1,1).bool(),new,hidden)
         return hidden
     def encode_depth(self,policy,images):
-        # A held feature is shared by both control steps without detaching its
+        # A held feature is shared by all held control steps without detaching its
         # capture-pose derivative. Recompute its CNN only once during backward.
         return checkpoint(policy.student_encoder.encode_depth,images,use_reentrant=False) if torch.is_grad_enabled() else policy.student_encoder.encode_depth(images)
     def _core(self,wm,policy,s,pose,a_prev,a_prev2,hist,cmd_state,xi,hidden,context,depth_features,branch,tasks,terrains,iteration):
         command=self.commands.command(cmd_state)
-        priv=st.privileged(s,a_prev,command,xi,relief(pose,self.field))
-        height=geometry_crop(s,pose,self.field,kind='teacher') if branch!=1 else s.new_zeros((len(s),2,1,1))
+        nt=branch[0] if isinstance(branch,tuple) else (len(s) if branch==0 else 0)
+        if nt:
+            priv=st.privileged(s[:nt],a_prev[:nt],command[:nt],xi[:nt],relief(pose[:nt],self.field))
+            height=geometry_crop(s[:nt],pose[:nt],self.field,kind='teacher')
+        else:priv=s.new_empty((0,st.PRIV_DIM));height=s.new_empty((0,2,1,1))
         a,nhidden,_,_=policy.step(hist,priv,branch,depth=None,depth_features=depth_features,hidden=hidden,height=height,task_ids=tasks)
         raw,dp,telemetry=wm.predict(s,a,a_prev,xi,geometry_crop(s,pose,self.field,kind='world_model'),pose)
         np=st.apply_pose_delta(pose,dp); ns=st.reconcile_state(raw,np,self.field,self.c.default_q)
@@ -106,11 +109,12 @@ class Imagination:
         nteacher=branch[0] if isinstance(branch,tuple) else (b if branch==0 else 0)
         student=slice(nteacher,b)
         if nteacher<b:
-            prefix={k:v[student] for k,v in seed['prefix'].items()}
+            prefix=seed['student_prefix'] if 'student_prefix' in seed else {k:v[student] for k,v in seed['prefix'].items()}
             hidden=torch.cat((hidden[:nteacher],self.burnin(policy,prefix)),0)
             subset={k:v[student] for k,v in seed.items() if torch.is_tensor(v)}
-            view=dict(subset,scene_ids=subset['depth_scene_ids'])
-            encoded=self.encode_depth(policy,self.render(subset['depth_pose'],view,subset['depth_frame_index']))
+            images=self.depth.captured(subset['depth_pose'],flat_ids(subset['depth_scene_ids']),flat_ids(subset['depth_frame_index']),
+                flat_ids(subset['episode']),flat_ids(subset['trajectory_ids']))
+            encoded=self.encode_depth(policy,images)
             depth_features=torch.cat((depth_features[:nteacher],encoded),0)
         active=context[:,ELAPSED]<context[:,EPISODE_LIMIT]; valid_start=active.to(s.dtype)
         rewards=[]; soft_done=[]; timeouts=[]; valid=[]; features=[]; values=[s.new_zeros(b)]
@@ -158,10 +162,18 @@ class Imagination:
     def targets(self,critic,data,geometry=None):
         flat=data['critic_in'].reshape(-1,critic.feature_dim)
         chunk_size=getattr(self.cfg,'critic_microbatch',4096)
-        pieces=[]
-        for start in range(0,len(flat),chunk_size):
-            stop=min(start+chunk_size,len(flat))
-            indices=torch.arange(start,stop,device=flat.device)
-            pieces.append(critic(flat[start:stop],geometry=geometry,geometry_indices=indices))
-        values=torch.cat(pieces).reshape(data['critic_in'].shape[:2])
+        # Parameters and normalization stay fixed throughout target construction.
+        # Group once across H+1 records instead of redispatching every chunk;
+        # original indices address the raw-map cache and restore trajectory order.
+        tasks=flat[:,-1].long()
+        order=torch.argsort(tasks,stable=True)
+        counts=torch.bincount(tasks,minlength=len(critic.tasks)).tolist()
+        values=flat.new_empty(len(flat));offset=0
+        for task,count in enumerate(counts):
+            block=order[offset:offset+count];offset+=count
+            for indices in block.split(chunk_size):
+                if not len(indices):continue
+                value=critic.forward_for_task(flat[indices],task,geometry=geometry,geometry_indices=indices)
+                values.index_copy_(0,indices,value)
+        values=values.reshape(data['critic_in'].shape[:2])
         return time_limit_lambda_targets(data['rewards'],data['soft_done'],data['timeout'],values,self.cfg.gamma,self.cfg.lam)

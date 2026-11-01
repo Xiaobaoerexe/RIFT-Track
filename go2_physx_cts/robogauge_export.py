@@ -9,6 +9,8 @@ from . import state as st
 
 STUDENT_INPUT=45+48*64
 TEACHER_INPUT=45+st.PRIV_DIM+2*64*128+1
+CHECKPOINT_SCHEMA='physx-depth-multitask-v2'
+EXPORT_SCHEMA='depth_cts_export_v2'
 
 class StatefulStudent(nn.Module):
     def __init__(self,core):
@@ -42,25 +44,38 @@ def export_checkpoint(checkpoint,output,iteration):
     torch.set_num_threads(2);torch.manual_seed(17)
     out=Path(output).resolve();out.mkdir(parents=True,exist_ok=True)
     path=Path(checkpoint);ck=torch.load(path,map_location='cpu',weights_only=False)
-    p=Policy(tuple(ck['cfg']['actor_hidden'])).eval();p.load_state_dict(ck['policy'])
+    if ck.get('schema')!=CHECKPOINT_SCHEMA:
+        raise ValueError('Architecture mismatch: export requires the V2 six-expert/shared-Critic-geometry checkpoint')
+    config=ck['cfg'];period=int(config['depth_period']);control_dt=float(config['dt'])
+    if period<=0 or control_dt<=0:raise ValueError('Invalid checkpoint camera/control cadence')
+    # BF16 is a training arithmetic mode; deploy the FP32 master weights through
+    # the pinned CPU official runtime, with no implicit expert-count default.
+    p=Policy(tuple(config['actor_hidden']),experts=int(config['actor_experts']),mixed_precision=False).float().eval()
+    p.load_state_dict(ck['policy'])
     with torch.no_grad():
         student_core=torch.jit.trace(StudentExport(p),(torch.zeros(1,450),torch.ones(1,1,48,64),torch.zeros(1,256),torch.zeros(1,dtype=torch.bool)))
         models={'student':torch.jit.script(StatefulStudent(student_core)),
                 'teacher':torch.jit.script(TeacherModel(torch.jit.trace(TeacherCore(p),torch.zeros(1,TEACHER_INPUT))))}
-        meta={'schema':'depth_cts_export_v1','iteration':iteration,'checkpoint':str(path),
+        meta={'schema':EXPORT_SCHEMA,'architecture_version':CHECKPOINT_SCHEMA,'iteration':iteration,'checkpoint':str(path),
               'checkpoint_sha256':hashlib.sha256(path.read_bytes()).hexdigest(),
               'consts':{k:v.tolist() for k,v in ck['consts'].items()},'models':{},
-              'depth_package':ck['cfg']['depth_package'],
-              'camera':{'depth_shape':[48,64],'depth_units':'meters_optical_axis','rate_hz':25,'control_hz':50,
+              'depth_package':config['depth_package'],
+              'network':{'actor_experts':int(config['actor_experts']),'proprio_experts':int(config['proprio_experts']),
+                         'training_mixed_precision':config.get('mixed_precision',False),'export_precision':'fp32'},
+              'camera':{'depth_shape':[48,64],'depth_units':'meters_optical_axis','rate_hz':1/(control_dt*period),'control_hz':1/control_dt,
+                        'control_dt':control_dt,'depth_period':period,'noise_key_frame':'episode_control_step',
                         'mount_xyz':[.101958,0,.327],'student_hidden_dim':256},
               'normalizer_counts':{k:float(getattr(p,k).count) for k in ('history_norm','single_norm','teacher_norm')}}
         for branch,model in models.items():
-            hist=torch.zeros(1,450);hidden=torch.zeros(1,256);pred=[];actual=[];inputs=[]
+            hist=torch.zeros(1,450);hidden=torch.zeros(1,256);pred=[];actual=[];inputs=[];capture_steps=[]
             model.reset()
             for i in range(50):
                 if i==25:model.reset();hist.zero_();hidden.zero_()
                 obs=torch.randn(1,45)*.2;priv=torch.randn(1,st.PRIV_DIM)*.2
-                depth=torch.rand(1,1,48,64)*5.9+.1;height=torch.randn(1,2,64,128)*.2
+                frame=i if i<25 else i-25
+                if frame%period==0:
+                    depth=torch.rand(1,1,48,64)*5.9+.1;capture_steps.append(i)
+                height=torch.randn(1,2,64,128)*.2
                 height[:,1]=1;task=torch.tensor([i%10]);hist=st.push_history(hist,obs)
                 if branch=='teacher':x=torch.cat((obs,priv,height.flatten(1),task[:,None].float()),-1)
                 else:x=torch.cat((obs,depth.flatten(1)),-1)
@@ -71,7 +86,8 @@ def export_checkpoint(checkpoint,output,iteration):
             model.reset();dst=out/f'{iteration}_{branch}.pt';model.save(str(dst))
             np.savez_compressed(out/f'{iteration}_{branch}_golden.npz',inputs=np.array(inputs),expected=np.array(actual),reset_at=np.array([0,25]))
             meta['models'][branch]={'path':str(dst),'sha256':hashlib.sha256(dst.read_bytes()).hexdigest(),
-                                    'export_max_error':error,'input_dim':TEACHER_INPUT if branch=='teacher' else STUDENT_INPUT}
+                                    'export_max_error':error,'input_dim':TEACHER_INPUT if branch=='teacher' else STUDENT_INPUT,
+                                    'golden_depth_capture_steps':capture_steps,'golden_reset_steps':[0,25]}
     (out/f'{iteration}_metadata.json').write_text(json.dumps(meta,indent=2));return meta
 
 def main():

@@ -1,8 +1,10 @@
 """Shared transition replay with terminal labels and episode-safe sequence sampling.
 
 All providers train the same dynamics and provide imagination starting states.
-Depth is reconstructed from immutable geometry/pose/key metadata, never copied
-from an unrelated future trajectory. Contact-event history is retained separately.
+Depth capture metadata addresses the observation module's bounded frozen-image
+cache. Evicted images reconstruct from the exact immutable pose/noise key; future
+imagined observations always use their own predicted pose. Contact-event history
+is retained separately.
 """
 import torch
 from . import state as st

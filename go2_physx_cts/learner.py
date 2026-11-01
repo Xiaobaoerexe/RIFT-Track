@@ -7,7 +7,7 @@ import torch
 from torch.utils.checkpoint import checkpoint
 from . import UPSTREAM_COMMIT,state as st
 from .networks import Policy,Critic,StudentExport
-from .world_model import WorldModel
+from .world_model import WorldModel,supervised_loss
 from .buffer import Replay,Archive,mixed_windows
 from .imagine import Imagination,flat_ids
 from .terrain import relief,geometry_crop
@@ -58,9 +58,11 @@ class Learner:
     def __init__(self,cfg,env,output,driver=None):
         self.cfg,self.env,self.output=cfg,env,Path(output); self.output.mkdir(parents=True,exist_ok=True)
         self.device=cfg.device; torch.manual_seed(cfg.seed)
-        self.policy=Policy(cfg.actor_hidden).to(cfg.device)
-        self.critic=Critic(cfg.critic_hidden,env.field,cfg.task_context_dim,compile=cfg.compile).to(cfg.device)
-        self.wm=WorldModel(cfg.wm_hidden).to(cfg.device)
+        mixed_precision=getattr(cfg,'mixed_precision',True)
+        self.policy=Policy(cfg.actor_hidden,experts=cfg.actor_experts,mixed_precision=mixed_precision).to(cfg.device)
+        self.critic=Critic(cfg.critic_hidden,env.field,cfg.task_context_dim,compile=cfg.compile,mixed_precision=mixed_precision).to(cfg.device)
+        self.wm=WorldModel(cfg.wm_hidden,mixed_precision=mixed_precision).to(cfg.device)
+        self._wm_loss_fn=torch.compile(supervised_loss,dynamic=False,fullgraph=True) if cfg.compile else supervised_loss
         self.depth=DepthObservation(cfg,env.field)
         self.actor_params=list(self.policy.teacher_encoder.parameters())+list(self.policy.actor.parameters())
         self.opt_wm=torch.optim.Adam(self.wm.parameters(),lr=cfg.wm_lr)
@@ -132,7 +134,7 @@ class Learner:
         self.camera_episode.copy_(episode)
         ids=(refresh&(self.source==1)).nonzero().flatten()
         if len(ids):
-            self.real_depth[ids]=self.depth.render(self.depth_pose[ids],self.depth_scene_ids[ids],self.depth_frame_index[ids],episode[ids],self.index[ids],mode='inference')
+            self.real_depth[ids]=self.depth.captured(self.depth_pose[ids],self.depth_scene_ids[ids],self.depth_frame_index[ids],episode[ids],self.index[ids]).float()
         return self.real_depth
     @torch.no_grad()
     def collect(self):
@@ -183,7 +185,7 @@ class Learner:
         losses=[]
         for _ in range(self.cfg.wm_updates_for(self.it)):
             w=mixed_windows(self.buf,self.archive,self.cfg,self.env.xi)
-            loss=self.wm.loss(w,self.env.field,self.env.consts.default_q)
+            loss=self._wm_loss_fn(self.wm,w,self.env.field,self.env.consts.default_q)
             self.opt_wm.zero_grad(set_to_none=True); loss.backward(); gn=clip_grad(self.wm.parameters(),self.cfg.grad_clip)
             if scalar_finite(gn) and scalar_finite(loss): self.opt_wm.step(); self.counts['wm']+=1
             else: self.nonfinite+=1
@@ -195,7 +197,7 @@ class Learner:
         return (self.it>=activation[tasks]+self.cfg.critic_warmup_iterations).to(seed['s'].dtype)
     def improve_policy(self):
         cfg=self.cfg; nt=int(cfg.imag_batch*cfg.teacher_fraction); sizes=(nt,cfg.imag_batch-nt)
-        all_data=[]; objective_means=[]; source_counts=torch.zeros(3,device=self.device)
+        objective_means=[]
         use_cuda=str(self.device).startswith('cuda'); spans=[]
         def stamp():
             if not use_cuda:return time.monotonic()
@@ -204,30 +206,30 @@ class Learner:
         actor_active=self.it>=1500 and self.it>=self.actor_frozen_until
         self.opt_actor.zero_grad(set_to_none=True)
         with frozen(self.wm,self.critic,self.policy.student_encoder):
-            for branch,batch in enumerate(sizes):
-                sample_start=stamp()
-                seed=self.buf.seeds(batch,burnin=cfg.cts_burnin if branch else 0)
-                span('seed_sampling',sample_start)
-                source_counts+=torch.bincount(flat_ids(seed['source']),minlength=3)
-                totals=[]
-                for lo in range(0,batch,cfg.actor_microbatch):
-                    sub=subset(seed,slice(lo,lo+cfg.actor_microbatch))
-                    with torch.enable_grad() if actor_active else torch.no_grad():
-                        forward_start=stamp()
-                        obj,data=self.imag.rollout(self.wm,self.policy,self.critic,sub,branch,iteration=self.it)
-                        span(('teacher' if branch==0 else 'student')+'_imagination_forward',forward_start)
-                        if actor_active:
-                            backward_start=stamp();branch_loss(obj*self._actor_ready(sub),branch,sizes).backward()
-                            span(('teacher' if branch==0 else 'student')+'_imagination_backward',backward_start)
-                    all_data.append(data); totals.append(obj.detach().sum())
-                objective_means.append(float(torch.stack(totals).sum()/batch))
+            sample_start=stamp()
+            teacher_seed=self.buf.seeds(sizes[0],burnin=0)
+            student_seed=self.buf.seeds(sizes[1],burnin=cfg.cts_burnin)
+            seed={k:torch.cat((value,student_seed[k]),0) for k,value in teacher_seed.items()}
+            seed['student_prefix']=student_seed['prefix']
+            span('seed_sampling',sample_start)
+            source_counts=torch.bincount(flat_ids(seed['source']),minlength=3)
+            # One fused mixed cohort, not separate teacher/student rollouts or
+            # renamed microbatching. Both branch means retain their own divisor.
+            with torch.enable_grad() if actor_active else torch.no_grad():
+                forward_start=stamp()
+                obj,data=self.imag.rollout(self.wm,self.policy,self.critic,seed,sizes,iteration=self.it)
+                span('mixed_imagination_forward',forward_start)
+                if actor_active:
+                    backward_start=stamp();branch_loss(obj*self._actor_ready(seed),sizes,sizes).backward()
+                    span('mixed_imagination_backward',backward_start)
+            objective_means=[float(obj[:nt].float().mean().detach()),float(obj[nt:].float().mean().detach())]
+            del teacher_seed,student_seed,seed
             actor_step_start=stamp()
             gn=clip_grad(self.actor_params,cfg.grad_clip,cfg.grad_clip_elem) if actor_active else torch.tensor(0.)
             finite=scalar_finite(gn) and all(math.isfinite(v) for v in objective_means)
             if actor_active and finite: self.opt_actor.step(); self.counts['actor']+=1
             elif not finite: self.nonfinite+=1
             span('actor_clip_and_step',actor_step_start)
-        data={k:torch.cat([d[k] for d in all_data]) for k in all_data[0]}
         geometry_start=stamp()
         geometry=self.critic.prepare_geometry(data['critic_in'])
         span('critic_geometry_cache',geometry_start)
@@ -241,10 +243,11 @@ class Learner:
         popart_start=stamp()
         self.critic.norm.update(x[:,:self.critic.physical_dim])
         self.critic.update_popart(x,y);span('critic_normalization_and_popart',popart_start)
-        fit_start=stamp();losses=[]
+        fit_start=stamp();losses=[];critic_samples_processed=0;critic_batch_sizes=[]
         for _ in range(cfg.critic_epochs):
             order=torch.randperm(len(x),device=self.device)
             for ids in torch.tensor_split(order,cfg.critic_minibatches):
+                critic_samples_processed+=len(ids);critic_batch_sizes.append(len(ids))
                 # Group once per original minibatch, then run larger single-task
                 # blocks. Its members, denominator, clipping and Adam step stay
                 # unchanged; the random permutation is still drawn once/epoch.
@@ -276,13 +279,16 @@ class Learner:
             update_times[name]=update_times.get(name,0.)+(start.elapsed_time(end)/1000. if use_cuda else end-start)
         return {'branch_objectives':objective_means,'objective':sum(objective_means),
             'actor_grad_norm':float(gn),'critic_loss':sum(losses)/len(losses),'imagined_sources':source_counts.tolist(),'update_times':update_times,'critic_geometry_cache':self.critic.geometry_cache_metadata,
+            'imagined_branch_samples':list(sizes),'fused_imagination':True,
+            'critic_epochs':cfg.critic_epochs,'critic_minibatches':cfg.critic_minibatches,
+            'critic_valid_samples':len(x),'critic_samples_processed':critic_samples_processed,'critic_batch_sizes':critic_batch_sizes,
             'immediate':float(data['immediate'].mean()),'bootstrap':float(data['bootstrap'].mean())}
     def sequence_loss(self,student,sequence,training=True):
         cfg=self.cfg; total=sequence['obs'].shape[1]; b=len(sequence['obs'])
         hidden=sequence['obs'].new_zeros((b,256),dtype=torch.float32)
         burn=cfg.cts_burnin;steps=total-burn
         # Replay inputs are already known: batch all nonrecurrent operations,
-        # while preserving ordered GRU resets and the exact32-step burn-in.
+        # while preserving ordered GRU resets and the configured16-step burn-in.
         with torch.no_grad():
             single=self.policy.single_norm(st.single_from_history(sequence['obs'].float().reshape(b*total,-1))).reshape(b,total,-1)
             burn_features=depth_sequence_features(student,self.depth,sequence,0,burn)
@@ -303,13 +309,13 @@ class Learner:
         # the burn-in/loss boundary even if the captured camera frame is held.
         # No encoded feature survives this call or either CTS optimizer step.
         depth_features=depth_sequence_features(student,self.depth,sequence,burn,total,training=training)
-        proprio=batched_apply(lambda hist:student.moe(hist)[0],history,training=training).reshape(b,steps,-1)
+        proprio=batched_apply(lambda hist:student.encode_proprio(hist)[0],history,training=training).reshape(b,steps,-1)
         losses=[]
         for j in range(steps):
             reset=sequence['reset'][:,burn+j].reshape(-1).bool()
             args=(proprio[:,j],single[:,burn+j],depth_features[:,j],hidden,reset)
             z,hidden=checkpoint(student.fuse_features,*args,use_reentrant=False) if training else student.fuse_features(*args)
-            losses.append((z-label[:,j]).square().mean(-1))
+            losses.append((z.float()-label[:,j].float()).square().mean(-1))
         loss=torch.stack(losses,1);mask=sequence['valid'][:,burn:].reshape(b,steps).float()
         return (loss*mask).sum()/mask.sum().clamp_min(1)
     def update_cts(self):
@@ -363,7 +369,7 @@ class Learner:
         path=Path(path) if path else self.output/f'model_{self.it:08d}.pt'
         contract_path=self.output/'physics_contract.json'
         project_commit=json.loads(contract_path.read_text()).get('code_commit') if contract_path.exists() else None
-        value={'schema':'physx-depth-multitask-v1','upstream_commit':UPSTREAM_COMMIT,'cfg':asdict(self.cfg),
+        value={'schema':'physx-depth-multitask-v2','upstream_commit':UPSTREAM_COMMIT,'cfg':asdict(self.cfg),
             'project_code_commit':project_commit,
             'policy':self.policy.state_dict(),'critic':self.critic.state_dict(),'world_model':self.wm.state_dict(),
             'optimizers':{k:getattr(self,'opt_'+k).state_dict() for k in ('wm','actor','critic','cts')},
@@ -381,7 +387,7 @@ class Learner:
         partial=path.with_suffix('.partial'); torch.save(value,partial); os.replace(partial,path); return path
     def load(self,path,continue_run=False):
         ck=torch.load(path,map_location=self.device,weights_only=False)
-        if ck['schema']!='physx-depth-multitask-v1' or ck['physics']!='isaacsim_physx': raise ValueError('Architecture mismatch; old policy weights cannot initialize depth training')
+        if ck['schema']!='physx-depth-multitask-v2' or ck['physics']!='isaacsim_physx': raise ValueError('Architecture mismatch; V2 requires a matching six-expert/shared-Critic-geometry checkpoint')
         for name,expected in ck['consts'].items():
             if not torch.allclose(getattr(self.env.consts,name),expected.to(getattr(self.env.consts,name)),atol=1e-6,rtol=1e-6): raise ValueError('Control constant mismatch: '+name)
         from .task import reward_budget
