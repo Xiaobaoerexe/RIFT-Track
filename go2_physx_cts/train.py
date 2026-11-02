@@ -14,6 +14,10 @@ def physics_configuration(cfg):
     # Measured4096-environment phase transition requested34,745,924 aggregate
     # pairs, above the upstream2**25 default. Dropped interactions are invalid.
     physics.gpu_found_lost_aggregate_pairs_capacity=2**26
+    # Cold flat startup at4096envs requests3,020,271 broadphase pairs and
+    # 2,101,248 total aggregate pairs, exceeding both2**21 defaults.
+    physics.gpu_found_lost_pairs_capacity=2**23
+    physics.gpu_total_aggregate_pairs_capacity=2**23
     physics.enable_external_forces_every_iteration=True
     return SimulationCfg(dt=cfg.physics_dt,device=cfg.device,render_interval=4,physics=physics,
         physics_material=RigidBodyMaterialCfg(static_friction=1.,dynamic_friction=1.,restitution=0.))
@@ -44,7 +48,7 @@ def write_contract(env,cfg,usd,out,sim_cfg,code_commit):
         'payload_model':'rigid point mass at existing base COM, sampled only on reset','payload_max_kg':cfg.payload_max_kg,
         'curriculum_clock':'learner iterations, one real vector step per iteration',
         'terrain':env.terrain_metadata,'reward_calibration':cfg.reward_calibration,
-        'physx_preset':{k:getattr(sim_cfg.physics,k) for k in ('gpu_max_rigid_patch_count','gpu_collision_stack_size','gpu_found_lost_aggregate_pairs_capacity','enable_external_forces_every_iteration')}}
+        'physx_preset':{k:getattr(sim_cfg.physics,k) for k in ('gpu_max_rigid_patch_count','gpu_collision_stack_size','gpu_found_lost_aggregate_pairs_capacity','gpu_found_lost_pairs_capacity','gpu_total_aggregate_pairs_capacity','enable_external_forces_every_iteration')}}
     if cfg.reward_calibration:
         record['reward_calibration_sha256']=hashlib.sha256(Path(cfg.reward_calibration).read_bytes()).hexdigest()
     (out/'physics_contract.json').write_text(json.dumps(record,indent=2))
