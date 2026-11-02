@@ -19,25 +19,28 @@ class RollbackRules(unittest.TestCase):
   self.assertEqual(s.ramp_start,start)
   for key in ('actor','teacher','critic'):self.assertAlmostEqual(s.rates(2000)[key],before[key]/2)
   self.assertAlmostEqual(s.rates(2500)['actor'],2e-4)
-  self.assertAlmostEqual(s.rates(2500)['teacher'],1e-4)
+  self.assertAlmostEqual(s.rates(2500)['teacher'],2e-4)
   self.assertAlmostEqual(s.rates(2500)['critic'],2e-4)
  def test_repeated_ramp_keeps_original_target(self):
   s=LearningRateController(TrainCfg());s.rollback(2000);before=s.rates(2200);s.rollback(2200)
   self.assertAlmostEqual(s.rates(2200)['actor'],before['actor']/2)
   self.assertAlmostEqual(s.rates(2500)['actor'],2e-4)
- def test_plateau_and_trial_candidates(self):
+ def test_plateau_and_feedback_recovery(self):
   s=LearningRateController(TrainCfg());s.rollback(8000)
   self.assertAlmostEqual(s.rates(8999)['actor'],1e-4)
-  for a,b in zip(s._candidates('actor'),[1e-4/1.3,1e-4,1.3e-4]):self.assertAlmostEqual(a,b)
- def test_exact_half_at_candidate_lower_bound(self):
+  s.last_window=8500
+  good={k:{'status':'good'} for k in ('wm','critic','actor','tracking')}
+  for it in (9500,10500,11500):s.feedback(it,good)
+  self.assertAlmostEqual(s.rates(11501)['actor'],1.3e-4)
+ def test_exact_half_at_feedback_lower_bound(self):
   s=LearningRateController(TrainCfg());s.current['actor']=4e-6;s.rollback(8000)
   self.assertEqual(s.rates(8001)['actor'],2e-6)
- def test_state_roundtrip_and_legacy_migration(self):
+ def test_state_roundtrip_and_legacy_rejection(self):
   a=LearningRateController(TrainCfg());a.rollback(2000);a.rates(2100)
   b=LearningRateController(TrainCfg());b.load_state_dict(copy.deepcopy(a.state_dict()))
   self.assertEqual(a.rates(2300),b.rates(2300));self.assertEqual(a.rates(2500),b.rates(2500))
-  old=a.state_dict();old.pop('original_ramp_semantics');old['ramp_start']=7950
-  b.load_state_dict(old);self.assertEqual(b.rates(8000)['actor_ramp'],1.)
+  old=a.state_dict();old.pop('version')
+  with self.assertRaisesRegex(ValueError,'Legacy'):b.load_state_dict(old)
  def log_stub(self,folder):
   l=Learner.__new__(Learner);l.cfg=TrainCfg();l.provider_counts=[2765,922,409]
   l.actor_frozen_until=0;l.counts={};l.start_time=0;l.archive=SimpleNamespace(size=0,statistics=lambda n:{})
@@ -62,7 +65,7 @@ class RollbackRules(unittest.TestCase):
    self.assertEqual(len(l.collapse_history),1)
  def test_weights_only_no_freeze_optimizer_moments_preserved(self):
   with tempfile.TemporaryDirectory() as folder:
-   l=Learner.__new__(Learner);l.cfg=TrainCfg();l.device='cpu';l.it=2000;l.teacher_stable=False;l.lr_scale=1.
+   l=Learner.__new__(Learner);l.cfg=TrainCfg();l.device='cpu';l.it=2000;l.teacher_stable=False
    l.policy=torch.nn.ModuleDict({name:torch.nn.Linear(1,1) for name in ('actor','teacher','student')})
    l.critic=torch.nn.Linear(1,1);l.wm=torch.nn.Linear(1,1)
    l.opt_actor=torch.optim.Adam([dict(params=l.policy['actor'].parameters(),name='actor'),dict(params=l.policy['teacher'].parameters(),name='teacher')])
@@ -71,13 +74,14 @@ class RollbackRules(unittest.TestCase):
    for opt in (l.opt_actor,l.opt_critic,l.opt_cts):
     opt.zero_grad();sum(p.sum() for g in opt.param_groups for p in g['params']).backward();opt.step()
    before=[copy.deepcopy(opt.state_dict()['state']) for opt in (l.opt_actor,l.opt_critic,l.opt_cts)]
-   l.schedule=LearningRateController(l.cfg);l.ramp_start=1500;l.actor_frozen_until=0;l.collapse_history=[{}]
+   l.schedule=LearningRateController(l.cfg);l.actor_frozen_until=0;l.collapse_history=[{}]
+   l.feedback=SimpleNamespace(reset=lambda:None)
    l.real_hidden=torch.ones(2,256);l.camera_episode=torch.ones(2,dtype=torch.long)
    l.last_good=Path(folder)/'old.pt';torch.save({'policy':l.policy.state_dict(),'critic':l.critic.state_dict()},l.last_good)
    expected=copy.deepcopy(l.policy.state_dict());opts=[l.opt_actor,l.opt_critic,l.opt_cts]
    with torch.no_grad():l.policy['actor'].weight.add_(1.)
    self.assertTrue(l.rollback());self.assertEqual(opts,[l.opt_actor,l.opt_critic,l.opt_cts])
-   self.assertEqual(l.ramp_start,1500);self.assertEqual(l.actor_frozen_until,0)
+   self.assertEqual(l.schedule.ramp_start,1500);self.assertEqual(l.actor_frozen_until,0)
    for key,value in expected.items():self.assertTrue(torch.equal(l.policy.state_dict()[key],value))
    for opt,saved in zip(opts,before):
     for p,state in opt.state_dict()['state'].items():
@@ -85,8 +89,10 @@ class RollbackRules(unittest.TestCase):
    self.assertEqual(l.real_hidden.count_nonzero().item(),0)
  def test_adaptation_clock_and_student_gate(self):
   s=LearningRateController(TrainCfg())
-  self.assertFalse(s.due('actor',5000));self.assertTrue(s.due('actor',6000))
-  self.assertFalse(s.due('cts',6000));self.assertTrue(s.due('cts',6000,teacher_stable=True))
+  self.assertFalse(s.window_due(2500));self.assertTrue(s.window_due(3500))
+  self.assertTrue(s.observe_due(2700));self.assertFalse(s.window_due(80000))
+  self.assertEqual(s.rates(1499)['cts'],0.)
+  self.assertEqual(s.rates(1500)['cts'],3e-4)
  def test_legacy_launch_threshold_rejected(self):
   with self.assertRaisesRegex(ValueError,'threshold5'):TrainCfg(collapse_falls=3.).validate(False)
 

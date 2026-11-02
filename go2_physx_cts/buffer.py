@@ -25,8 +25,10 @@ BOOL_FIELDS = ('done','terminated','timeout','success')
 HALF_FIELDS = ('obs','relief')
 
 class Replay:
-    def __init__(self,n,length,device):
+    def __init__(self,n,length,device,holdout_modulus=32):
         self.n,self.L,self.device=n,length,device
+        self.holdout_modulus=holdout_modulus
+        self.heldout=torch.zeros((n,length),device=device,dtype=torch.bool)
         self.ptr=self.size=0
         self.total_collections=0
         self.data={k:torch.zeros((n,length,d),device=device,dtype=torch.float16 if k in HALF_FIELDS else torch.float32) for k,d in FLOAT_FIELDS.items()}
@@ -39,6 +41,7 @@ class Replay:
             raise ValueError(f'Replay schema mismatch missing={set(self.data)-set(values)} extra={set(values)-set(self.data)}')
         for key,dst in self.data.items():
             dst[:,self.ptr]=values[key].reshape(self.n,dst.shape[-1])
+        self.heldout[:,self.ptr]=self.validation_episodes(values['episode'])
         self.event_history[:,self.ptr]=False
         # Includes failures, successful completion, support loss and body contact.
         contact=values['next_contact_prob']
@@ -57,25 +60,32 @@ class Replay:
     def physical(self,t):
         return (self.ptr-self.size+t)%self.L
 
-    def sample_states(self,batch,source=None):
-        if not self.size:raise ValueError('Empty Replay')
-        env=torch.randint(self.n,(batch,),device=self.device)
-        logical=torch.randint(self.size,(batch,),device=self.device)
-        if source is not None:
-            for _ in range(32):
-                bad=self.data['source'][env,self.physical(logical),0]!=source
-                if not bad.any():break
-                count=int(bad.sum())
-                env[bad]=torch.randint(self.n,(count,),device=self.device)
-                logical[bad]=torch.randint(self.size,(count,),device=self.device)
-            bad=self.data['source'][env,self.physical(logical),0]!=source
-            if bad.any():
-                chronological=self.physical(torch.arange(self.size,device=self.device))
-                eligible=(self.data['source'][:,chronological,0]==source).nonzero()
-                if not len(eligible):raise ValueError('Requested source has no replay samples')
-                pick=eligible[torch.randint(len(eligible),(int(bad.sum()),),device=self.device)]
-                env[bad]=pick[:,0];logical[bad]=pick[:,1]
-        return env,self.physical(logical)
+    def validation_episodes(self,episode):
+        env=torch.arange(self.n,device=self.device,dtype=torch.int64)
+        return ((env*73856093+episode.reshape(-1).long()*19349663)%self.holdout_modulus)==0
+
+    def _positions(self,batch,length,source=None,validation=False,whole=False):
+        if self.size<length:raise ValueError('Replay lacks a complete window')
+        selected_e=[];selected_t=[];remaining=batch
+        for _ in range(16):
+            count=max(remaining*(self.holdout_modulus*2 if validation else 2),32)
+            e=torch.randint(self.n,(count,),device=self.device)
+            t=torch.randint(self.size-length+1,(count,),device=self.device)
+            ok=self.heldout[e,self.physical(t)]==validation
+            if whole and length>1:
+                slots=self.physical(t[:,None]+torch.arange(length,device=self.device))
+                ok&=(self.heldout[e[:,None],slots]==validation).all(-1)
+            if source is not None:
+                ok&=self.data['source'][e,self.physical(t+length-1),0]==source
+            ids=ok.nonzero().flatten()[:remaining]
+            selected_e.append(e[ids]);selected_t.append(t[ids]);remaining-=len(ids)
+            if not remaining:break
+        if remaining:raise ValueError('Insufficient independent replay samples for requested partition')
+        return torch.cat(selected_e),torch.cat(selected_t)
+
+    def sample_states(self,batch,source=None,validation=False):
+        e,t=self._positions(batch,1,source,validation)
+        return e,self.physical(t)
 
     def _gather(self,e,slots):
         ei=e if slots.ndim==1 else e[:,None]
@@ -84,8 +94,8 @@ class Replay:
         out['trajectory_ids']=e
         return out
 
-    def seeds(self,batch,xi=None,source=None,burnin=32):
-        e,t=self.sample_states(batch,source)
+    def seeds(self,batch,xi=None,source=None,burnin=32,validation=False):
+        e,t=self.sample_states(batch,source,validation)
         out=self._gather(e,t)
         if burnin:
             logical=(t-(self.ptr-self.size))%self.L
@@ -99,24 +109,9 @@ class Replay:
             out['prefix']=prefix
         return out
 
-    def sequences(self,batch,loss_steps=64,burnin=32,source=None):
+    def sequences(self,batch,loss_steps=64,burnin=32,source=None,validation=False):
         total=loss_steps+burnin
-        if self.size<total:raise ValueError('Replay needs a complete student sequence')
-        e=torch.randint(self.n,(batch,),device=self.device)
-        first=torch.randint(self.size-total+1,(batch,),device=self.device)
-        if source is not None:
-            for _ in range(32):
-                bad=self.data['source'][e,self.physical(first+total-1),0]!=source
-                if not bad.any():break
-                count=int(bad.sum());e[bad]=torch.randint(self.n,(count,),device=self.device)
-                first[bad]=torch.randint(self.size-total+1,(count,),device=self.device)
-            bad=self.data['source'][e,self.physical(first+total-1),0]!=source
-            if bad.any():
-                ends=self.physical(torch.arange(total-1,self.size,device=self.device))
-                eligible=(self.data['source'][:,ends,0]==source).nonzero()
-                if not len(eligible):raise ValueError('Requested source has no complete sequences')
-                pick=eligible[torch.randint(len(eligible),(int(bad.sum()),),device=self.device)]
-                e[bad]=pick[:,0];first[bad]=pick[:,1]
+        e,first=self._positions(batch,total,source,validation,whole=True)
         slots=self.physical(first[:,None]+torch.arange(total,device=self.device))
         out=self._gather(e,slots)
         reset=torch.ones((batch,total),device=self.device,dtype=torch.bool)
@@ -126,17 +121,14 @@ class Replay:
         out['loss_mask']=torch.arange(total,device=self.device)[None,:].expand(batch,-1)>=burnin
         return out
 
-    def windows(self,batch,k,xi=None,event=False):
-        if self.size<k:raise ValueError('Not enough contiguous history')
-        e=torch.randint(self.n,(batch,),device=self.device)
-        start=torch.randint(self.size-k+1,(batch,),device=self.device)
+    def windows(self,batch,k,xi=None,event=False,validation=False):
+        e,start=self._positions(batch,k,validation=validation)
         if event:
-            # Bounded rejection avoids a full multi-million-row scan per update.
             for _ in range(8):
                 bad=~self.event_history[e,self.physical(start)]
                 if not bad.any():break
-                count=int(bad.sum());e[bad]=torch.randint(self.n,(count,),device=self.device)
-                start[bad]=torch.randint(self.size-k+1,(count,),device=self.device)
+                ne,nt=self._positions(int(bad.sum()),k,validation=validation)
+                e[bad]=ne;start[bad]=nt
         idx=self.physical(start[:,None]+torch.arange(k,device=self.device));ee=e[:,None]
         required=('s','pose','s_next','pose_next','a','a_prev','xi','relief','command',
                   'episode','done','next_contact_prob','next_applied_torque',
@@ -158,12 +150,14 @@ class Replay:
              'foot_velocity':raw['next_foot_velocity'],
              'scene_ids':raw['scene_ids'][...,0],
              'task_ids':raw['task_ids'][...,0],
-             'event_history':self.event_history[ee,idx]}
+             'event_history':self.event_history[ee,idx],
+             'trajectory_ids':e,'episode_ids':raw['episode'][:,0,0],
+             'validation':self.heldout[e,self.physical(start)]}
         return out
 
     @property
     def storage_bytes(self):
-        return sum(x.numel()*x.element_size() for x in self.data.values())+self.event_history.numel()
+        return sum(x.numel()*x.element_size() for x in self.data.values())+self.event_history.numel()+self.heldout.numel()
 
 class Archive:
     def __init__(self,capacity,k,device):
@@ -173,6 +167,8 @@ class Archive:
         self.total_admitted=0
 
     def add(self,w,tick=0):
+        if w.get('validation') is not None and bool(w['validation'].any()):
+            raise ValueError('Held-out episodes must never enter the training archive')
         n=min(len(w['s']),self.cap)
         if not n:return
         if not self.data:

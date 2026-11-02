@@ -13,6 +13,7 @@ from .imagine import Imagination,flat_ids
 from .terrain import relief,geometry_crop
 from .depth import DepthObservation
 from .schedules import LearningRateController,ProviderSchedule
+from .lr_feedback import UpdateFeedback
 from .sequence_execution import depth_sequence_features,batched_apply,ENCODING_CHUNK
 
 
@@ -67,10 +68,11 @@ class Learner:
         self.actor_params=list(self.policy.teacher_encoder.parameters())+list(self.policy.actor.parameters())
         self.opt_wm=torch.optim.Adam(self.wm.parameters(),lr=cfg.wm_lr)
         self._new_policy_optimizers()
-        self.buf=Replay(cfg.num_envs,cfg.buffer_len,cfg.device)
+        self.buf=Replay(cfg.num_envs,cfg.buffer_len,cfg.device,cfg.lr_holdout_modulus)
         self.archive=Archive(cfg.archive_size,cfg.wm_window,cfg.device)
         self.imag=Imagination(cfg,env.consts,env.field,env.command_sampler,self.depth)
         self.schedule=LearningRateController(cfg)
+        self.feedback=UpdateFeedback(self)
         self.driver=driver
         if cfg.driver_frac and driver is None: raise ValueError('Declared official driver is missing')
         self.index=torch.arange(cfg.num_envs,device=cfg.device)
@@ -83,9 +85,9 @@ class Learner:
         self.depth_scene_ids=torch.zeros(cfg.num_envs,dtype=torch.long,device=cfg.device)
         self.depth_frame_index=torch.zeros_like(self.depth_scene_ids)
         self.camera_episode=torch.full_like(self.depth_scene_ids,-1)
-        self.it=0; self.actor_frozen_until=0; self.ramp_start=1500; self.lr_scale=1.
+        self.it=0; self.actor_frozen_until=0
         self.last_good=None; self.collapse_strikes=0; self.nonfinite=0; self.teacher_stable=False
-        self.collapse_history=[]; self._critic_trial_data=None
+        self.collapse_history=[]
         self.counts=dict(collect=0,transitions=0,wm=0,actor=0,critic=0,cts=0)
         self.metrics=[]; self.start_time=time.monotonic(); self.provider_counts=[0,0,0]
         self.refresh_providers()
@@ -99,7 +101,7 @@ class Learner:
             'curriculum_clock':'learner iteration, one real vector step per iteration'},indent=2))
     def _new_policy_optimizers(self):
         self.opt_actor=torch.optim.Adam([{'params':self.policy.actor.parameters(),'lr':self.cfg.lr,'name':'actor'},
-            {'params':self.policy.teacher_encoder.parameters(),'lr':self.cfg.teacher_lr,'name':'teacher'}],betas=(.9,.95))
+            {'params':self.policy.teacher_encoder.parameters(),'lr':self.cfg.lr,'name':'teacher'}],betas=(.9,.95))
         self.opt_critic=torch.optim.Adam(self.critic.parameters(),lr=self.cfg.lr)
         self.opt_cts=torch.optim.Adam(self.policy.student_encoder.parameters(),lr=self.cfg.cts_lr)
     def refresh_providers(self):
@@ -114,11 +116,11 @@ class Learner:
         self.provider_counts=[int((self.source==i).sum()) for i in range(3)]
         self.env.own_mask=self.source<2
     def learning_rates(self):
-        rates=self.schedule.rates(self.it,teacher_stable=self.teacher_stable)
+        rates=self.schedule.rates(self.it)
         if self.it<self.actor_frozen_until: rates['actor']=rates['teacher']=0.
         for opt,name in ((self.opt_wm,'wm'),(self.opt_critic,'critic'),(self.opt_cts,'cts')):
             for group in opt.param_groups: group['lr']=rates[name]
-        for group in self.opt_actor.param_groups: group['lr']=rates[group['name']]*self.lr_scale
+        for group in self.opt_actor.param_groups: group['lr']=rates[group['name']]
         return rates
     @torch.no_grad()
     def camera_inputs(self,before):
@@ -173,10 +175,11 @@ class Learner:
             next_applied_torque=after['applied_torque'],next_foot_velocity=after['foot_velocity'],
             depth_pose=self.depth_pose,depth_scene_ids=self.depth_scene_ids,depth_frame_index=self.depth_frame_index)
         self.buf.add(**values)
-        telemetry={k:after[k] for k in ('contact_prob','applied_torque','foot_velocity')}
-        self.wm.update_stats(before['s'],a,before['a_prev'],before['xi'],None,after['s'],
-            st.pose_delta(before['pose'],after['pose']),telemetry,pose=before['pose'])
-        self.policy.update_stats(before['obs'],priv)
+        training=~self.buf.validation_episodes(before['episode'])
+        telemetry={k:after[k][training] for k in ('contact_prob','applied_torque','foot_velocity')}
+        self.wm.update_stats(before['s'][training],a[training],before['a_prev'][training],before['xi'][training],None,after['s'][training],
+            st.pose_delta(before['pose'][training],after['pose'][training]),telemetry,pose=before['pose'][training])
+        self.policy.update_stats(before['obs'][training],priv[training])
         self.ou[done]=0; self.real_hidden[done]=0; self.camera_episode[done]=-1
         if self.driver is not None: self.driver.reset(done)
         self.counts['collect']+=1; self.counts['transitions']+=cfg.num_envs
@@ -203,7 +206,8 @@ class Learner:
             if not use_cuda:return time.monotonic()
             mark=torch.cuda.Event(enable_timing=True);mark.record();return mark
         def span(name,start):spans.append((name,start,stamp()))
-        actor_active=self.it>=1500 and self.it>=self.actor_frozen_until
+        actor_active=self.it>=cfg.policy_start and self.it>=self.actor_frozen_until
+        if actor_active:self.feedback.before_actor()
         self.opt_actor.zero_grad(set_to_none=True)
         with frozen(self.wm,self.critic,self.policy.student_encoder):
             sample_start=stamp()
@@ -234,6 +238,9 @@ class Learner:
         # BPTT graph and consumed Actor gradients before allocating map blocks.
         del obj
         self.opt_actor.zero_grad(set_to_none=True)
+        if actor_active and finite:self.feedback.after_actor()
+        else:self.feedback.actor_pending=None
+        self.feedback.before_critic()
         geometry_start=stamp()
         geometry=self.critic.prepare_geometry(data['critic_in'])
         span('critic_geometry_cache',geometry_start)
@@ -274,9 +281,7 @@ class Learner:
         span('critic_fit',fit_start)
         # No terrain pixels or encoded features survive into the CTS update.
         del geometry,geometry_indices
-        # Keep disjoint small immutable sets for LR trials, not giant rollout maps.
-        order=torch.randperm(len(x),device=self.device)[:4096]
-        self._critic_trial_data=(x[order].detach(),y[order].detach())
+        self.feedback.after_critic()
         if use_cuda:torch.cuda.synchronize(self.device)
         update_times={}
         for name,start,end in spans:
@@ -323,6 +328,7 @@ class Learner:
         loss=torch.stack(losses,1);mask=sequence['valid'][:,burn:].reshape(b,steps).float()
         return (loss*mask).sum()/mask.sum().clamp_min(1)
     def update_cts(self):
+        if self.it<self.cfg.policy_start:return None
         losses=[]
         with frozen(self.wm,self.critic,self.policy.actor,self.policy.teacher_encoder):
             for _ in range(self.cfg.cts_updates):
@@ -333,42 +339,6 @@ class Learner:
                 else: self.nonfinite+=1
                 losses.append(float(loss.detach()))
         return sum(losses)/len(losses)
-    def adapt_learning_rates(self):
-        if self.it<self.cfg.lr_fixed_until or self.it%self.cfg.lr_trial_interval: return {}
-        train=mixed_windows(self.buf,self.archive,self.cfg,self.env.xi)
-        validation=self.buf.windows(self.cfg.wm_batch,self.cfg.wm_window)
-        results={'wm':self.schedule.supervised_trial('wm',self.wm,self.opt_wm,
-            lambda model:model.loss(train,self.env.field,self.env.consts.default_q),
-            lambda model:model.loss(validation,self.env.field,self.env.consts.default_q),self.it)}
-        if self._critic_trial_data is not None:
-            x,y=self._critic_trial_data; split=len(x)//2
-            results['critic']=self.schedule.supervised_trial('critic',self.critic,self.opt_critic,
-                lambda model:model.loss(x[:split],y[:split]),lambda model:model.loss(x[split:],y[split:]),self.it)
-        if self.teacher_stable:
-            train_seq=self.buf.sequences(self.cfg.cts_batch,self.cfg.cts_sequence_steps,self.cfg.cts_burnin,source=1)
-            val_seq=self.buf.sequences(self.cfg.cts_batch,self.cfg.cts_sequence_steps,self.cfg.cts_burnin,source=1)
-            results['cts']=self.schedule.supervised_trial('cts',self.policy.student_encoder,self.opt_cts,
-                lambda model:self.sequence_loss(model,train_seq),lambda model:self.sequence_loss(model,val_seq,False),self.it,teacher_stable=True)
-        if self.schedule.due('actor',self.it) and self.it>=self.actor_frozen_until and self.opt_actor.param_groups[0]['lr']>0:
-            from .diagnostics import native_candidate_probe
-            # Fixed independent representative cohorts; these are discarded LR
-            # probes, never additional committed Actor updates.
-            train_seed=self.buf.seeds(256,burnin=self.cfg.cts_burnin)
-            val_seed=self.buf.seeds(256,burnin=self.cfg.cts_burnin)
-            split=(192,64)
-            def train_actor(policy):
-                obj,_=self.imag.rollout(self.wm,policy,self.critic,train_seed,split,self.it)
-                return branch_loss(obj*self._actor_ready(train_seed),split,split)
-            def probe_actor(policy):
-                with torch.no_grad():
-                    obj,_=self.imag.rollout(self.wm,policy,self.critic,val_seed,split,self.it)
-                    result=native_candidate_probe(self,policy)
-                    result['heldout_return']=float(obj[:192].mean()+obj[192:].mean())
-                    return result
-            with frozen(self.wm,self.critic,self.policy.student_encoder):
-                results['actor']=self.schedule.actor_trial(self.policy,self.opt_actor,train_actor,probe_actor,self.it)
-            self.reset_rollout_state()
-        return results
     def save(self,path=None):
         path=Path(path) if path else self.output/f'model_{self.it:08d}.pt'
         contract_path=self.output/'physics_contract.json'
@@ -377,7 +347,8 @@ class Learner:
             'project_code_commit':project_commit,
             'policy':self.policy.state_dict(),'critic':self.critic.state_dict(),'world_model':self.wm.state_dict(),
             'optimizers':{k:getattr(self,'opt_'+k).state_dict() for k in ('wm','actor','critic','cts')},
-            'iteration':self.it,'counts':self.counts,'lr_scale':self.lr_scale,'ramp_start':self.ramp_start,
+            'iteration':self.it,'counts':self.counts,'training_schedule_version':LearningRateController.version,
+            'feedback':self.feedback.state_dict(),
             'schedule':self.schedule.state_dict(),'teacher_stable':self.teacher_stable,
             'model_validation_history':getattr(self,'_model_validation_history',{}),
             'providers':self.providers.state_dict(),
@@ -390,6 +361,8 @@ class Learner:
         partial=path.with_suffix('.partial'); torch.save(value,partial); os.replace(partial,path); return path
     def load(self,path,continue_run=False):
         ck=torch.load(path,map_location=self.device,weights_only=False)
+        if ck.get('training_schedule_version')!=LearningRateController.version:
+            raise ValueError('Checkpoint predates observed-update LR schedule; explicit new initialization required')
         if ck['schema']!='physx-depth-multitask-v2' or ck['physics']!='isaacsim_physx': raise ValueError('Architecture mismatch; a matching expert-count/shared-Critic-geometry checkpoint is required')
         if ck['cfg']['actor_experts']!=self.cfg.actor_experts:raise ValueError('Actor expert count differs from checkpoint')
         for name,expected in ck['consts'].items():
@@ -401,7 +374,8 @@ class Learner:
         self.schedule.load_state_dict(ck['schedule']); self.teacher_stable=ck['teacher_stable']
         self.collapse_history=[]; self.collapse_strikes=0
         self._model_validation_history=ck.get('model_validation_history',{})
-        self.it=ck['iteration']; self.counts=ck['counts']; self.lr_scale=ck['lr_scale']; self.ramp_start=ck['ramp_start']
+        self.it=ck['iteration']; self.counts=ck['counts']
+        self.feedback.load_state_dict(ck['feedback'])
         self.actor_frozen_until=ck.get('actor_frozen_until',0)
         self.providers.load_state_dict(ck['providers'])
         self.env.load_curriculum_state_dict(ck['curriculum']); self.env.iteration=self.it
@@ -410,7 +384,7 @@ class Learner:
         # Restoring into an existing Learner has the same fresh-data semantics
         # as a CLI resume. Allocated storage is reused without exposing old slots.
         self.buf.ptr=0; self.buf.size=0; self.buf.total_collections=0
-        self.buf.event_history.zero_()
+        self.buf.event_history.zero_();self.buf.heldout.zero_()
         self.archive.ptr=0; self.archive.size=0; self.archive.total_admitted=0
         self.archive.admission_tick.zero_(); self.metrics.clear()
         self.env.reset(self.env.ids); self.env._snapshot=self.env._observe(); self.refresh_providers()
@@ -421,6 +395,7 @@ class Learner:
         ck=torch.load(path,map_location=self.device,weights_only=False)
         self.policy.load_state_dict(ck['policy']); self.critic.load_state_dict(ck['critic'])
         self.schedule.rollback(self.it)
+        self.feedback.reset()
         self.collapse_strikes=0; self.collapse_history=[]
         # Preserve optimizer moments and the original ramp/freeze clocks.
         self.learning_rates()
@@ -470,17 +445,26 @@ class Learner:
             tick=time.monotonic(); self.collect(); timings['collect_seconds']=time.monotonic()-tick
             if self.buf.size>=self.cfg.wm_window:
                 tick=time.monotonic(); stats['wm_loss']=self.fit_world_model(); timings['wm_seconds']=time.monotonic()-tick
-            if self.it>self.cfg.warmup_iterations:
+            if self.it>=self.cfg.warmup_iterations:
                 tick=time.monotonic(); stats.update(self.improve_policy()); timings['actor_critic_seconds']=time.monotonic()-tick
-            if self.buf.size>=self.cfg.cts_burnin+self.cfg.cts_sequence_steps:
+            if self.it>=self.cfg.policy_start and self.buf.size>=self.cfg.cts_burnin+self.cfg.cts_sequence_steps:
                 tick=time.monotonic(); stats['cts_loss']=self.update_cts(); timings['cts_seconds']=time.monotonic()-tick
             stats['phase_times']=timings
-            if self.it>=self.cfg.lr_fixed_until and self.it%self.cfg.lr_trial_interval==0: stats['lr_trials']=self.adapt_learning_rates()
+            feedback=self.feedback.finish()
+            if feedback is not None:
+                stats['lr_feedback']=feedback
+                with (self.output/'lr_feedback.jsonl').open('a') as f:f.write(json.dumps(feedback,allow_nan=False)+'\n')
             if self.it==1 or self.it%self.cfg.log_interval==0 or self.it==end: self.log(stats)
             if self.it==1 or self.it%self.cfg.save_interval==0 or self.it==end:
                 path=self.save()
-                if self.it>1500 and not self.collapse_strikes: self.last_good=path
-            if self.cfg.evaluation_python and self.it%self.cfg.evaluation_interval==0: self.evaluate_feedback(self.save())
+                if self.it>=self.cfg.policy_start and not self.collapse_strikes: self.last_good=path
+            if self.cfg.evaluation_python and self.it%self.cfg.evaluation_interval==0:
+                self.evaluate_feedback(self.save())
+            previous_start=self.schedule.student_start
+            self.schedule.check_student(self.it)
+            self.teacher_stable=self.schedule.teacher_stable
+            if self.schedule.student_start!=previous_start:
+                self.save()  # Persist the gate decided from this iteration's new reports.
         return self.last_good
     def evaluate_feedback(self,path):
         from .robogauge_feedback import evaluate_checkpoint
@@ -497,6 +481,10 @@ class Learner:
                 (out/(name+'_error.json')).write_text(json.dumps(record,indent=2)); print(json.dumps({'diagnostic_error':name,**record}),flush=True)
         # Stability and provider retirement require fixed real tests plus heldout
         # model quality; never infer competence from imagined return alone.
+        for name,kind in (('native','teacher_fixed_eval'),('transfer','teacher_transfer_fixed_eval')):
+            record=results.get(name,{}).get('teacher_fixed_eval')
+            self.schedule.observe(dict(record,kind=kind) if record else
+                                  {'kind':kind,'valid':False,'iteration':self.it})
         if 'native' in results and 'model' in results:
             self.consume_validation(results['native'],results['model'],results.get('transfer'))
         (self.output/'latest_diagnostics.json').write_text(json.dumps({'iteration':self.it,'results':results,'automatic_transfer_rollback':False},indent=2))

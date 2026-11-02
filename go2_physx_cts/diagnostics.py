@@ -17,7 +17,7 @@ def _native_probe(learner,policy,steps,per_task=24,high_speed=None):
         env.set_diagnostic_levels(0)
         for branch in (0,1):
             # Identical terrain, payload, command and initialization across
-            # candidates; this clock does not advance the training curriculum.
+            # branches; this clock does not advance the training curriculum.
             with torch.random.fork_rng(devices=devices):
                 torch.manual_seed(76119)
                 if devices:torch.cuda.manual_seed_all(76119)
@@ -33,6 +33,9 @@ def _native_probe(learner,policy,steps,per_task=24,high_speed=None):
                 cmd[tasks==1]=torch.tensor([1.5 if high_speed is None else high_speed,0,0],device=dev)
                 cmd[(tasks==5)|(tasks==8)|(tasks==9)]=torch.tensor([.8,0,0],device=dev)
                 env.command_override=cmd;env.command=cmd.clone();env._snapshot=env._observe()
+                case_commands=cmd[index].cpu().tolist()
+                case_payload=payload[index].cpu().tolist()
+                case_scenes=env._snapshot['scene_ids'][index].reshape(-1).cpu().tolist()
                 hidden=torch.zeros(nt,256,device=dev);image=torch.zeros(nt,1,48,64,device=dev)
                 live=torch.ones(nt,device=dev,dtype=torch.bool);returns=torch.zeros(nt,device=dev)
                 error=torch.zeros(nt,device=dev);yaw_error=error.clone();height=torch.zeros(nt,device=dev);slip=torch.zeros(nt,device=dev)
@@ -73,7 +76,8 @@ def _native_probe(learner,policy,steps,per_task=24,high_speed=None):
                         'tracking_rmse':float((error[mask]/den).sqrt().mean()),
                         'height':float((height[mask]/den).mean()),'foot_slip_mps':float((slip[mask]/den).mean()),
                         'falls_per_env_min':float(failures[mask].sum()/mask.sum()/(steps*env.cfg.dt)*60),
-                        'difficulty':'fixed level0; recovery fixedlevel5','seconds':steps*env.cfg.dt})
+                        'difficulty':'fixed level0; recovery fixedlevel5','seconds':steps*env.cfg.dt,
+                        'cases':[(case_commands[i],case_payload[i],case_scenes[i]) for i in mask.nonzero().flatten().cpu().tolist()]})
     finally:
         env.load_curriculum_state_dict(course);env.command_override=command_override
         env.evaluation_mode=True;env.reset(env.ids,advance_curriculum=False)
@@ -82,7 +86,10 @@ def _native_probe(learner,policy,steps,per_task=24,high_speed=None):
     count=sum(r['trials'] for r in rows)
     def mean(key):return sum(r[key]*r['trials'] for r in rows)/max(count,1)
     teacher=[r for r in rows if r['branch']=='teacher']
-    cohort=hashlib.sha256(json.dumps([(r['task_id'],r['trials'],r['seconds']) for r in teacher]).encode()).hexdigest()
+    protocol={'version':2,'seed':76119,'depth_period':learner.cfg.depth_period,
+              'terrain':env.terrain_metadata,
+              'cases':[(r['task_id'],r['seconds'],r['difficulty'],r['cases']) for r in teacher]}
+    cohort=hashlib.sha256(json.dumps(protocol,sort_keys=True,default=str).encode()).hexdigest()
     task_records={str(t):{'own_success_rate':sum(r['own_success_rate'] for r in rows if r['task_id']==t)/2}
                   for t in sorted(set(r['task_id'] for r in rows))}
     fixed={'kind':'teacher_fixed_eval','valid':bool(teacher),'cohort_id':cohort,
@@ -93,7 +100,6 @@ def _native_probe(learner,policy,steps,per_task=24,high_speed=None):
             'protocol':'fixed seed76119, matched task/payload/commands, no replay or optimizer writes',
             'training_episode_reset_after_probe':True}
 
-def native_candidate_probe(learner,policy):return _native_probe(learner,policy,steps=150,per_task=24)
 def native_diagnostics(learner,steps=500):
     result=_native_probe(learner,learner.policy,steps,per_task=24)
     if learner.it>=5000:
@@ -106,7 +112,7 @@ def native_diagnostics(learner,steps=500):
 
 @torch.no_grad()
 def model_diagnostics(learner,batch=2048):
-    windows=learner.buf.windows(batch,learner.cfg.wm_window)
+    windows=learner.buf.windows(batch,learner.cfg.wm_window,validation=True)
     loss,terms=learner.wm.loss(windows,learner.env.field,learner.env.consts.default_q,return_terms=True)
     state=windows['s'][:,0];pose=windows['pose'][:,0];initial=state.clone()
     error=torch.zeros(len(state),device=state.device);baseline=error.clone();den=error.clone()

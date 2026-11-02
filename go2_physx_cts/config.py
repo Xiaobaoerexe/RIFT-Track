@@ -39,14 +39,32 @@ class TrainCfg:
     critic_microbatch: int = 4096
     lr: float = 2e-4
     wm_lr: float = 2e-4
-    teacher_lr: float = 1e-4
-    lr_trial_factor: float = 1.3
-    lr_trial_interval: int = 1000
-    lr_fixed_until: int = 5000
-    wm_lr_bounds: tuple = (2e-5, 5e-4)
-    actor_lr_bounds: tuple = (4e-6, 2e-3)
-    critic_lr_bounds: tuple = (4e-6, 2e-3)
-    cts_lr_bounds: tuple = (1e-5, 3e-4)
+    policy_start: int = 1500
+    lr_feedback_start: int = 2500
+    lr_observe_interval: int = 200
+    lr_feedback_interval: int = 1000
+    lr_adjust_factor: float = 1.3
+    lr_cosine_start: int = 80000
+    lr_cosine_end: int = 120000
+    lr_final: float = 1e-6
+    wm_lr_bounds: tuple = (2e-5, 2e-4)
+    actor_lr_bounds: tuple = (4e-6, 2e-4)
+    critic_lr_bounds: tuple = (4e-6, 2e-4)
+    cts_stability_start: int = 30000
+    cts_stability_interval: int = 1000
+    cts_early_end: int = 80000
+    cts_late_end: int = 120000
+    cts_final_lr: float = 3e-6
+    lr_holdout_modulus: int = 32
+    lr_probe_windows: int = 256
+    lr_probe_sequences: int = 128
+    lr_probe_imaginations: int = 128
+    lr_min_episodes: int = 8
+    lr_wm_threshold: float = .01
+    lr_critic_threshold: float = .001
+    lr_actor_high: float = 2.
+    lr_actor_low: float = 1.25
+    lr_tracking_threshold: float = .1
     grad_clip: float = 1.
     grad_clip_elem: float = .1
     gamma: float = .99
@@ -92,6 +110,18 @@ class TrainCfg:
         return cls(**record)
 
     def validate(self, production=True):
+        if (self.policy_start,self.warmup_iterations,self.critic_warmup_iterations,self.actor_ramp_iterations)!=(1500,1000,500,1000):
+            raise ValueError('Approved warmup is WM0/Critic1000/policy+student1500/ramp1000')
+        if (self.lr_feedback_start,self.lr_observe_interval,self.lr_feedback_interval,self.lr_cosine_start,self.lr_cosine_end)!=(2500,200,1000,80000,120000):
+            raise ValueError('Approved feedback/cosine clocks changed')
+        if self.lr_final!=1e-6 or self.cts_final_lr!=3e-6 or self.cts_lr!=3e-4:
+            raise ValueError('Approved learning-rate endpoints changed')
+        if (self.cts_stability_start,self.cts_stability_interval,self.cts_early_end,self.cts_late_end)!=(30000,1000,80000,120000):
+            raise ValueError('Approved student stability/cosine clocks changed')
+        if self.lr_adjust_factor!=1.3 or self.lr!=2e-4 or self.wm_lr!=2e-4:
+            raise ValueError('Approved initial rates or feedback factor changed')
+        if self.lr_holdout_modulus<2 or self.lr_probe_imaginations<=0 or self.lr_probe_imaginations%4:
+            raise ValueError('Invalid held-out diagnostic configuration')
         if self.collapse_falls != 5. or self.log_interval != 50:
             raise ValueError('Rollback requires threshold5 and complete50-iteration windows; update legacy launch config')
         if self.stage != 'multitask':

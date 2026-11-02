@@ -61,6 +61,37 @@ class WorldModel(nn.Module):
         return s+physical[:,:st.STATE_DIM],physical[:,st.STATE_DIM:],telemetry
     def forward(self,s,a,a_prev,xi,local_map,pose):
         ns,dp,_=self.predict(s,a,a_prev,xi,local_map,pose); return ns,dp
+
+    @torch.no_grad()
+    def validation_errors(self,w,field,default_q,scales):
+        """Per-window physical errors on immutable labels and fixed metric scales."""
+        s=w['s'][:,0];pose=w['pose'][:,0];valid=w['valid']
+        scale,aux_scale=scales
+        sums={k:torch.zeros(len(s),device=s.device) for k in
+              ('state','pose','contact','telemetry','consistency','one_step','velocity_mse','pose_mse')}
+        for j in range(w['a'].shape[1]):
+            xi=w['xi'][:,j] if w['xi'].ndim==3 else w['xi']
+            raw,dp,telemetry=self.predict(s,w['a'][:,j],w['a_prev'][:,j],xi,
+                geometry_crop(s,pose,field,kind='world_model'),pose)
+            next_pose=st.apply_pose_delta(pose,dp)
+            ns=st.reconcile_state(raw,next_pose,field,default_q)
+            pe=st.pose_delta(w['pose_next'][:,j],next_pose)
+            aux=torch.cat((telemetry['applied_torque'],telemetry['foot_velocity'].reshape(-1,12)),-1)
+            target_aux=torch.cat((w['applied_torque'][:,j],w['foot_velocity'][:,j].reshape(-1,12)),-1)
+            terms={'state':((ns-w['s_next'][:,j])/scale[:st.STATE_DIM]).square().mean(-1),
+                'pose':(pe/scale[st.STATE_DIM:]).square().mean(-1),
+                'contact':F.binary_cross_entropy_with_logits(telemetry['contact_logits'],w['contact_prob'][:,j].float(),reduction='none').mean(-1),
+                'telemetry':((aux-target_aux)/aux_scale).square().mean(-1),
+                'consistency':((raw-ns)/scale[:st.STATE_DIM]).square().mean(-1),
+                'velocity_mse':(ns[:,4:10]-w['s_next'][:,j,4:10]).square().mean(-1),
+                'pose_mse':pe.square().mean(-1)}
+            for k,v in terms.items():sums[k]+=v*valid[:,j]
+            if j==0:sums['one_step']=terms['state']+terms['pose']
+            s,pose=ns,next_pose
+        den=valid.sum(-1).clamp_min(1)
+        rows={k:v/den if k!='one_step' else v for k,v in sums.items()}
+        rows['total']=rows['state']+rows['pose']+rows['contact']+rows['telemetry']+.1*rows['consistency']
+        return rows
     def loss(self,w,field=None,default_q=None,return_terms=False):
         s=w['s'][:,0]; pose=w['pose'][:,0]; total=s.new_zeros(())
         sums={name:s.new_zeros(()) for name in ('state','pose','contact','telemetry','consistency')}
