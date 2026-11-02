@@ -8,6 +8,13 @@ import copy
 import math
 import torch
 
+def collapse_trend(rows,threshold=5.):
+    if len(rows)!=3:return False
+    if not all(math.isfinite(r[k]) for r in rows for k in ('falls','xy_rmse','reward')):return False
+    return (all(r['falls']>threshold for r in rows)
+            and all(a['falls']<b['falls'] and a['xy_rmse']<b['xy_rmse'] and a['reward']>b['reward']
+                    for a,b in zip(rows,rows[1:])))
+
 class LearningRateController:
     def __init__(self,cfg):
         self.cfg=cfg
@@ -20,10 +27,15 @@ class LearningRateController:
         self.teacher_evaluations=[]
         self.transfer_evaluations=[]
         self.ramp_start=cfg.warmup_iterations+cfg.critic_warmup_iterations
+        self.rollback_recovery={}
 
     def rates(self,iteration,teacher_stable=False):
         self.teacher_stable=self.teacher_stable or teacher_stable
         ramp=min(1.,max(0.,(iteration-self.ramp_start)/self.cfg.actor_ramp_iterations))
+        for name,record in list(self.rollback_recovery.items()):
+            fraction=min(1.,max(0.,(iteration-record['start'])/(record['end']-record['start'])))
+            self.current[name]=record['initial']+(record['target']-record['initial'])*fraction
+            if fraction>=1.:del self.rollback_recovery[name]
         rates=dict(self.current)
         rates['actor']*=ramp
         rates['teacher']=rates['actor']*self.cfg.teacher_lr/self.cfg.lr
@@ -153,14 +165,19 @@ class LearningRateController:
         self.teacher_stable=stable(self.teacher_evaluations) and stable(self.transfer_evaluations)
 
     def rollback(self,iteration):
+        self.rates(iteration)
+        end=self.ramp_start+self.cfg.actor_ramp_iterations
         for name in ('actor','critic'):
+            target=self.rollback_recovery.get(name,{}).get('target',self.current[name])
             self.current[name]=max(self.bounds[name][0],self.current[name]*.5)
-        self.ramp_start=iteration
+            if iteration<end:
+                self.rollback_recovery[name]={'start':iteration,'end':end,'initial':self.current[name],'target':target}
+            else:self.rollback_recovery.pop(name,None)
 
     def state_dict(self):
         return {'current':self.current,'last_trial':self.last_trial,'history':self.history,
                 'teacher_stable':self.teacher_stable,'teacher_evaluations':self.teacher_evaluations,
-                'transfer_evaluations':self.transfer_evaluations,'ramp_start':self.ramp_start}
+                'transfer_evaluations':self.transfer_evaluations,'ramp_start':self.ramp_start,'rollback_recovery':self.rollback_recovery}
 
     def load_state_dict(self,state):
         for key,value in state.items():setattr(self,key,value)

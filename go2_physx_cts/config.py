@@ -58,7 +58,7 @@ class TrainCfg:
     expert_policy: str = ""
     expert_frac: float = 0.
     allow_missing_flat_expert: bool = False
-    collapse_falls: float = 3.
+    collapse_falls: float = 5.
     log_interval: int = 50
     save_interval: int = 1000
     seed: int = 17

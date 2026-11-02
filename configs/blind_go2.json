@@ -78,7 +78,7 @@
   "expert_policy": "/home/abc/Admin/go2_supermimic_blind/weights/flat_reference_40000.pt",
   "expert_frac": 0.1,
   "allow_missing_flat_expert": false,
-  "collapse_falls": 3.0,
+  "collapse_falls": 5.0,
   "log_interval": 50,
   "save_interval": 1000,
   "seed": 17,

@@ -72,7 +72,7 @@ class Learner:
         self.schedule=LearningRateController(cfg)
         self._critic_trial_data=None
         self.native_teacher_history=[]
-        self.last_good=None;self.collapse_strikes=0;self.nonfinite=0
+        self.last_good=None;self.collapse_strikes=0;self.collapse_history=[];self.nonfinite=0
         self.counts=dict(collect=0,transitions=0,wm=0,actor=0,critic=0,cts=0)
         self.metrics=[];self.start_time=time.monotonic()
         self.provider_counts=[int((self.source==i).sum()) for i in range(4)]
@@ -281,8 +281,8 @@ class Learner:
         if reset_critic:self.actor_frozen_until=self.cfg.warmup_iterations+self.cfg.critic_warmup_iterations
         if continue_run:
             self.schedule.load_state_dict(ck['schedule']);self.native_teacher_history=ck.get('native_teacher_history',[])
-            self.it=ck['iteration'];self.counts=ck['counts'];self.lr_scale=ck['lr_scale'];self.ramp_start=self.it
-            self.actor_frozen_until=self.it+self.cfg.warmup_iterations
+            self.it=ck['iteration'];self.counts=ck['counts'];self.lr_scale=ck['lr_scale'];self.ramp_start=ck['ramp_start']
+            self.actor_frozen_until=ck['actor_frozen_until']
             # Retired evaluator metadata in immutable checkpoints is ignored.
             torch.set_rng_state(ck['rng'].cpu())
             if ck['cuda_rng']:torch.cuda.set_rng_state_all([v.cpu() for v in ck['cuda_rng']])
@@ -302,11 +302,10 @@ class Learner:
         if path is None:return False
         ck=torch.load(path,map_location=self.device,weights_only=False)
         self.policy.load_state_dict(ck['policy']);self.critic.load_state_dict(ck['critic'])
-        self.schedule.rollback(self.it);self.lr_scale*=.5;self.ramp_start=self.it;self.collapse_strikes=0
-        # Keep the newly trained WM/replay/archive, discard diverging policy moments.
-        self.opt_actor=torch.optim.Adam(self.actor_params,lr=self.cfg.lr,betas=(.9,.95))
-        self.opt_critic=torch.optim.Adam(self.critic.parameters(),lr=self.cfg.lr)
-        self.opt_cts=torch.optim.Adam(self.policy.student_encoder.parameters(),lr=self.cfg.cts_lr)
+        self.schedule.rollback(self.it);self.lr_scale*=.5
+        self.collapse_strikes=0;self.collapse_history=[]
+        # Weight-only rollback: retain optimizer moments, WM, Replay and curriculum.
+        self.learning_rates()
         return True
 
     def log(self,stats):
@@ -322,11 +321,22 @@ class Learner:
         result['reward_weights']=reward_weights(self.it,self.cfg.stage)
         result['command_ranges']=RANGE_STAGES[sum(self.it>=v for v in RANGE_ITERATIONS)]
         falls_all=sum(m['falls_all'] for m in self.metrics)/max(1,len(self.metrics)) if self.metrics else falls
-        self.metrics=[]
+        window_size=len(self.metrics);self.metrics=[]
         result['falls_per_vector_step_all_providers']=falls_all
-        if self.it>max(self.cfg.warmup_iterations,self.actor_frozen_until) and falls_all>self.cfg.collapse_falls:self.collapse_strikes+=1
-        else:self.collapse_strikes=0
-        result['rolled_back']=self.rollback() if self.collapse_strikes>=2 else False
+        from .schedules import collapse_trend
+        active=self.it>max(self.cfg.warmup_iterations,self.actor_frozen_until)
+        if active and window_size==self.cfg.log_interval and self.it%self.cfg.log_interval==0:
+            row={'iteration':self.it,'falls':falls_all,'xy_rmse':result['metrics']['xy_rmse'],'reward':result['metrics']['reward']}
+            if self.collapse_history and self.it-self.collapse_history[-1]['iteration']!=self.cfg.log_interval:self.collapse_history=[]
+            self.collapse_history=(self.collapse_history+[row])[-3:]
+        else:self.collapse_history=[]
+        trigger=collapse_trend(self.collapse_history,self.cfg.collapse_falls)
+        self.collapse_strikes=int(active and falls_all>self.cfg.collapse_falls)
+        result['rollback_window_history']=list(self.collapse_history)
+        result['rollback_triggered']=trigger
+        result['rollback_checkpoint']=str(self.last_good) if trigger and self.last_good else None
+        result['rolled_back']=self.rollback() if trigger else False
+        result['lr_after_rollback']=self.schedule.rates(self.it) if result['rolled_back'] else None
         with (self.output/'training.jsonl').open('a') as f:f.write(json.dumps(result,allow_nan=False)+'\n')
         (self.output/'progress.json').write_text(json.dumps(result,indent=2,allow_nan=False))
         print(json.dumps(result),flush=True)

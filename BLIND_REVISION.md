@@ -36,3 +36,12 @@ verified As2 RoboGauge transfer. Native diagnostics remain available.
 Each robot120000 iterations, no hour cap. Start As2 only after Go2 exits
 successfully at full budget and creates its student export.
 Failure/signal stops sequence. Engineering checks are not gait capability.
+
+
+## 2026-11-02 rollback rule update
+
+Three consecutive complete 50-iteration windows are required: all-provider falls per vector step strictly above 5 and strictly increasing, own teacher/student XY RMSE strictly increasing, own mean reward strictly decreasing. Partial windows and process discontinuities restart the trend history. Logs record the windows and rollback checkpoint.
+
+Rollback restores policy/critic weights only, keeps optimizer moments and WM/data, and halves Actor/Critic rates. The original ramp endpoint is retained: during ramp the base rates recover to their pre-rollback targets by that endpoint; on the plateau the halved rates persist until ordinary 1000-iteration adaptation. CTS/WM rates are unchanged by rollback. Continue-run retains the checkpoint Actor freeze deadline instead of adding a new 1000-iteration freeze. Replay/simulator still restart, as before.
+
+Validation: 33 unit tests, 30 passed and 3 skipped, including eight rollback regressions. The sequential launcher supports --resume-go2 CHECKPOINT; As2 still starts cold only after Go2 completes.

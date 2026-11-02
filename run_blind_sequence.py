@@ -1,5 +1,5 @@
 """Run Go2 to completion, then As2; stop on failure or interruption."""
-import fcntl,json,os,signal,subprocess,sys,time
+import argparse,fcntl,json,os,signal,subprocess,sys,time
 from pathlib import Path
 root=Path(__file__).resolve().parent
 runtime=Path.home()/'Documents/go2_supermimic_runtime/physx/bin/python'
@@ -10,6 +10,9 @@ def stop(signum,frame):
     if child is not None and child.poll() is None:child.send_signal(signum)
 def main():
     global child
+    parser=argparse.ArgumentParser()
+    parser.add_argument('--resume-go2')
+    args=parser.parse_args()
     for sig in (signal.SIGTERM,signal.SIGINT):signal.signal(sig,stop)
     with (root/'physx_training.lock').open('a') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
@@ -27,6 +30,7 @@ def main():
             output=records/(robot.upper()+'_BLIND_OFFICIAL_s17_'+stamp+'_175')
             usd=root/'assets'/robot/('usd/go2.usd' if robot=='go2' else 'as2.usd')
             command=[str(runtime),'-m','go2_physx_cts.train','--config',str(cfg_path),'--output',str(output),'--usd',str(usd)]
+            if robot=='go2' and args.resume_go2:command+=['--resume',str(Path(args.resume_go2).resolve()),'--continue-run']
             record={'robot':robot,'output':str(output),'log':str(output)+'.log','command':command,'status':'starting'}
             state['robots'].append(record);save()
             with open(record['log'],'w') as log:
