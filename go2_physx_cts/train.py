@@ -11,9 +11,9 @@ def physics_configuration(cfg):
     physics=_make_physics_cfg('isaacsim_physx')
     physics.gpu_max_rigid_patch_count=2*1024*1024
     physics.gpu_collision_stack_size=512*1024*1024
-    # Measured4096-environment phase transition requested34,745,924 aggregate
-    # pairs, above the upstream2**25 default. Dropped interactions are invalid.
-    physics.gpu_found_lost_aggregate_pairs_capacity=2**26
+    # Measured4096-env flat cold start requests74,162,569 aggregate pairs;
+    # mixed-phase smoke requested34,745,924. Keep35% cold-start headroom.
+    physics.gpu_found_lost_aggregate_pairs_capacity=96*1024*1024
     # Cold flat startup at4096envs requests3,020,271 broadphase pairs and
     # 2,101,248 total aggregate pairs, exceeding both2**21 defaults.
     physics.gpu_found_lost_pairs_capacity=2**23
