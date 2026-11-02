@@ -114,7 +114,7 @@ def learner_smoke(l,iterations):
     assert all(adaptive[k] is not None for k in ('wm','actor','critic','cts'))
     assert all(torch.isfinite(param).all() for param in l.policy.parameters())
     from .diagnostics import native_diagnostics,model_diagnostics
-    levels=l.env.curriculum_state_dict();counts=copy.deepcopy(l.counts)
+    levels=l.env.curriculum_state_dict();counts=copy.deepcopy(l.counts);replay_size=l.buf.size
     native=native_diagnostics(l,steps=100);model=model_diagnostics(l,batch=256)
     if levels['terrain_levels'] is not None:
         assert torch.equal(levels['terrain_levels'],l.env.curriculum_state_dict()['terrain_levels'])
