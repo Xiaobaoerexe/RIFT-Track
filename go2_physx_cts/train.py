@@ -1,5 +1,10 @@
 """Isaac Sim/PhysX depth multitask training and measured reward calibration."""
-import argparse,hashlib,importlib.metadata,json,os,signal,subprocess,sys,time
+import os
+# Set before config/Isaac/torch imports can initialize CUDA. Validated on the
+# pinned PyTorch runtime; explicit caller allocator settings remain respected.
+if 'PYTORCH_ALLOC_CONF' not in os.environ and 'PYTORCH_CUDA_ALLOC_CONF' not in os.environ:
+    os.environ['PYTORCH_ALLOC_CONF']='expandable_segments:True'
+import argparse,hashlib,importlib.metadata,json,signal,subprocess,sys,time
 from pathlib import Path
 from dataclasses import asdict
 from .config import TrainCfg
@@ -44,6 +49,7 @@ def write_contract(env,cfg,usd,out,sim_cfg,code_commit):
         'actor_experts':cfg.actor_experts,'proprio_experts':cfg.proprio_experts,
         'policy_hz':1/cfg.dt,'physics_hz':1/cfg.physics_dt,'depth_hz':1/(cfg.dt*cfg.depth_period),
         'network_precision':'bf16_mixed' if cfg.mixed_precision else 'fp32',
+        'cuda_allocator_settings':torch.cuda.memory._snapshot().get('allocator_settings',{}),
         'motor':{k:v.tolist() for k,v in vars(env.consts).items()},
         'payload_model':'rigid point mass at existing base COM, sampled only on reset','payload_max_kg':cfg.payload_max_kg,
         'curriculum_clock':'learner iterations, one real vector step per iteration',

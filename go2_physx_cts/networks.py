@@ -214,7 +214,7 @@ class Critic(nn.Module):
         if geometry is None:height=self._geometry_fn(pose,self.field)
         else:
             take=torch.arange(len(flat),device=flat.device) if geometry_indices is None else geometry_indices
-            height=torch.stack((geometry[0][take],geometry[1][take].to(physical.dtype)),1)
+            height=geometry.gather(take)
         encoded=self._encode_geometry_fn(self.geometry,height)
         # One task-count transfer replaces ten CUDA nonzero synchronizations.
         # Stable sorting preserves the original within-task sample order exactly.
@@ -244,7 +244,7 @@ class Critic(nn.Module):
             height=self._geometry_fn(pose,self.field)
         else:
             take=torch.arange(len(flat),device=x.device) if geometry_indices is None else geometry_indices
-            height=torch.stack((geometry[0][take],geometry[1][take].to(physical.dtype)),1)
+            height=geometry.gather(take)
         encoded=self._encode_geometry_fn(self.geometry,height)
         val=self._value_fn(self.tasks[task],self.norm(physical),encoded).gather(1,branch[:,None]).squeeze(1)
         if not normalized: val=val*self.pop_scale[task,branch]+self.pop_mean[task,branch]
@@ -256,31 +256,31 @@ class Critic(nn.Module):
         return F.smooth_l1_loss(value.float().reshape(-1),y.float())
     @torch.no_grad()
     def prepare_geometry(self,x,chunk_size=2048):
-        """Ephemeral exact input cache for TD fitting, never learned features."""
+        """Ephemeral detached inputs, quantized at the CNN's BF16 boundary."""
         if x.requires_grad: raise ValueError('Only detached Critic training samples may be cached')
+        from .critic_cache import CriticGeometryCache
         flat,physical,pose,_,_=self.decode(x)
-        cache_bytes=len(flat)*64*128*(flat.element_size()+1)
-        if flat.is_cuda:
-            free,_=torch.cuda.mem_get_info(flat.device)
-            reusable=max(0,torch.cuda.memory_reserved(flat.device)-torch.cuda.memory_allocated(flat.device))
-            # Keep space for Critic activations/gradients and optimizer kernels.
-            workspace=free+reusable-cache_bytes-2*1024**3
-            bytes_per_row=64*128*128  # conservative temporary bilinear-query workspace
-            allowed=int(workspace//bytes_per_row)
-            if allowed<64:
-                raise MemoryError(f'Exact Critic terrain cache needs {cache_bytes/1024**3:.2f}GiB; '
-                    f'available including reusable allocator blocks {(free+reusable)/1024**3:.2f}GiB; '
-                    'insufficient safe query/fitting workspace')
-            chunk_size=min(chunk_size,allowed)
-        self.geometry_cache_metadata={'bytes':cache_bytes,'query_chunk':chunk_size,
-            'height_dtype':str(flat.dtype),'validity_dtype':'bool','scope':'one Critic update; no learned feature caching'}
-        heights=flat.new_empty((len(flat),64,128))
-        valid=torch.empty((len(flat),64,128),device=flat.device,dtype=torch.bool)
-        for begin in range(0,len(flat),chunk_size):
-            end=min(begin+chunk_size,len(flat))
-            crop=self._geometry_fn(pose[begin:end],self.field)
-            heights[begin:end]=crop[:,0];valid[begin:end]=crop[:,1].bool()
-        return heights,valid
+        dtype=torch.bfloat16 if flat.is_cuda and self.mixed_precision else torch.float32
+        cache=CriticGeometryCache(len(flat),flat.device,dtype,chunk_size)
+        # Reserved-minus-allocated is not a promise of reusable contiguous space.
+        # Issue bounded real allocations; do not authorize a giant request using
+        # that optimistic sum, or flush the allocator every training iteration.
+        free_before=torch.cuda.mem_get_info(flat.device)[0] if flat.is_cuda else None
+        try:
+            for begin in range(0,len(flat),chunk_size):
+                crop=self._geometry_fn(pose[begin:begin+chunk_size],self.field)
+                cache.append(crop)
+                del crop
+            cache.finish()
+        except torch.cuda.OutOfMemoryError:
+            cache.heights.clear();cache.validity.clear()
+            raise
+        self.geometry_cache_metadata={'bytes':cache.storage_bytes,'query_chunk':chunk_size,
+            'height_dtype':str(dtype),'validity_dtype':'uint8 bit-packed, exact',
+            'blocks':len(cache.heights),'device_free_before':free_before,
+            'allocation_policy':'bounded allocations; reserved slack is not credited',
+            'scope':'one detached Critic update; no learned feature caching'}
+        return cache
 
     @torch.no_grad()
     def update_popart(self,x,targets,beta=.001):

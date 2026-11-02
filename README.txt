@@ -1,4 +1,12 @@
 Go2 Depth Multitask CTS / SuperMimic-style BPTT
+最新要求（2026-11-02显存优化）：只完成实现、完整更新验收及测试文件清理，不启动或恢复正式训练。
+Critic已detach的270336个地图记录使用132个BF16分块和精确位压缩有效性；总缓存4.3828125GiB。
+任意minibatch通过GPU地址表批量读取，成员/排列/损失分母/梯度累积/5次Adam更新不变。
+Actor状态梯度路径仍实时查询地形，禁止使用上述detach缓存。完成Actor反传后释放图引用与已消费梯度。
+历史已知深度图FP16缓存放CPU，最多48MiB锁页缓冲区、独立传输流和事件保护复用；未来想象深度不变。
+CUDA初始化前默认expandable_segments:True；不把reserved-allocated视为保证可分配空间，不逐轮empty_cache。
+Replay/长期事件仍在GPU。内存与同负载速度证据：research/runs/DEPTH_MEMORY_20261102。
+以下V3启动授权及计时为历史记录，不覆盖上述最新暂停要求。
 V3工程实测：完整4096环境单轮5.561584秒（6轮均值），相对V2的6.213263秒缩短约10.5%。正式冷启动授权与测试能力证据分开记录。
 
 最新V3授权：共享Actor改为3个稠密专家；启用经独立精度与可微性验收的compact surface depth。两项通过验证并清理临时文件后直接冷启动120000轮；此前10倍提速门槛已经取消。

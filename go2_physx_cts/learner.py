@@ -230,6 +230,10 @@ class Learner:
             if actor_active and finite: self.opt_actor.step(); self.counts['actor']+=1
             elif not finite: self.nonfinite+=1
             span('actor_clip_and_step',actor_step_start)
+        # The detached TD records are sufficient below. Drop the completed
+        # BPTT graph and consumed Actor gradients before allocating map blocks.
+        del obj
+        self.opt_actor.zero_grad(set_to_none=True)
         geometry_start=stamp()
         geometry=self.critic.prepare_geometry(data['critic_in'])
         span('critic_geometry_cache',geometry_start)
