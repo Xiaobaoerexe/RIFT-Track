@@ -84,6 +84,9 @@ class PhysXEnv:
         n=cfg.num_envs;dev=cfg.device;self.ids=torch.arange(n,device=dev)
         self.origins=torch.zeros(n,3,device=dev);self.goals=torch.zeros_like(self.origins);self.bounds=torch.zeros(n,4,device=dev)
         self.task_ids=task_assignments(n,0,dev);self.terrain_ids=torch.full((n,),7,dtype=torch.long,device=dev);self.terrain_levels=torch.zeros(n,dtype=torch.long,device=dev)
+        self.pending_task=torch.full((n,),-1,dtype=torch.long,device=dev)
+        self.pending_terrain=self.pending_task.clone();self.pending_level=self.pending_task.clone()
+        self.allocation_target=None
         self.arena_index=torch.full((n,),-1,dtype=torch.long,device=dev);self.recovery_kind=torch.full_like(self.arena_index,-1)
         self.xi=torch.zeros(n,st.CONTEXT_DIM,device=dev);self.xi[:,0]=1.
         self.hist=torch.zeros(n,450,device=dev);self.last=torch.zeros(n,12,device=dev);self.last2=torch.zeros_like(self.last)
@@ -197,6 +200,7 @@ class PhysXEnv:
                 progress=self.cmd_state[active,12]/self.task_context[active,ROUTE_LENGTH].clamp_min(.1)
                 up,down=terrain_level_decisions(progress,self._episode_success[active],self.task_ids[active])
                 self.terrain_levels[active]=(self.terrain_levels[active]+up.long()-down.long()).clamp(0,9)
+            self._apply_task_transfers(ids)
         self._place_arenas(ids)
         pose=tensor(self.robot.data.default_root_pose)[ids].clone();pose[:,:3]+=self.origins[ids]
         normal=self.arena_index[ids]<0;pose[:,:2]+=(torch.rand(n,2,device=dev)-.5)*.3*normal[:,None]
@@ -265,10 +269,52 @@ class PhysXEnv:
         self._place_arenas(self.ids);self._snapshot=None
 
     def curriculum_state_dict(self):
-        return {'terrain_levels':self.terrain_levels.clone(),'terrain_ids':self.terrain_ids.clone(),'task_ids':self.task_ids.clone(),'phase':self._phase,'max_levels_reached':self._terrain_max_levels.clone(),'grid':self.command_sampler.state_dict()}
+        return {'terrain_levels':self.terrain_levels.clone(),'terrain_ids':self.terrain_ids.clone(),'task_ids':self.task_ids.clone(),'phase':self._phase,'max_levels_reached':self._terrain_max_levels.clone(),'grid':self.command_sampler.state_dict(),
+                'allocation_target':self.allocation_target,**{k:getattr(self,k).clone() for k in ('pending_task','pending_terrain','pending_level')}}
     def load_curriculum_state_dict(self,s):
         for name in ('terrain_levels','terrain_ids','task_ids'):getattr(self,name).copy_(s[name])
+        self.allocation_target=s.get('allocation_target')
+        for name in ('pending_task','pending_terrain','pending_level'):
+            if name in s:getattr(self,name).copy_(s[name])
+            else:getattr(self,name).fill_(-1)
         self._phase=int(s['phase']);self._terrain_max_levels.copy_(s['max_levels_reached']);self.command_sampler.load_state_dict(s['grid']);self._place_arenas(self.ids)
+
+    def allocation_status(self):
+        return {'actual':torch.bincount(self.task_ids,minlength=10).tolist(),'target':self.allocation_target,
+                'pending':int((self.pending_task>=0).sum())}
+
+    def request_task_allocation(self,target):
+        from .task_allocation import BASE_COUNTS,TERRAIN_WEIGHTS,apportion
+        if self.num_envs!=4096 or len(target)!=10 or any(type(n) is not int for n in target) or sum(target)!=4096 or any(n<200 or n>2*b for n,b in zip(target,BASE_COUNTS)):
+            raise ValueError('Invalid task allocation')
+        if bool((self.pending_task>=0).any()):raise ValueError('Previous task transfer still pending')
+        task=self.task_ids.cpu();terrain=self.terrain_ids.cpu();level=self.terrain_levels.cpu()
+        actual=torch.bincount(task,minlength=10).tolist();donors=[];dest=[]
+        rng=torch.Generator().manual_seed(self.cfg.seed+int(self.iteration))
+        for t in range(10):
+            ids=(task==t).nonzero().flatten()
+            donors.extend(ids[torch.randperm(len(ids),generator=rng)[:max(0,actual[t]-target[t])]].tolist())
+            dest.extend([t]*max(0,target[t]-actual[t]))
+        if len(donors)!=len(dest):raise ValueError('Unbalanced task transfer')
+        projected=task.clone()
+        if donors:projected[donors]=torch.tensor(dest)
+        for t in sorted(set(dest)):
+            new=[e for e,d in zip(donors,dest) if d==t];weights=TERRAIN_WEIGHTS[t];types=list(weights)
+            desired=apportion(target[t],list(weights.values()))
+            kept=(projected==t)&(task==t);counts=[int((kept&(terrain==tid)).sum()) for tid in types]
+            for e in new:
+                slot=max(range(len(types)),key=lambda j:(desired[j]-counts[j],-j));tid=types[slot];counts[slot]+=1
+                population=level[(task==t)&(terrain==tid)]
+                lev=5 if t==6 else int(population[torch.randint(len(population),(1,),generator=rng)]) if len(population) else 0
+                self.pending_task[e]=t;self.pending_terrain[e]=tid;self.pending_level[e]=lev
+        self.allocation_target=list(target)
+
+    def _apply_task_transfers(self,ids):
+        moved=ids[self.pending_task[ids]>=0]
+        if not len(moved):return
+        self.task_ids[moved]=self.pending_task[moved];self.terrain_ids[moved]=self.pending_terrain[moved]
+        self.terrain_levels[moved]=self.pending_level[moved];self.recovery_kind[moved]=-1
+        self.pending_task[moved]=-1;self.pending_terrain[moved]=-1;self.pending_level[moved]=-1
     def _record_grid(self,before,after,done):
         command=self.command;yaw=st.yaw_from_pose(before['pose']);body_delta=st.yaw_inverse(after['pose'][:,:3]-before['pose'][:,:3],yaw)[:,:2]
         speed=command[:,:2].norm(dim=-1);direction=command[:,:2]/speed[:,None].clamp_min(1e-6)

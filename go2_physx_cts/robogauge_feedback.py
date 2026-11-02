@@ -17,9 +17,12 @@ def evaluate_checkpoint(checkpoint,output,iteration,official_python):
     ]
     if manifest.exists():
         maps=json.loads(manifest.read_text())
+        allocation_maps=manifest.parent/'allocation/manifest.json'
+        if allocation_maps.exists():maps['maps']+=json.loads(allocation_maps.read_text())['maps']
         combined=out/'task_maps.json';combined.write_text(json.dumps(maps,indent=2))
         commands[1]+=['--task-maps',str(combined)]
     if iteration>=5000:commands[1]+=['--high-speed-probes',fast_speeds]
+    if iteration>=20000:commands[1]+=['--allocation-cohort']
     for i,cmd in enumerate(commands):
         proc=subprocess.run(cmd,cwd=root,capture_output=True,text=True,timeout=7200)
         (out/f'process_{i}.log').write_text(proc.stdout+'\n'+proc.stderr)
@@ -28,7 +31,7 @@ def evaluate_checkpoint(checkpoint,output,iteration,official_python):
     # Transfer measurements are not a native capability gate or an automatic
     # rollback signal. A native/transfer decision requires explicit review.
     result['automatic_training_decision']=False
-    teacher=[r for r in result.get('rows',[]) if r['branch']=='teacher' and r.get('cohort_role')!='high_speed_probe']
+    teacher=[r for r in result.get('rows',[]) if r['branch']=='teacher' and r.get('cohort_role')=='fixed_protocol']
     cases=[(r['task_id'],r['map_sha256'],r.get('fixture_label'),r['command'],r['payload_kg'],r['seed']) for r in teacher]
     valid=bool(teacher) and not result.get('skipped') and all(r.get('error') is None and r.get('xy_rmse') is not None for r in teacher)
     scores=[float(r['survived'])-float(r['xy_rmse'])-.5*float(r['yaw_rmse']) for r in teacher if r.get('xy_rmse') is not None]

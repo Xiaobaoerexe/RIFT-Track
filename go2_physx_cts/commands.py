@@ -7,6 +7,7 @@ phase caps and .5/.75 thresholds are the explicitly approved project adaptation.
 """
 import math
 import torch
+from .task_allocation import BASE_COUNTS
 SOURCE_COMMIT='f5143ef940e934849c00284e34caf164d6ce7b6e'
 CMD_STATE_DIM=20
 REQUEST,COMMAND=slice(0,3),slice(3,6)
@@ -16,7 +17,7 @@ ORIGIN,RANGE_STAGE,LIMIT_STAGE=slice(13,15),15,16
 GRID_BIN,TASK_ID,TERRAIN_ID=17,18,19
 COMMAND_NAMES=('lin_vel_x','lin_vel_y','ang_vel_yaw')
 TERRAIN_NAMES=('wave','slope_up','slope_down','rough_slope','stairs_up','stairs_down','obstacles','flat','wheels','small_squares','gap','indoor_obstacles','obstacle_up','obstacle_down')
-FINAL_TASK_COUNTS=(820,365,365,365,365,365,356,365,365,365)
+FINAL_TASK_COUNTS=BASE_COUNTS
 TASK_TERRAINS=((7,1,2,3),(7,),(0,6,8,9),(4,),(5,),(10,),(7,0,1,2,3,4,5,6,8,9),(11,),(12,),(13,))
 
 def phase(iteration):return 0 if iteration<2500 else 1 if iteration<5000 else 2 if iteration<8000 else 3

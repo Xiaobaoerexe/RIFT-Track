@@ -101,6 +101,12 @@ def main():
             return
         from .robogauge_assets import export_task_maps
         export_task_maps(env.terrain_metadata,out/'robogauge_maps')
+        from .allocation_assets import export_allocation_maps
+        export_allocation_maps(env,out/'robogauge_maps/allocation')
+        validation=subprocess.run([cfg.evaluation_python,'-B','-m','go2_physx_cts.robogauge_assets','--validate-recovery',
+            str((out/'robogauge_maps/allocation/manifest.json').resolve())],cwd=root,capture_output=True,text=True,timeout=600)
+        (out/'robogauge_maps/allocation/validation.log').write_text(validation.stdout+'\n'+validation.stderr)
+        if validation.returncode:raise RuntimeError('Official recovery pose validation failed; inspect asset validation.log')
         from .learner import Learner
         learner=Learner(cfg,env,out,driver)
         if args.resume:learner.load(args.resume,continue_run=True)

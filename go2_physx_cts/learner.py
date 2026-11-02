@@ -14,6 +14,7 @@ from .terrain import relief,geometry_crop
 from .depth import DepthObservation
 from .schedules import LearningRateController,ProviderSchedule
 from .lr_feedback import UpdateFeedback
+from .task_allocation import TaskAllocator
 from .commands import phase
 from .sequence_execution import depth_sequence_features,batched_apply,ENCODING_CHUNK
 
@@ -74,6 +75,7 @@ class Learner:
         self.imag=Imagination(cfg,env.consts,env.field,env.command_sampler,self.depth)
         self.schedule=LearningRateController(cfg)
         self.feedback=UpdateFeedback(self)
+        self.task_allocator=TaskAllocator()
         self.driver=driver
         if cfg.driver_frac and driver is None: raise ValueError('Declared official driver is missing')
         self.index=torch.arange(cfg.num_envs,device=cfg.device)
@@ -234,6 +236,7 @@ class Learner:
             seed['student_prefix']=student_seed['prefix']
             span('seed_sampling',sample_start)
             source_counts=torch.bincount(flat_ids(seed['source']),minlength=3)
+            imagined_tasks=torch.bincount(flat_ids(seed['task_ids']),minlength=10).tolist()
             # One fused mixed cohort, not separate teacher/student rollouts or
             # renamed microbatching. Both branch means retain their own divisor.
             with torch.enable_grad() if actor_active else torch.no_grad():
@@ -305,7 +308,7 @@ class Learner:
             update_times[name]=update_times.get(name,0.)+(start.elapsed_time(end)/1000. if use_cuda else end-start)
         return {'branch_objectives':objective_means,'objective':sum(objective_means),
             'actor_grad_norm':float(gn),'critic_loss':sum(losses)/len(losses),'imagined_sources':source_counts.tolist(),'update_times':update_times,'critic_geometry_cache':self.critic.geometry_cache_metadata,
-            'imagined_branch_samples':list(sizes),'fused_imagination':True,
+            'imagined_branch_samples':list(sizes),'imagined_tasks':imagined_tasks,'fused_imagination':True,
             'critic_epochs':cfg.critic_epochs,'critic_minibatches':cfg.critic_minibatches,
             'critic_valid_samples':len(x),'critic_samples_processed':critic_samples_processed,'critic_batch_sizes':critic_batch_sizes,
             'immediate':float(data['immediate'].mean()),'bootstrap':float(data['bootstrap'].mean())}
@@ -366,6 +369,7 @@ class Learner:
             'optimizers':{k:getattr(self,'opt_'+k).state_dict() for k in ('wm','actor','critic','cts')},
             'iteration':self.it,'counts':self.counts,'training_schedule_version':LearningRateController.version,
             'feedback':self.feedback.state_dict(),
+            'task_allocator':self.task_allocator.state_dict(),
             'schedule':self.schedule.state_dict(),'teacher_stable':self.teacher_stable,
             'model_validation_history':getattr(self,'_model_validation_history',{}),
             'providers':self.providers.state_dict(),
@@ -393,6 +397,7 @@ class Learner:
         self._model_validation_history=ck.get('model_validation_history',{})
         self.it=ck['iteration']; self.counts=ck['counts']
         self.feedback.load_state_dict(ck['feedback'])
+        if 'task_allocator' in ck:self.task_allocator.load_state_dict(ck['task_allocator'])
         self.actor_frozen_until=ck.get('actor_frozen_until',0)
         self.providers.load_state_dict(ck['providers'])
         self.env.load_curriculum_state_dict(ck['curriculum']); self.env.iteration=self.it
@@ -467,6 +472,7 @@ class Learner:
             if self.it>=self.cfg.policy_start and self.buf.size>=self.cfg.cts_burnin+self.cfg.cts_sequence_steps:
                 tick=time.monotonic(); stats['cts_loss']=self.update_cts(); timings['cts_seconds']=time.monotonic()-tick
             stats['phase_times']=timings
+            if self.it%self.cfg.log_interval==0:stats['task_allocation']=self.env.allocation_status()
             feedback=self.feedback.finish()
             if feedback is not None:
                 stats['lr_feedback']=feedback
@@ -504,6 +510,16 @@ class Learner:
                                   {'kind':kind,'valid':False,'iteration':self.it})
         if 'native' in results and 'model' in results:
             self.consume_validation(results['native'],results['model'],results.get('transfer'))
+        if self.it>=20000:
+            report=results.get('transfer',{}).get('task_allocation',{'iteration':self.it,'tasks':{}})
+            status=self.env.allocation_status()
+            decision=self.task_allocator.observe(report,status['actual'],pending=bool(status['pending']))
+            if decision is not None:
+                if decision['changed']:self.env.request_task_allocation(decision['target'])
+                decision['native_tasks']=results.get('native',{}).get('tasks',{})
+                (out/'task_allocation.json').write_text(json.dumps(decision,indent=2,allow_nan=False))
+                with (self.output/'task_allocation.jsonl').open('a') as f:f.write(json.dumps(decision,allow_nan=False)+'\n')
+                self.save()  # Persist the decision AND its deferred reset transfers.
         (self.output/'latest_diagnostics.json').write_text(json.dumps({'iteration':self.it,'results':results,'automatic_transfer_rollback':False},indent=2))
     def consume_validation(self,native,model,transfer=None):
         fixed=native.get('teacher_fixed_eval')

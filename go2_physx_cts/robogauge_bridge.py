@@ -26,13 +26,17 @@ from robogauge.utils.logger import logger
 UPSTREAM_COMMIT='add2c7ee0185ea8fd93d242f86e1c8cac6e9913b'
 LEGS=('FL','FR','RL','RR')
 
-def verify_runtime(exports,iterations):
+def verify_source_runtime():
  manifest=json.loads((Path(__file__).parent/'robogauge_source.json').read_text())
  import robogauge
  root=Path(robogauge.__file__).resolve().parent.parent
  for name,digest in manifest['files'].items():
   if hashlib.sha256((root/name).read_bytes()).hexdigest()!=digest:raise RuntimeError('Official source changed: '+name)
  if mujoco.__version__!='3.2.3' or metadata.version('dm-control')!='1.0.23' or torch.__version__!='2.4.1+cu124':raise RuntimeError('Pinned RoboGauge runtime required')
+ return {'upstream_commit':UPSTREAM_COMMIT,'verified_source_files':len(manifest['files']),'mujoco':mujoco.__version__,'torch':torch.__version__}
+
+def verify_runtime(exports,iterations):
+ verified=verify_source_runtime()
  errors={}
  for it in iterations:
   meta=json.loads((Path(exports)/f'{it}_metadata.json').read_text())
@@ -46,7 +50,7 @@ def verify_runtime(exports,iterations):
      outputs.append(model(torch.from_numpy(x).unsqueeze(0))[0].numpy())
    error=float(np.max(np.abs(np.array(outputs)-data['expected'])));assert error<1e-5,(it,branch,error)
    errors[f'{it}_{branch}']=error
- return {'upstream_commit':UPSTREAM_COMMIT,'verified_source_files':len(manifest['files']),'export_errors':errors,'mujoco':mujoco.__version__,'torch':torch.__version__}
+ return dict(verified,export_errors=errors)
 
 def yaw_inverse(v,yaw):
  c,s=math.cos(yaw),math.sin(yaw)
@@ -74,6 +78,13 @@ class CTSPerceptive(Go2):
    if name.startswith('go2/'):self.robot_ray_geoms.append(g)
   self.original_geom_groups=m.geom_group.copy()
   self.ray_groups=np.array([1,1,1,1,1,0],dtype=np.uint8)
+  self.source_surface_ids=[g for g in range(m.ngeom) if
+      (mujoco.mj_id2name(m,mujoco.mjtObj.mjOBJ_GEOM,g) or '').split('/')[-1]=='source_surface']
+ def surface_ray(self,origin,direction):
+  # Exact original terrain mesh, using MuJoCo's own mesh BVH. Avoid scanning
+  # tens of thousands of ray-excluded convex contact cells for every pixel.
+  distances=[mujoco.mj_rayMesh(self.sim.mj_model,self.sim.mj_data,g,origin,direction) for g in self.source_surface_ids]
+  return min((v for v in distances if v>=0),default=-1.)
  @contextmanager
  def ray_filter(self):
   m=self.sim.mj_model;m.geom_group[self.robot_ray_geoms]=5
@@ -97,7 +108,8 @@ class CTSPerceptive(Go2):
      key=(int(ix),int(iy))
      if key not in self.height_cache:
       gid=np.zeros(1,dtype=np.int32)
-      distance=mujoco.mj_ray(m,d,np.array([ix*.05,iy*.05,100.]),np.array([0.,0.,-1.]),self.ray_groups,1,-1,gid)
+      origin=np.array([ix*.05,iy*.05,100.]);direction=np.array([0.,0.,-1.])
+      distance=self.surface_ray(origin,direction) if self.source_surface_ids else mujoco.mj_ray(m,d,origin,direction,self.ray_groups,1,-1,gid)
       self.height_cache[key]=(100-distance) if distance>=0 else 0.
      heights.append(self.height_cache[key])
     values.append(np.asarray(heights))
@@ -110,7 +122,9 @@ class CTSPerceptive(Go2):
   norm=np.linalg.norm(vectors,axis=1);unit=np.ascontiguousarray(vectors/norm[:,None])
   distances=np.zeros(len(unit),dtype=np.float64);geoms=np.zeros(len(unit),dtype=np.int32)
   with self.ray_filter():
-   mujoco.mj_multiRay(self.sim.mj_model,self.sim.mj_data,origin,unit.ravel(),self.ray_groups,1,-1,geoms,distances,len(unit),12.)
+   if self.source_surface_ids:
+    distances[:]=[self.surface_ray(origin,vector) for vector in unit]
+   else:mujoco.mj_multiRay(self.sim.mj_model,self.sim.mj_data,origin,unit.ravel(),self.ray_groups,1,-1,geoms,distances,len(unit),12.)
   z=distances/norm;valid=(distances>=0)&(z>=.1)&(z<=6.)
   image=torch.from_numpy(np.clip(z,.1,6.).reshape(1,48,64)).float();mask=torch.from_numpy(valid.reshape(1,48,64)).float()
   keys=noise_keys(torch.tensor([self.cfg.eval_seed]),frame,episode_ids=self.depth_episode)
@@ -352,6 +366,7 @@ def main():
  p=argparse.ArgumentParser();p.add_argument('--exports',required=True);p.add_argument('--output',required=True);p.add_argument('--iterations',default='5000,10000,40000');p.add_argument('--forward-only',action='store_true');p.add_argument('--video',action='store_true');p.add_argument('--official-noise-delay',action='store_true')
  p.add_argument('--payloads',default='0,1.2');p.add_argument('--forward-speeds',default='')
  p.add_argument('--high-speed-probes',default='',help='Additional task2 speeds; excluded from the fixed stability cohort')
+ p.add_argument('--allocation-cohort',action='store_true',help='Matched five-seed/two-payload task allocation panel')
  p.add_argument('--tasks',default='0');p.add_argument('--level',type=int,default=0);p.add_argument('--task-maps');a=p.parse_args()
  out=Path(a.output);out.mkdir(parents=True,exist_ok=True)
  (out/'runtime_verification.json').write_text(json.dumps(verify_runtime(a.exports,list(map(int,a.iterations.split(',')))),indent=2))
@@ -378,4 +393,25 @@ def main():
        row['cohort_role']='high_speed_probe' if task_id==1 and cmd[0]!=1.5 else 'fixed_protocol'
        row['map_sha256']=hashlib.sha256(Path(task_map['xml']).read_bytes()).hexdigest();rows.append(row)
        (out/'results.json').write_text(json.dumps({'rows':rows,'skipped':skipped,'training_updates':0,'upstream_commit':UPSTREAM_COMMIT},indent=2));print(json.dumps(row),flush=True)
+  if a.allocation_cohort:
+   from .allocation_evaluation import plan_cases
+   from .task_allocation import summarize_cohort
+   meta=json.loads((Path(a.exports)/f'{it}_metadata.json').read_text())
+   protocol={'version':1,'pass_rule':'existing_CommandGauge','duration':10.,'ignore_seconds':1.,
+             'camera':meta['camera'],'consts':meta['consts'],'noise_delay':a.official_noise_delay,'mujoco':mujoco.__version__,
+             'upstream_commit':UPSTREAM_COMMIT,'adapter_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+             'noise_sha256':hashlib.sha256((Path(meta['depth_package'])/'go2_depth_input/assets/weights.pt').read_bytes()).hexdigest()}
+   plans,missing=plan_cases(it,manifest,protocol)
+   (out/'allocation_expected.json').write_text(json.dumps({'cases':[r for r,m in plans],'missing':missing},indent=2))
+   for case,task_map in plans:
+    mapped=dict(task_map,label='allocation_'+task_map.get('label',f"terrain{case['terrain_id']}_layout{task_map.get('layout',0)}"))
+    try:
+     row=evaluate_case(a.exports,it,case['branch'],case['command'],case['payload_kg'],out,seed=case['seed'],
+         video=a.video and case['seed']==17 and case['payload_kg']==0.,official_noise_delay=a.official_noise_delay,task_id=case['task_id'],task_map=mapped)
+    except Exception as error:row={'task_id':case['task_id'],'branch':case['branch'],'error':str(error),'pass':None}
+    row.update(iteration=it,cohort_role='task_allocation',allocation_case_id=case['case_id'],terrain_id=case['terrain_id'])
+    rows.append(row)
+    summary=summarize_cohort(it,rows,[r for r,m in plans])
+    (out/'results.json').write_text(json.dumps({'rows':rows,'skipped':skipped,'allocation_missing':missing,
+        'task_allocation':summary,'training_updates':0,'upstream_commit':UPSTREAM_COMMIT},indent=2))
 if __name__=='__main__':main()
