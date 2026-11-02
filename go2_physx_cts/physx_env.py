@@ -2,7 +2,7 @@
 import math
 import torch
 from . import state as st
-from .task import RobotConsts,task_reward,initial_task_context,reward_budget,COMPLETED,ELAPSED,EPISODE_LIMIT,RECOVERY_DEADLINE,ROUTE_LENGTH
+from .task import RobotConsts,task_reward,initial_task_context,reward_budget,episode_time_reached,COMPLETED,ELAPSED,EPISODE_LIMIT,RECOVERY_DEADLINE,ROUTE_LENGTH
 from .commands import OfficialCommands,TERRAIN_NAMES,TASK_TERRAINS,task_assignments,phase,speed_cap,GRID_BIN
 from .terrain import relief,ground
 
@@ -293,7 +293,7 @@ class PhysXEnv:
             self.robot.set_joint_position_target_index(target=delayed);self.scene.write_data_to_sim();self.sim.step(render=False);self.scene.update(self.cfg.physics_dt)
         self.steps+=1;after=self._observe();s=after['s'];after['telemetry']['joint_acc']=(s[:,st.QD]-before['s'][:,st.QD])/self.cfg.dt
         r,terms,context,terminated,success=task_reward(before['s'],s,a,self.last,self.command,self.consts,task_id=self.task_ids,terrain_id=after['terrain_ids'],context=self.task_context,pose0=before['pose'],pose=after['pose'],telemetry=after['telemetry'],previous2=self.last2,history_valid=before['history_valid'],iteration=self.iteration,field=self.field,height_above_crop=after['height_above_crop'])
-        self.task_context=context;self._episode_success|=success.bool();timeout=self.steps*self.cfg.dt>=context[:,EPISODE_LIMIT]
+        self.task_context=context;self._episode_success|=success.bool();timeout=episode_time_reached(context[:,ELAPSED],context[:,EPISODE_LIMIT])
         done=terminated.bool()|timeout
         if not torch.isfinite(s).all():raise FloatingPointError('Nonfinite PhysX state')
         after.update(reward=r,positive_reward=terms['positive'],negative_reward=terms['negative'],terminated=terminated,timeout=timeout,success=success,task_context=context.clone(),done=done)

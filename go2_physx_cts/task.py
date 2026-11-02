@@ -27,6 +27,18 @@ BASE_HEIGHT_CROP_X=(-.2,-.1,0.,.1,.2)
 BASE_HEIGHT_CROP_Y=(-.1,0.,.1)
 _BUDGET=None
 
+def advance_episode_time(elapsed):
+    """Advance the deterministic 50Hz clock without accumulated FP32 drift.
+
+    Keep the existing seconds-valued context/checkpoint layout. Rounding only
+    reconstructs the control tick; no action-dependent physical path is rounded.
+    """
+    return (torch.round(elapsed.float()/DT)+1)*DT
+
+def episode_time_reached(elapsed,limit):
+    """One shared tick boundary for real/imagined deadlines and time limits."""
+    return torch.round(elapsed.float()/DT)*DT>=limit
+
 @dataclass
 class RobotConsts:
     default_q:torch.Tensor
@@ -154,7 +166,7 @@ def task_reward(s0,s1,a,previous,command,c,*,task_id,terrain_id,context,pose0,po
     watermark=torch.maximum(context[:,HIGH_WATERMARK],net)
     ctx[:,ROUTE]=context[:,ROUTE]+direction*DT;ctx[:,ROUTE_YAW]=yaw+command[:,2]*DT
     ctx[:,PROGRESS]=net;ctx[:,HIGH_WATERMARK]=watermark
-    ctx[:,ELAPSED]=context[:,ELAPSED]+DT;ctx[:,PRIOR_SUPPORT]=support
+    ctx[:,ELAPSED]=advance_episode_time(context[:,ELAPSED]);ctx[:,PRIOR_SUPPORT]=support
     goal_delta=context[:,GOAL][:,:2]-context[:,ORIGIN]
     goal_dir=goal_delta/goal_delta.norm(dim=-1,keepdim=True).clamp_min(1e-6)
     target_delta=pose[:,:2]-context[:,GOAL][:,:2]
@@ -182,7 +194,7 @@ def task_reward(s0,s1,a,previous,command,c,*,task_id,terrain_id,context,pose0,po
     success_p*=((ids==3)|(ids==4)|(ids==5)|(ids==6)|(ids==8)|(ids==9))
     fall=fall_probability(s1) if soft else fell(s1).to(s1.dtype)
     normal_failure=1-(1-fall)*(1-illegal)*(1-head)
-    deadline=(ctx[:,ELAPSED]>=context[:,RECOVERY_DEADLINE]).to(s1.dtype)*(1-done0)
+    deadline=episode_time_reached(ctx[:,ELAPSED],context[:,RECOVERY_DEADLINE]).to(s1.dtype)*(1-done0)
     failure=torch.where(recovery,done0*normal_failure+(1-done0)*deadline,normal_failure).clamp(0,1)
     success_p=success_p*(1-failure)
     complete=done0+(1-done0)*success_p;success=complete-done0

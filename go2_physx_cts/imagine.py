@@ -9,7 +9,7 @@ from torch.utils.checkpoint import checkpoint
 from .activation import matrix_checkpoint
 from . import state as st
 from .terrain import relief,geometry_crop
-from .task import task_reward,ELAPSED,EPISODE_LIMIT
+from .task import task_reward,episode_time_reached,ELAPSED,EPISODE_LIMIT
 from .sequence_execution import depth_sequence_features
 
 
@@ -116,14 +116,13 @@ class Imagination:
                 flat_ids(subset['episode']),flat_ids(subset['trajectory_ids']))
             encoded=self.encode_depth(policy,images)
             depth_features=torch.cat((depth_features[:nteacher],encoded),0)
-        active=context[:,ELAPSED]<context[:,EPISODE_LIMIT]; valid_start=active.to(s.dtype)
+        active=~episode_time_reached(context[:,ELAPSED],context[:,EPISODE_LIMIT]); valid_start=active.to(s.dtype)
         rewards=[]; soft_done=[]; timeouts=[]; valid=[]; features=[]; values=[s.new_zeros(b)]
         for t in range(cfg.horizon):
             command=self.commands.command(cmd_state)
             priv=st.privileged(s,a_prev,command,xi,relief(pose,self.field))
             features.append(critic.features(priv,branch,tasks,context,pose))
             valid.append(active)
-            timeout=active&(context[:,ELAPSED]+cfg.dt>=context[:,EPISODE_LIMIT]-1e-6)
             if t and nteacher<b:
                 refresh=((frame[student]+t)%cfg.depth_period==0)
                 # Every refreshed image corresponds to this imagined pose; held
@@ -143,6 +142,7 @@ class Imagination:
                 return self._step(wm,policy,*args,branch,tasks,terrains,iteration,reward_iteration,current_active)
             out=step(*args)
             s,pose,a_prev,a_prev2,hist,cmd_state,hidden,context,r,done=out
+            timeout=current_active&episode_time_reached(context[:,ELAPSED],context[:,EPISODE_LIMIT])
             rewards.append(r); soft_done.append(done); timeouts.append(timeout)
             active=active&~timeout
             p=st.privileged(s,a_prev,self.commands.command(cmd_state),xi,relief(pose,self.field))
