@@ -177,8 +177,11 @@ class LearningRateController:
     def state_dict(self):
         return {'current':self.current,'last_trial':self.last_trial,'history':self.history,
                 'teacher_stable':self.teacher_stable,'teacher_evaluations':self.teacher_evaluations,
-                'transfer_evaluations':self.transfer_evaluations,'ramp_start':self.ramp_start,'rollback_recovery':self.rollback_recovery}
+                'transfer_evaluations':self.transfer_evaluations,'ramp_start':self.ramp_start,'rollback_recovery':self.rollback_recovery,'original_ramp_semantics':True}
 
     def load_state_dict(self,state):
         for key,value in state.items():setattr(self,key,value)
+        if not state.get('original_ramp_semantics',False):
+            self.ramp_start=self.cfg.warmup_iterations+self.cfg.critic_warmup_iterations
+            self.rollback_recovery={}
 

@@ -32,6 +32,12 @@ class RollbackRules(unittest.TestCase):
   self.assertAlmostEqual(s.rates(12000)['actor'],1e-4)
 
   for actual,expected in zip(s._candidates('actor'),[1e-4/1.3,1e-4,1.3e-4]):self.assertAlmostEqual(actual,expected)
+ def test_legacy_checkpoint_cannot_postpone_original_ramp(self):
+  old=LearningRateController(TrainCfg()).state_dict()
+  old.pop('original_ramp_semantics');old['ramp_start']=7950;old['current']['actor']=4e-6
+  s=LearningRateController(TrainCfg());s.load_state_dict(old)
+  self.assertEqual(s.rates(8000)['actor_ramp'],1.)
+  self.assertEqual(s.rates(8000)['actor'],4e-6)
  def test_recovery_checkpoint_roundtrip(self):
   a=LearningRateController(TrainCfg());a.rollback(2000);a.rates(2100)
   b=LearningRateController(TrainCfg());b.load_state_dict(a.state_dict())
