@@ -14,6 +14,7 @@ from .terrain import relief,geometry_crop
 from .depth import DepthObservation
 from .schedules import LearningRateController,ProviderSchedule
 from .lr_feedback import UpdateFeedback
+from .commands import phase
 from .sequence_execution import depth_sequence_features,batched_apply,ENCODING_CHUNK
 
 
@@ -104,17 +105,30 @@ class Learner:
             {'params':self.policy.teacher_encoder.parameters(),'lr':self.cfg.lr,'name':'teacher'}],betas=(.9,.95))
         self.opt_critic=torch.optim.Adam(self.critic.parameters(),lr=self.cfg.lr)
         self.opt_cts=torch.optim.Adam(self.policy.student_encoder.parameters(),lr=self.cfg.cts_lr)
-    def refresh_providers(self):
-        tasks=flat_ids(self.env.snapshot()['task_ids']); old=self.source.clone(); self.source.zero_()
+    def refresh_providers(self,before=None):
+        before=self.env.snapshot() if before is None else before
+        tasks=flat_ids(before['task_ids']); old=self.source.clone(); self.source.zero_()
         for task in range(10):
             ids=(tasks==task).nonzero().flatten()
             if not len(ids): continue
             frac=self.providers.fraction(task,self.it)
             self.source[ids]=provider_assignment(len(ids),frac,self.cfg.teacher_fraction,self.device)
         self.provider_requested=self.source.clone()
+        self._provider_tasks=tasks.clone()
+        self._provider_phase=phase(self.env.iteration)
+        self._provider_before_stop=self.it<self.providers.stop_iteration
         changed=self.source!=old; self.real_hidden[changed]=0; self.camera_episode[changed]=-1
         self.provider_counts=[int((self.source==i).sum()) for i in range(3)]
         self.env.own_mask=self.source<2
+    def sync_providers(self,before):
+        # snapshot() may change tasks/reset episodes even when the caller skips
+        # a curriculum boundary. Refresh from the actual assignment, not a list
+        # of exact iteration numbers.
+        tasks=flat_ids(before['task_ids'])
+        if (phase(self.env.iteration)!=self._provider_phase
+            or (self.it<self.providers.stop_iteration)!=self._provider_before_stop
+            or self.it%1000==0 or not torch.equal(tasks,self._provider_tasks)):
+            self.refresh_providers(before)
     def learning_rates(self):
         rates=self.schedule.rates(self.it)
         if self.it<self.actor_frozen_until: rates['actor']=rates['teacher']=0.
@@ -129,6 +143,7 @@ class Learner:
         # Curriculum phase changes can reset inside snapshot(), before step()
         # returns a done mask. Recurrent memory must follow episode identity.
         self.real_hidden[episode_changed]=0
+        if self.driver is not None:self.driver.reset(episode_changed)
         refresh=(frame%self.cfg.depth_period==0)|episode_changed
         self.depth_pose[refresh]=before['pose'][refresh]
         self.depth_scene_ids[refresh]=flat_ids(before['scene_ids'])[refresh]
@@ -141,12 +156,14 @@ class Learner:
     @torch.no_grad()
     def collect(self):
         cfg=self.cfg; before=self.env.snapshot()
-        if self.it in (2500,5000,8000) or self.it%1000==0: self.refresh_providers()
+        self.sync_providers(before)
         # Official walking data are not represented as a validated5m/s expert.
         # Eligibility is decided from this exact frame's command, and Replay
         # and curriculum statistics record the actually executed provider.
         self.source=self.provider_requested.clone()
-        unsupported=(before['command'][:,:2].norm(dim=-1)>4.)&(self.source==2)
+        unsupported=((before['command'][:,:2].norm(dim=-1)>4.)
+                     |(flat_ids(before['task_ids'])>=5)
+                     |(self.it>=self.providers.stop_iteration))&(self.source==2)
         self.source[unsupported]=0
         self.env.own_mask=self.source<2
         self.provider_counts=torch.bincount(self.source.long(),minlength=3).tolist()
@@ -159,7 +176,7 @@ class Learner:
             action,hidden,_,_=self.policy.step(before['obs'][ids],priv[ids],branch,depth=depth[ids],hidden=self.real_hidden[ids],
                 height=height,task_ids=flat_ids(before['task_ids'])[ids])
             a[ids]=action; self.real_hidden[ids]=hidden
-        if self.driver is not None:
+        if self.driver is not None and self.it<self.providers.stop_iteration and bool((self.source==2).any()):
             external=self.driver.act(before['command']); a[self.source==2]=external[self.source==2]
         sigma=cfg.explore_noise*math.sqrt(2*cfg.explore_theta)
         self.ou=self.ou*(1-cfg.explore_theta*cfg.dt)+sigma*math.sqrt(cfg.dt)*torch.randn_like(a)

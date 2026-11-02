@@ -223,8 +223,9 @@ class LearningRateController:
                 setattr(self,key,copy.deepcopy(value))
 
 class ProviderSchedule:
-    """Per-task supported official provider, fading only after validated competence."""
+    """Supported official collection fades with competence and ends before phase3."""
     supported=(0,1,2,3,4)
+    stop_iteration=8000
     def __init__(self,cfg):
         self.initial=cfg.driver_frac;self.duration=cfg.provider_fade_iterations
         self.started={};self.confirmations={};self.evidence=[]
@@ -236,7 +237,7 @@ class ProviderSchedule:
         self.evidence.append({'task':task,'iteration':iteration,'own_success':own_success,'model_valid':bool(model_valid),'stable':bool(stable),'fade_start':self.started.get(task)})
         self.evidence=self.evidence[-100:]
     def fraction(self,task,iteration):
-        if task not in self.supported:return 0.
+        if iteration>=self.stop_iteration or task not in self.supported:return 0.
         start=self.started.get(task)
         return self.initial if start is None else self.initial*max(0.,1.-(iteration-start)/self.duration)
     def state_dict(self):return {'started':self.started,'confirmations':self.confirmations,'evidence':self.evidence}
