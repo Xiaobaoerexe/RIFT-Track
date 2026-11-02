@@ -169,7 +169,7 @@ class LearningRateController:
         end=self.ramp_start+self.cfg.actor_ramp_iterations
         for name in ('actor','critic'):
             target=self.rollback_recovery.get(name,{}).get('target',self.current[name])
-            self.current[name]=max(self.bounds[name][0],self.current[name]*.5)
+            self.current[name]*=.5
             if iteration<end:
                 self.rollback_recovery[name]={'start':iteration,'end':end,'initial':self.current[name],'target':target}
             else:self.rollback_recovery.pop(name,None)
