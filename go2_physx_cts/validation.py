@@ -1,5 +1,5 @@
 """Real PhysX control, update ownership, restore and export validation."""
-import copy,time
+import copy,time,json
 from pathlib import Path
 import torch
 from . import state as st
@@ -101,7 +101,15 @@ def learner_smoke(l,iterations):
     assert l.rollback() and not changed(l.wm,w_before) and archive_size==l.archive.size and replay_size==l.buf.size
     l.it=6000;l.env.iteration=l.it;l.env.reset(l.env.ids);l.env._snapshot=l.env._observe()
     l.schedule.teacher_stable=True
-    l.learning_rates();adaptive=l.adapt_learning_rates()
+    # Exercise the actual run-loop ordering: collect/update, LR trial, log, save.
+    l.it=5999
+    l.run(iterations=2)
+    adaptive=json.loads((l.output/'lr_trials.jsonl').read_text().splitlines()[-1])
+    logged=[json.loads(row) for row in (l.output/'training.jsonl').read_text().splitlines()]
+    assert [row['iteration'] for row in logged[-2:]]==[6000,6001]
+    assert all(row['metrics']['height']>0 for row in logged[-2:])
+    assert (l.output/'model_00006000.pt').is_file()
+
     assert all(k in adaptive for k in ('wm','actor','critic','cts'))
     assert all(adaptive[k] is not None for k in ('wm','actor','critic','cts'))
     assert all(torch.isfinite(param).all() for param in l.policy.parameters())

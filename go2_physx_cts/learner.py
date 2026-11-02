@@ -143,7 +143,7 @@ class Learner:
             'scope':'fixed native flat cohort, not a sim2sim capability claim'}
         self.ou.zero_()
         if self.driver is not None:self.driver.reset(torch.ones(self.cfg.num_envs,dtype=torch.bool,device=self.device))
-        self.metrics=[]
+        # Keep collected training metrics until log(); LR probes never append to them.
         self.learning_rates()
         with (self.output/'lr_trials.jsonl').open('a') as handle:handle.write(json.dumps({'iteration':self.it,**result},allow_nan=False)+'\n')
         return result
