@@ -58,7 +58,7 @@ class TrainCfg:
     driver_policy: str = ''
     driver_frac: float = .1
     provider_fade_iterations: int = 5000
-    collapse_falls: float = 3.
+    collapse_falls: float = 5.
     log_interval: int = 50
     save_interval: int = 1000
     seed: int = 17
@@ -92,6 +92,8 @@ class TrainCfg:
         return cls(**record)
 
     def validate(self, production=True):
+        if self.collapse_falls != 5. or self.log_interval != 50:
+            raise ValueError('Rollback requires threshold5 and complete50-iteration windows; update legacy launch config')
         if self.stage != 'multitask':
             raise ValueError('Only the approved depth multitask architecture is supported')
         if (self.collect_steps, self.horizon, self.wm_window) != (1, 32, 8):

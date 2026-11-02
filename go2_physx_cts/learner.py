@@ -85,7 +85,7 @@ class Learner:
         self.camera_episode=torch.full_like(self.depth_scene_ids,-1)
         self.it=0; self.actor_frozen_until=0; self.ramp_start=1500; self.lr_scale=1.
         self.last_good=None; self.collapse_strikes=0; self.nonfinite=0; self.teacher_stable=False
-        self.task_fall_reference={}; self.task_collapse_strikes={}; self._critic_trial_data=None
+        self.collapse_history=[]; self._critic_trial_data=None
         self.counts=dict(collect=0,transitions=0,wm=0,actor=0,critic=0,cts=0)
         self.metrics=[]; self.start_time=time.monotonic(); self.provider_counts=[0,0,0]
         self.refresh_providers()
@@ -379,7 +379,6 @@ class Learner:
             'optimizers':{k:getattr(self,'opt_'+k).state_dict() for k in ('wm','actor','critic','cts')},
             'iteration':self.it,'counts':self.counts,'lr_scale':self.lr_scale,'ramp_start':self.ramp_start,
             'schedule':self.schedule.state_dict(),'teacher_stable':self.teacher_stable,
-            'task_fall_reference':self.task_fall_reference,'task_collapse_strikes':self.task_collapse_strikes,
             'model_validation_history':getattr(self,'_model_validation_history',{}),
             'providers':self.providers.state_dict(),
             'curriculum':self.env.curriculum_state_dict(),'actor_frozen_until':self.actor_frozen_until,
@@ -400,10 +399,10 @@ class Learner:
         self.policy.load_state_dict(ck['policy']); self.wm.load_state_dict(ck['world_model']); self.critic.load_state_dict(ck['critic'])
         for k in ('wm','actor','critic','cts'): getattr(self,'opt_'+k).load_state_dict(ck['optimizers'][k])
         self.schedule.load_state_dict(ck['schedule']); self.teacher_stable=ck['teacher_stable']
-        self.task_fall_reference=ck.get('task_fall_reference',{}); self.task_collapse_strikes=ck.get('task_collapse_strikes',{})
+        self.collapse_history=[]; self.collapse_strikes=0
         self._model_validation_history=ck.get('model_validation_history',{})
         self.it=ck['iteration']; self.counts=ck['counts']; self.lr_scale=ck['lr_scale']; self.ramp_start=ck['ramp_start']
-        self.actor_frozen_until=self.it+self.cfg.warmup_iterations
+        self.actor_frozen_until=ck.get('actor_frozen_until',0)
         self.providers.load_state_dict(ck['providers'])
         self.env.load_curriculum_state_dict(ck['curriculum']); self.env.iteration=self.it
         torch.set_rng_state(ck['rng'].cpu())
@@ -421,8 +420,11 @@ class Learner:
         if path is None: return False
         ck=torch.load(path,map_location=self.device,weights_only=False)
         self.policy.load_state_dict(ck['policy']); self.critic.load_state_dict(ck['critic'])
-        self.schedule.rollback(self.it); self.ramp_start=self.it; self.actor_frozen_until=self.it+self.cfg.critic_warmup_iterations
-        self.collapse_strikes=0; self.task_collapse_strikes={}; self._new_policy_optimizers()
+        self.schedule.rollback(self.it)
+        self.collapse_strikes=0; self.collapse_history=[]
+        # Preserve optimizer moments and the original ramp/freeze clocks.
+        self.learning_rates()
+        # Recurrent state encoded by replaced student weights is no longer valid.
         self.real_hidden.zero_(); self.camera_episode.fill_(-1)
         return True
     def log(self,stats):
@@ -435,21 +437,29 @@ class Learner:
         result['archive_retention']=self.archive.statistics(self.buf.total_collections)
         from .task import reward_weights
         result['reward_weights']={k:float(v) for k,v in reward_weights(self.it).items()}
-        # Compare failures within each active task; recovery initialization is
-        # not a fall, and newly unlocked tasks do not erase mature task baselines.
+        # Retain per-task diagnostics; only the approved global joint trend triggers rollback.
         task_rows={}
         for metric in metrics:
             for task,row in metric.get('task_metrics',{}).items():
                 task_rows.setdefault(str(task),[]).append(row)
-        for task,rows in task_rows.items():
-            rate=sum(r.get('falls_per_env_min',0.) for r in rows)/len(rows)
-            reference=self.task_fall_reference.get(task)
-            mature=self.it>=([1000,5000,5000,5000,5000,8000,8000,8000,8000,8000][int(task)]+1000)
-            bad=mature and reference is not None and rate>max(reference*2.,reference+self.cfg.collapse_falls)
-            self.task_collapse_strikes[task]=self.task_collapse_strikes.get(task,0)+1 if bad else 0
-            if not bad: self.task_fall_reference[task]=rate if reference is None else .95*reference+.05*rate
-        result['task_metrics']=task_rows; self.metrics=[]
-        result['rolled_back']=self.rollback() if any(v>=2 for v in self.task_collapse_strikes.values()) else False
+        result['task_metrics']=task_rows
+        falls_all=sum(m['falls_all'] for m in metrics)/count
+        result['falls_per_vector_step_all_providers']=falls_all
+        from .schedules import collapse_trend
+        active=self.it>max(self.cfg.warmup_iterations+self.cfg.critic_warmup_iterations,self.actor_frozen_until)
+        if active and len(metrics)==self.cfg.log_interval and self.it%self.cfg.log_interval==0:
+            row={'iteration':self.it,'falls':falls_all,'xy_rmse':result['metrics']['xy_rmse'],'reward':result['metrics']['reward']}
+            if self.collapse_history and self.it-self.collapse_history[-1]['iteration']!=self.cfg.log_interval:self.collapse_history=[]
+            self.collapse_history=(self.collapse_history+[row])[-3:]
+        else:self.collapse_history=[]
+        self.metrics=[]
+        trigger=collapse_trend(self.collapse_history,self.cfg.collapse_falls)
+        self.collapse_strikes=int(active and falls_all>self.cfg.collapse_falls)
+        result['rollback_window_history']=list(self.collapse_history)
+        result['rollback_triggered']=trigger
+        result['rollback_checkpoint']=str(self.last_good) if trigger and self.last_good else None
+        result['rolled_back']=self.rollback() if trigger else False
+        result['lr_after_rollback']=self.schedule.rates(self.it) if result['rolled_back'] else None
         with (self.output/'training.jsonl').open('a') as f: f.write(json.dumps(result,allow_nan=False)+'\n')
         (self.output/'progress.json').write_text(json.dumps(result,indent=2,allow_nan=False)); print(json.dumps(result),flush=True)
     def run(self,iterations=None):
@@ -469,7 +479,7 @@ class Learner:
             if self.it==1 or self.it%self.cfg.log_interval==0 or self.it==end: self.log(stats)
             if self.it==1 or self.it%self.cfg.save_interval==0 or self.it==end:
                 path=self.save()
-                if self.it>1500 and not any(self.task_collapse_strikes.values()): self.last_good=path
+                if self.it>1500 and not self.collapse_strikes: self.last_good=path
             if self.cfg.evaluation_python and self.it%self.cfg.evaluation_interval==0: self.evaluate_feedback(self.save())
         return self.last_good
     def evaluate_feedback(self,path):

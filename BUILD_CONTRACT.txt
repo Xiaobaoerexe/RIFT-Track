@@ -48,3 +48,10 @@ Learning agent owns networks.py, world_model.py, learner.py, imagine.py,moe.py o
 Reward/eval agent owns task.py, validation.py, diagnostics.py, robogauge_* and calibration scripts.
 Prefer preserve state70 feature slices for compatibility but pose is now full7 [xyz,xyzw]. Next-state gravity/geometry consistent with pose. Need explicit contacts/foot velocities/true applied torque. Reward context carries task IDs/phase/goal/clock. Agree shapes before extensive edits.
 All work only new local repo; root syncs server. No credentials in files. All temporary SSH requests and test scripts are removed after release preparation.
+
+
+2026-11-02 rollback rule replacement
+Global trigger: three consecutive complete 50-iteration windows, all-provider failures/vector-step >5 in every window and strictly increasing, own teacher/student XY RMSE strictly increasing, own reward strictly decreasing. Per-task diagnostics remain; the old per-task trigger is removed. Existing task termination semantics remain (including collision failures, excluding ordinary episode timeouts and recovery initial lying pose).
+Rollback restores policy and Critic weights; retains optimizer moments, WM, Replay and course; halves Actor/teacher and Critic effective rates. Original ramp endpoint is retained, pre-rollback targets recovered there while ramping; plateau rates stay halved until normal adaptation. Recurrent hidden states are invalidated because encoder weights changed. No extra Actor freeze is added. Legacy ramp delays migrate to original deadline; fresh replay after resume restarts trend collection.
+Launch contract: collapse_falls=5 and log_interval=50; stale config threshold3 is rejected explicitly. Old experiment records are not rewritten.
+Validation: 12 CPU regression tests passed, covering actual log gating, partial windows, weight-only rollback with Adam moment preservation, exact halving at candidate floor, repeated ramp rollback, schedule save/load and legacy migration. No training launched. The 1000-iteration candidate selection mechanism, including its existing tie behavior, is unchanged.
