@@ -1,0 +1,1981 @@
+{
+  "kind": "actual_physx_parameter_and_collision_geometry_audit_not_capability",
+  "terrain": {
+    "names": [
+      "wave",
+      "slope_up",
+      "slope_down",
+      "rough_slope",
+      "stairs_up",
+      "stairs_down",
+      "obstacles",
+      "flat",
+      "wheels",
+      "small_squares"
+    ],
+    "raw_proportions": [
+      0.05,
+      0.1,
+      0.1,
+      0.05,
+      0.25,
+      0.1,
+      0.1,
+      0.15,
+      0.05,
+      0.05
+    ],
+    "raw_proportion_sum": 1.0,
+    "normalized_proportions": [
+      0.05,
+      0.1,
+      0.1,
+      0.05,
+      0.25,
+      0.1,
+      0.1,
+      0.15,
+      0.05,
+      0.05
+    ],
+    "column_type_ids": [
+      0,
+      1,
+      1,
+      2,
+      2,
+      3,
+      4,
+      4,
+      4,
+      4,
+      4,
+      5,
+      5,
+      6,
+      6,
+      7,
+      7,
+      7,
+      8,
+      9
+    ],
+    "column_counts": [
+      1,
+      2,
+      2,
+      1,
+      5,
+      2,
+      2,
+      3,
+      1,
+      1
+    ],
+    "rows": 10,
+    "columns": 20,
+    "tile_size_m": [
+      9.0,
+      9.0
+    ],
+    "border_width_m": 25.0,
+    "sub_terrain_border_width_m": 0.5,
+    "max_init_terrain_level": 5,
+    "default_geometry_backend": "source_direct_mesh",
+    "seed": 17,
+    "numpy_geometry_seed_scope": "saved_seeded_generated_restored",
+    "collision_heightfield": {
+      "vertices_sha256": "ec6ac949e65f45e3f2179d18cc9c429fd047c2750ab5e810895d80729f55fd94",
+      "faces_sha256": "8a959e418335d68a99f63ea01cc557fd4d766e603ec90202fd5c6339ed62c0fa",
+      "vertex_count": 1139476,
+      "triangle_count": 1940460,
+      "resolution_m": 0.05,
+      "shape": [
+        4601,
+        2801
+      ],
+      "outer_boundary_misses": 0,
+      "collision_bounds": [
+        [
+          -70.0,
+          -115.0,
+          -2.255
+        ],
+        [
+          70.0,
+          115.0,
+          2.2049999237060547
+        ]
+      ]
+    }
+  },
+  "physics_steps": 64,
+  "body_names": [
+    "base",
+    "FL_hip",
+    "FR_hip",
+    "RL_hip",
+    "RR_hip",
+    "FL_thigh",
+    "FR_thigh",
+    "RL_thigh",
+    "RR_thigh",
+    "FL_calf",
+    "FR_calf",
+    "RL_calf",
+    "RR_calf",
+    "FL_foot",
+    "FR_foot",
+    "RL_foot",
+    "RR_foot"
+  ],
+  "base_body_index": 0,
+  "initial_first3_body_mass": [
+    [
+      8.800000190734863,
+      0.6949999928474426,
+      0.6949999928474426,
+      0.6949999928474426,
+      0.6949999928474426,
+      1.25,
+      1.25,
+      1.25,
+      1.25,
+      0.2199999988079071,
+      0.2199999988079071,
+      0.2199999988079071,
+      0.2199999988079071,
+      0.04500000178813934,
+      0.04500000178813934,
+      0.04500000178813934,
+      0.04500000178813934
+    ],
+    [
+      9.800000190734863,
+      0.6949999928474426,
+      0.6949999928474426,
+      0.6949999928474426,
+      0.6949999928474426,
+      1.25,
+      1.25,
+      1.25,
+      1.25,
+      0.2199999988079071,
+      0.2199999988079071,
+      0.2199999988079071,
+      0.2199999988079071,
+      0.04500000178813934,
+      0.04500000178813934,
+      0.04500000178813934,
+      0.04500000178813934
+    ],
+    [
+      10.800000190734863,
+      0.6949999928474426,
+      0.6949999928474426,
+      0.6949999928474426,
+      0.6949999928474426,
+      1.25,
+      1.25,
+      1.25,
+      1.25,
+      0.2199999988079071,
+      0.2199999988079071,
+      0.2199999988079071,
+      0.2199999988079071,
+      0.04500000178813934,
+      0.04500000178813934,
+      0.04500000178813934,
+      0.04500000178813934
+    ]
+  ],
+  "initial_first3_com": [
+    [
+      0.045604001730680466,
+      -0.0008999999845400453,
+      0.020368000492453575
+    ],
+    [
+      0.045604001730680466,
+      -0.0008999999845400453,
+      0.020368000492453575
+    ],
+    [
+      0.045604001730680466,
+      -0.0008999999845400453,
+      0.020368000492453575
+    ]
+  ],
+  "initial_first3_inertia": [
+    [
+      0.044043999165296555,
+      1.9589962903410196e-05,
+      -0.02618100494146347,
+      1.9589962903410196e-05,
+      0.13739000260829926,
+      0.0003082405310124159,
+      -0.02618100866675377,
+      0.0003082405310124159,
+      0.146200031042099
+    ],
+    [
+      0.044043999165296555,
+      1.9589962903410196e-05,
+      -0.02618100494146347,
+      1.9589962903410196e-05,
+      0.13739000260829926,
+      0.0003082405310124159,
+      -0.02618100866675377,
+      0.0003082405310124159,
+      0.146200031042099
+    ],
+    [
+      0.044043999165296555,
+      1.9589962903410196e-05,
+      -0.02618100494146347,
+      1.9589962903410196e-05,
+      0.13739000260829926,
+      0.0003082405310124159,
+      -0.02618100866675377,
+      0.0003082405310124159,
+      0.146200031042099
+    ]
+  ],
+  "initial_first3_xi": [
+    [
+      1.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      1.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      1.0,
+      0.0,
+      0.0,
+      0.0,
+      2.0
+    ]
+  ],
+  "mass_dtype": "torch.float32",
+  "step_parameter_trace": [
+    {
+      "step": 1,
+      "automatic_resets": 0,
+      "mass_max_change_kg": 0.0,
+      "mass_change_since_first_solver_readback_kg": 0.0,
+      "largest_mass_change_env_body": [
+        0,
+        0
+      ],
+      "first3_body_mass_delta_kg": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "first3_base_mass_kg": [
+        8.800000190734863,
+        9.800000190734863,
+        10.800000190734863
+      ],
+      "first3_xi": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          2.0
+        ]
+      ],
+      "xi_max_change": 0.0,
+      "first3_base_com_max_change_m": 0.0,
+      "first3_base_inertia_max_change": 0.0,
+      "recorded_base_mass_vs_live_max_kg": 0.0,
+      "payload_context_vs_live_max_kg": 0.0
+    },
+    {
+      "step": 2,
+      "automatic_resets": 0,
+      "mass_max_change_kg": 0.0,
+      "mass_change_since_first_solver_readback_kg": 0.0,
+      "largest_mass_change_env_body": [
+        0,
+        0
+      ],
+      "first3_body_mass_delta_kg": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "first3_base_mass_kg": [
+        8.800000190734863,
+        9.800000190734863,
+        10.800000190734863
+      ],
+      "first3_xi": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          2.0
+        ]
+      ],
+      "xi_max_change": 0.0,
+      "first3_base_com_max_change_m": 0.0,
+      "first3_base_inertia_max_change": 0.0,
+      "recorded_base_mass_vs_live_max_kg": 0.0,
+      "payload_context_vs_live_max_kg": 0.0
+    },
+    {
+      "step": 3,
+      "automatic_resets": 0,
+      "mass_max_change_kg": 0.0,
+      "mass_change_since_first_solver_readback_kg": 0.0,
+      "largest_mass_change_env_body": [
+        0,
+        0
+      ],
+      "first3_body_mass_delta_kg": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "first3_base_mass_kg": [
+        8.800000190734863,
+        9.800000190734863,
+        10.800000190734863
+      ],
+      "first3_xi": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          2.0
+        ]
+      ],
+      "xi_max_change": 0.0,
+      "first3_base_com_max_change_m": 0.0,
+      "first3_base_inertia_max_change": 0.0,
+      "recorded_base_mass_vs_live_max_kg": 0.0,
+      "payload_context_vs_live_max_kg": 0.0
+    },
+    {
+      "step": 4,
+      "automatic_resets": 0,
+      "mass_max_change_kg": 0.0,
+      "mass_change_since_first_solver_readback_kg": 0.0,
+      "largest_mass_change_env_body": [
+        0,
+        0
+      ],
+      "first3_body_mass_delta_kg": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "first3_base_mass_kg": [
+        8.800000190734863,
+        9.800000190734863,
+        10.800000190734863
+      ],
+      "first3_xi": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          2.0
+        ]
+      ],
+      "xi_max_change": 0.0,
+      "first3_base_com_max_change_m": 0.0,
+      "first3_base_inertia_max_change": 0.0,
+      "recorded_base_mass_vs_live_max_kg": 0.0,
+      "payload_context_vs_live_max_kg": 0.0
+    },
+    {
+      "step": 5,
+      "automatic_resets": 0,
+      "mass_max_change_kg": 0.0,
+      "mass_change_since_first_solver_readback_kg": 0.0,
+      "largest_mass_change_env_body": [
+        0,
+        0
+      ],
+      "first3_body_mass_delta_kg": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "first3_base_mass_kg": [
+        8.800000190734863,
+        9.800000190734863,
+        10.800000190734863
+      ],
+      "first3_xi": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          2.0
+        ]
+      ],
+      "xi_max_change": 0.0,
+      "first3_base_com_max_change_m": 0.0,
+      "first3_base_inertia_max_change": 0.0,
+      "recorded_base_mass_vs_live_max_kg": 0.0,
+      "payload_context_vs_live_max_kg": 0.0
+    },
+    {
+      "step": 6,
+      "automatic_resets": 0,
+      "mass_max_change_kg": 0.0,
+      "mass_change_since_first_solver_readback_kg": 0.0,
+      "largest_mass_change_env_body": [
+        0,
+        0
+      ],
+      "first3_body_mass_delta_kg": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "first3_base_mass_kg": [
+        8.800000190734863,
+        9.800000190734863,
+        10.800000190734863
+      ],
+      "first3_xi": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          2.0
+        ]
+      ],
+      "xi_max_change": 0.0,
+      "first3_base_com_max_change_m": 0.0,
+      "first3_base_inertia_max_change": 0.0,
+      "recorded_base_mass_vs_live_max_kg": 0.0,
+      "payload_context_vs_live_max_kg": 0.0
+    },
+    {
+      "step": 7,
+      "automatic_resets": 0,
+      "mass_max_change_kg": 0.0,
+      "mass_change_since_first_solver_readback_kg": 0.0,
+      "largest_mass_change_env_body": [
+        0,
+        0
+      ],
+      "first3_body_mass_delta_kg": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "first3_base_mass_kg": [
+        8.800000190734863,
+        9.800000190734863,
+        10.800000190734863
+      ],
+      "first3_xi": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          2.0
+        ]
+      ],
+      "xi_max_change": 0.0,
+      "first3_base_com_max_change_m": 0.0,
+      "first3_base_inertia_max_change": 0.0,
+      "recorded_base_mass_vs_live_max_kg": 0.0,
+      "payload_context_vs_live_max_kg": 0.0
+    },
+    {
+      "step": 8,
+      "automatic_resets": 0,
+      "mass_max_change_kg": 0.0,
+      "mass_change_since_first_solver_readback_kg": 0.0,
+      "largest_mass_change_env_body": [
+        0,
+        0
+      ],
+      "first3_body_mass_delta_kg": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "first3_base_mass_kg": [
+        8.800000190734863,
+        9.800000190734863,
+        10.800000190734863
+      ],
+      "first3_xi": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          2.0
+        ]
+      ],
+      "xi_max_change": 0.0,
+      "first3_base_com_max_change_m": 0.0,
+      "first3_base_inertia_max_change": 0.0,
+      "recorded_base_mass_vs_live_max_kg": 0.0,
+      "payload_context_vs_live_max_kg": 0.0
+    },
+    {
+      "step": 9,
+      "automatic_resets": 0,
+      "mass_max_change_kg": 0.0,
+      "mass_change_since_first_solver_readback_kg": 0.0,
+      "largest_mass_change_env_body": [
+        0,
+        0
+      ],
+      "first3_body_mass_delta_kg": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "first3_base_mass_kg": [
+        8.800000190734863,
+        9.800000190734863,
+        10.800000190734863
+      ],
+      "first3_xi": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          2.0
+        ]
+      ],
+      "xi_max_change": 0.0,
+      "first3_base_com_max_change_m": 0.0,
+      "first3_base_inertia_max_change": 0.0,
+      "recorded_base_mass_vs_live_max_kg": 0.0,
+      "payload_context_vs_live_max_kg": 0.0
+    },
+    {
+      "step": 10,
+      "automatic_resets": 0,
+      "mass_max_change_kg": 0.0,
+      "mass_change_since_first_solver_readback_kg": 0.0,
+      "largest_mass_change_env_body": [
+        0,
+        0
+      ],
+      "first3_body_mass_delta_kg": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "first3_base_mass_kg": [
+        8.800000190734863,
+        9.800000190734863,
+        10.800000190734863
+      ],
+      "first3_xi": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          2.0
+        ]
+      ],
+      "xi_max_change": 0.0,
+      "first3_base_com_max_change_m": 0.0,
+      "first3_base_inertia_max_change": 0.0,
+      "recorded_base_mass_vs_live_max_kg": 0.0,
+      "payload_context_vs_live_max_kg": 0.0
+    },
+    {
+      "step": 11,
+      "automatic_resets": 0,
+      "mass_max_change_kg": 0.0,
+      "mass_change_since_first_solver_readback_kg": 0.0,
+      "largest_mass_change_env_body": [
+        0,
+        0
+      ],
+      "first3_body_mass_delta_kg": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "first3_base_mass_kg": [
+        8.800000190734863,
+        9.800000190734863,
+        10.800000190734863
+      ],
+      "first3_xi": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          2.0
+        ]
+      ],
+      "xi_max_change": 0.0,
+      "first3_base_com_max_change_m": 0.0,
+      "first3_base_inertia_max_change": 0.0,
+      "recorded_base_mass_vs_live_max_kg": 0.0,
+      "payload_context_vs_live_max_kg": 0.0
+    },
+    {
+      "step": 12,
+      "automatic_resets": 0,
+      "mass_max_change_kg": 0.0,
+      "mass_change_since_first_solver_readback_kg": 0.0,
+      "largest_mass_change_env_body": [
+        0,
+        0
+      ],
+      "first3_body_mass_delta_kg": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "first3_base_mass_kg": [
+        8.800000190734863,
+        9.800000190734863,
+        10.800000190734863
+      ],
+      "first3_xi": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          2.0
+        ]
+      ],
+      "xi_max_change": 0.0,
+      "first3_base_com_max_change_m": 0.0,
+      "first3_base_inertia_max_change": 0.0,
+      "recorded_base_mass_vs_live_max_kg": 0.0,
+      "payload_context_vs_live_max_kg": 0.0
+    },
+    {
+      "step": 13,
+      "automatic_resets": 0,
+      "mass_max_change_kg": 0.0,
+      "mass_change_since_first_solver_readback_kg": 0.0,
+      "largest_mass_change_env_body": [
+        0,
+        0
+      ],
+      "first3_body_mass_delta_kg": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "first3_base_mass_kg": [
+        8.800000190734863,
+        9.800000190734863,
+        10.800000190734863
+      ],
+      "first3_xi": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          2.0
+        ]
+      ],
+      "xi_max_change": 0.0,
+      "first3_base_com_max_change_m": 0.0,
+      "first3_base_inertia_max_change": 0.0,
+      "recorded_base_mass_vs_live_max_kg": 0.0,
+      "payload_context_vs_live_max_kg": 0.0
+    },
+    {
+      "step": 14,
+      "automatic_resets": 0,
+      "mass_max_change_kg": 0.0,
+      "mass_change_since_first_solver_readback_kg": 0.0,
+      "largest_mass_change_env_body": [
+        0,
+        0
+      ],
+      "first3_body_mass_delta_kg": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "first3_base_mass_kg": [
+        8.800000190734863,
+        9.800000190734863,
+        10.800000190734863
+      ],
+      "first3_xi": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          2.0
+        ]
+      ],
+      "xi_max_change": 0.0,
+      "first3_base_com_max_change_m": 0.0,
+      "first3_base_inertia_max_change": 0.0,
+      "recorded_base_mass_vs_live_max_kg": 0.0,
+      "payload_context_vs_live_max_kg": 0.0
+    },
+    {
+      "step": 15,
+      "automatic_resets": 0,
+      "mass_max_change_kg": 0.0,
+      "mass_change_since_first_solver_readback_kg": 0.0,
+      "largest_mass_change_env_body": [
+        0,
+        0
+      ],
+      "first3_body_mass_delta_kg": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "first3_base_mass_kg": [
+        8.800000190734863,
+        9.800000190734863,
+        10.800000190734863
+      ],
+      "first3_xi": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          2.0
+        ]
+      ],
+      "xi_max_change": 0.0,
+      "first3_base_com_max_change_m": 0.0,
+      "first3_base_inertia_max_change": 0.0,
+      "recorded_base_mass_vs_live_max_kg": 0.0,
+      "payload_context_vs_live_max_kg": 0.0
+    },
+    {
+      "step": 16,
+      "automatic_resets": 0,
+      "mass_max_change_kg": 0.0,
+      "mass_change_since_first_solver_readback_kg": 0.0,
+      "largest_mass_change_env_body": [
+        0,
+        0
+      ],
+      "first3_body_mass_delta_kg": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "first3_base_mass_kg": [
+        8.800000190734863,
+        9.800000190734863,
+        10.800000190734863
+      ],
+      "first3_xi": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          2.0
+        ]
+      ],
+      "xi_max_change": 0.0,
+      "first3_base_com_max_change_m": 0.0,
+      "first3_base_inertia_max_change": 0.0,
+      "recorded_base_mass_vs_live_max_kg": 0.0,
+      "payload_context_vs_live_max_kg": 0.0
+    }
+  ],
+  "mass_max_change_kg": 0.0,
+  "mass_comparison_atol_kg": 1e-06,
+  "mass_comparison_rtol": 0.0,
+  "max_post_first_step_mass_change_kg": 0.0,
+  "explicit_reset_mass_max_change_kg": 0.0,
+  "payload_kg": [
+    0.0,
+    1.0,
+    2.0
+  ],
+  "actual_base_mass_kg": [
+    8.800000190734863,
+    9.800000190734863,
+    10.800000190734863
+  ],
+  "com_unchanged": true,
+  "inertia_unchanged": true,
+  "automatic_resets": 0,
+  "evaluation_preserves_terrain_levels": true,
+  "heightfield_vs_collision_ray": {
+    "samples": 150,
+    "all_crop_rays_valid": true,
+    "mean_abs_m": 0.0037937029264867306,
+    "max_abs_m": 0.025776147842407227,
+    "per_terrain": {
+      "wave": {
+        "count": 15,
+        "mean_abs_m": 9.040038275998086e-05,
+        "max_abs_m": 0.0001976490020751953
+      },
+      "slope_up": {
+        "count": 15,
+        "mean_abs_m": 7.2558723331894726e-06,
+        "max_abs_m": 4.017353057861328e-05
+      },
+      "slope_down": {
+        "count": 15,
+        "mean_abs_m": 9.222825610777363e-06,
+        "max_abs_m": 3.910064697265625e-05
+      },
+      "rough_slope": {
+        "count": 15,
+        "mean_abs_m": 0.00017391840810887516,
+        "max_abs_m": 0.0003960132598876953
+      },
+      "stairs_up": {
+        "count": 15,
+        "mean_abs_m": 0.010803368873894215,
+        "max_abs_m": 0.024855852127075195
+      },
+      "stairs_down": {
+        "count": 15,
+        "mean_abs_m": 0.005886364262551069,
+        "max_abs_m": 0.0183563232421875
+      },
+      "obstacles": {
+        "count": 15,
+        "mean_abs_m": 0.001954662846401334,
+        "max_abs_m": 0.012347280979156494
+      },
+      "flat": {
+        "count": 15,
+        "mean_abs_m": 2.3047130071063293e-07,
+        "max_abs_m": 4.76837158203125e-07
+      },
+      "wheels": {
+        "count": 15,
+        "mean_abs_m": 0.006819363683462143,
+        "max_abs_m": 0.01632821559906006
+      },
+      "small_squares": {
+        "count": 15,
+        "mean_abs_m": 0.012192241847515106,
+        "max_abs_m": 0.025776147842407227
+      }
+    },
+    "scope": "Deterministic off-center points at levels0/5/9; geometry approximation, not robot traversal"
+  },
+  "status": "PASS_PHYSICAL_PARAMETERS_GEOMETRY_MEASURED"
+}

@@ -2,7 +2,7 @@
 import torch
 from . import state as st
 from .terrain import relief
-from .task import reward
+from .task import reward,reward_weights
 from .commands import OfficialCommands,EPISODE_ELAPSED
 
 
@@ -51,7 +51,7 @@ class Imagination:
         ns,dp,aux=wm.forward_reward(s,a,a_prev,xi,rlf);np=st.apply_pose_delta(pose,dp)
         lookup=self.commands.terrain_lookup
         on_flat=torch.ones(len(s),device=s.device,dtype=torch.bool) if lookup is None else lookup.query(np[:,:2])==lookup.names.index("flat")
-        r,_,done=reward(s,ns,a,a_prev,command,self.c,cfg.stage,soft=True,iteration=iteration,pose=np,field=self.field,base_height_target=self.reward_height,aux=aux,previous_previous=a_prev2,on_flat=on_flat)
+        r,terms,done=reward(s,ns,a,a_prev,command,self.c,cfg.stage,soft=True,iteration=iteration,pose=np,field=self.field,base_height_target=self.reward_height,aux=aux,previous_previous=a_prev2,on_flat=on_flat)
         # An inactive row is still evaluated in the fixed-size compiled graph.
         # Give only that discarded command candidate a safe elapsed time; keep
         # its actual terminal memory frozen, avoiding negative remaining-time
@@ -64,7 +64,8 @@ class Imagination:
         def select(new,old):return torch.where(active[:,None],new,old)
         return (select(ns,s),select(np,pose),select(a,a_prev),select(a_prev,a_prev2),select(nhist,hist),
                 select(candidate_command,cmd_state),torch.where(active,r,torch.zeros_like(r)),
-                torch.where(active,done,torch.zeros_like(done)),feature)
+                torch.where(active,done,torch.zeros_like(done)),feature,
+                torch.stack([terms[k]*v*.02 for k,v in reward_weights(iteration).items()],-1).detach())
     def rollout(self,wm,policy,critic,seed,branch,iteration=0):
         cfg=self.cfg;s,pose,a_prev,hist=seed['s'],seed['pose'],seed['a_prev'],seed['obs']
         cmd_state,xi=seed['cmd_state'],seed['xi'];a_prev2=seed['a_prev2']
@@ -72,19 +73,19 @@ class Imagination:
         max_steps=round(cfg.episode_seconds/cfg.dt)
         active=torch.round(cmd_state[:,EPISODE_ELAPSED]/cfg.dt)<max_steps
         valid_start=active.to(s.dtype)
-        rewards=[];soft_done=[];timeouts=[];valid=[];features=[]
+        rewards=[];soft_done=[];timeouts=[];valid=[];features=[];term_values=[]
         for _ in range(cfg.horizon):
             valid.append(active)
             timeout=active&(torch.round(cmd_state[:,EPISODE_ELAPSED]/cfg.dt)+1>=max_steps)
-            s,pose,a_prev,a_prev2,hist,cmd_state,r,done,feature=self._step_fn(wm,policy,critic,s,pose,a_prev,a_prev2,hist,cmd_state,xi,branch,iteration,active)
-            features.append(feature)
+            s,pose,a_prev,a_prev2,hist,cmd_state,r,done,feature,terms=self._step_fn(wm,policy,critic,s,pose,a_prev,a_prev2,hist,cmd_state,xi,branch,iteration,active)
+            features.append(feature);term_values.append(terms)
             rewards.append(r);soft_done.append(done);timeouts.append(timeout)
             active=active&~timeout
         last_priv=st.privileged(s,a_prev,self.commands.command(cmd_state),xi,relief(pose,self.field))
         features.append(critic.features(last_priv,branch));features=torch.stack(features,1)
         rewards=torch.stack(rewards,1);soft_done=torch.stack(soft_done,1);timeouts=torch.stack(timeouts,1)
         objective,surv,immediate,bootstrap=time_limit_return(rewards,soft_done,timeouts,critic(features),cfg.gamma,valid_start)
-        return objective,{'rewards':rewards.detach(),'surv':surv.detach(),'soft_done':soft_done.detach(),
+        return objective,{'reward_terms':torch.stack(term_values,1),'rewards':rewards.detach(),'surv':surv.detach(),'soft_done':soft_done.detach(),
                          'timeout':timeouts,'critic_valid':torch.stack(valid,1),'critic_in':features.detach(),
                          'immediate':immediate.detach(),'bootstrap':bootstrap.detach()}
 

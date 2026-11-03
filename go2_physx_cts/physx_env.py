@@ -41,7 +41,8 @@ class PhysXEnv:
         self.cfg,self.sim,self.device,self.num_envs=cfg,sim,cfg.device,cfg.num_envs
         self.field=None;self.terrain_lookup=PlaneTerrainLookup();self.terrain_names=('flat',)
         self.terrain_metadata={'names':['flat'],'geometry':'infinite_ground_plane'}
-        self.evaluation_mode=False;self.command_override=None
+        self.evaluation_mode=False;self.command_override=None;self.fixed_reset=None
+        self.desired_terrain_types=None;self.desired_terrain_levels=None;self.allocation_version=0
         self.profile=profile(cfg.robot)
         inertia,kp,kd,effort,scale=(motor_values(cfg.device) if cfg.robot=='go2' else as2_motor_values(cfg.device))
         def mapping(v):return {n:float(x) for n,x in zip(st.JOINT_NAMES,v)}
@@ -92,6 +93,8 @@ class PhysXEnv:
         self.hist=torch.zeros(n,450,device=dev);self.last=torch.zeros(n,12,device=dev)
         self.steps=torch.zeros(n,dtype=torch.long,device=dev);self.episode=torch.zeros(n,1,dtype=torch.int32,device=dev)
         self.own_mask=torch.ones(n,dtype=torch.bool,device=dev)
+        self.source=torch.zeros(n,dtype=torch.long,device=dev)
+        self.group_sums=torch.zeros(2*len(self.terrain_names)*4,6+15,device=dev)
         self.delay=torch.randint(3,(n,),device=dev);self.target_ring=self.consts.default_q.expand(3,n,12).clone();self.ring_ptr=0
         self.ids=torch.arange(n,device=dev);self.iteration=0
         self._terrain_max_levels=torch.full((len(self.terrain_names),),-1.,device=dev)
@@ -169,7 +172,14 @@ class PhysXEnv:
                     terrain.terrain_levels[changed]=self._original_terrain_levels[changed]
                 self._terrain_phase[changed]=phase
                 terrain.env_origins[changed]=terrain.terrain_origins[terrain.terrain_levels[changed],terrain.terrain_types[changed]]
-            eligible=ids[(self.steps[ids]>0)&~torch.isin(ids,changed)]
+            moved=ids[:0]
+            if phase==2 and not self.evaluation_mode and self.desired_terrain_types is not None:
+                moved=ids[terrain.terrain_types[ids]!=self.desired_terrain_types[ids]]
+                if len(moved):
+                    terrain.terrain_types[moved]=self.desired_terrain_types[moved]
+                    terrain.terrain_levels[moved]=self.desired_terrain_levels[moved]
+                    terrain.env_origins[moved]=terrain.terrain_origins[terrain.terrain_levels[moved],terrain.terrain_types[moved]]
+            eligible=ids[(self.steps[ids]>0)&~torch.isin(ids,torch.cat((changed,moved)))]
             if len(eligible) and not self.evaluation_mode:
                 from .terrain_scene import terrain_level_decisions
                 gen=terrain.cfg.terrain_generator
@@ -182,6 +192,9 @@ class PhysXEnv:
         pose=tensor(self.robot.data.default_root_pose)[ids].clone();pose[:,:3]+=self.origins[ids]
         pose[:,:2]+=(torch.rand(n,2,device=dev)-.5)*.5
         yaw=(torch.rand(n,device=dev)*2-1)*math.pi;pose[:,3:]=0;pose[:,5]=torch.sin(yaw/2);pose[:,6]=torch.cos(yaw/2)
+        if self.fixed_reset is not None:
+            pose[:,:2]=self.origins[ids,:2]+self.fixed_reset['jitter'][ids]
+            yaw=self.fixed_reset['yaw'][ids];pose[:,3:]=0;pose[:,5]=torch.sin(yaw/2);pose[:,6]=torch.cos(yaw/2)
         pos=self.consts.default_q.expand(n,12).clone()
         self.robot.write_root_pose_to_sim_index(root_pose=pose,env_ids=ids)
         self.robot.write_root_velocity_to_sim_index(root_velocity=torch.zeros(n,6,device=dev),env_ids=ids)
@@ -191,6 +204,7 @@ class PhysXEnv:
         self.sensor.reset(ids)
         self.hist[ids]=0;self.last[ids]=0;self.steps[ids]=0;self.episode[ids]+=1
         self.target_ring[:,ids]=pos;self.delay[ids]=torch.randint(3,(n,),device=dev)
+        if self.fixed_reset is not None:self.delay[ids]=self.fixed_reset['delay'][ids]
         mask=torch.zeros(self.num_envs,dtype=torch.bool,device=dev);mask[ids]=True
         all_positions=tensor(self.robot.data.root_link_pose_w)[:,:2].clone()
         all_positions[ids]=pose[:,:2]
@@ -236,12 +250,15 @@ class PhysXEnv:
         return torch.zeros(xy.shape[:-1],dtype=torch.long,device=xy.device) if self.terrain_lookup is None else self.terrain_lookup.query(xy)
 
     def curriculum_state_dict(self):
-        return {'terrain_levels':None if self.field is None else self.scene.terrain.terrain_levels.clone(),
+        return {'desired_types':None if self.desired_terrain_types is None else self.desired_terrain_types.clone(),
+                'desired_levels':None if self.desired_terrain_levels is None else self.desired_terrain_levels.clone(),'allocation_version':self.allocation_version,
+                'terrain_levels':None if self.field is None else self.scene.terrain.terrain_levels.clone(),
                 'max_levels_reached':self._terrain_max_levels.clone(),
                 'terrain_types':None if self.field is None else self.scene.terrain.terrain_types.clone(),
                 'terrain_phase':None if self.field is None else self._terrain_phase.clone()}
 
     def load_curriculum_state_dict(self,state):
+        self.desired_terrain_types=state.get('desired_types');self.desired_terrain_levels=state.get('desired_levels');self.allocation_version=state.get('allocation_version',0)
         self._terrain_max_levels.copy_(state['max_levels_reached'])
         if self.field is not None and state['terrain_levels'] is not None:
             terrain=self.scene.terrain;terrain.terrain_levels.copy_(state['terrain_levels'])
@@ -286,6 +303,15 @@ class PhysXEnv:
         own=self.own_mask;vb=st.velocity_body(s)
         metrics={'height':float(s[own,0].mean()),'xy_rmse':float((vb[own,:2]-self.command[own,:2]).square().mean().sqrt()),
                  'yaw_rmse':float((s[own,9]-self.command[own,2]).square().mean().sqrt()),'reward':float(r[own].mean()),'falls':int((falls&own).sum()),'falls_all':int(falls.sum())}
+        if not self.evaluation_mode:
+            from .task import reward_weights
+            kind=after['terrain_id'];speed=self.command[:,:2].norm(dim=-1)
+            band=torch.bucketize(speed,speed.new_tensor([.5,1.5,2.5]))
+            valid=own&(kind>=0);group=(self.source.long()*len(self.terrain_names)+kind.clamp_min(0))*4+band
+            weights=reward_weights(self.iteration,self.cfg.stage)
+            values=torch.stack([torch.ones_like(r),r,(vb[:,:2]-self.command[:,:2]).square().mean(-1),
+                falls.float(),(s[:,9]-self.command[:,2]).square(),s[:,0]]+[terms[k]*weights[k]*.02 for k in weights],-1)
+            self.group_sums.index_add_(0,group[valid],values[valid])
         self.last=a.clone()
         if self.command_override is None:
             self.cmd_state=self.command_sampler.advance(self.cmd_state,after['pose'][:,:2],self.iteration)
@@ -296,3 +322,48 @@ class PhysXEnv:
         self._snapshot=self._observe(measured_crop=cached_crop)
         # Return terminal state for labels; replay masks all reset transitions.
         return after,done,metrics
+
+    def allocation_counts(self):
+        if self.field is None:return [self.num_envs]
+        kind=self.terrain_lookup.column_types[self.scene.terrain.terrain_types]
+        return torch.bincount(kind,minlength=len(self.terrain_names)).tolist()
+
+    def allocation_pending(self):
+        return self.desired_terrain_types is not None and bool((self.desired_terrain_types!=self.scene.terrain.terrain_types).any())
+
+    def queue_allocation(self,target):
+        if self.field is None or self.allocation_pending():return False
+        terrain=self.scene.terrain;current=self.allocation_counts()
+        if sum(target)!=self.num_envs:raise ValueError('Allocation must conserve environments')
+        kind=self.terrain_lookup.column_types[terrain.terrain_types]
+        desired=terrain.terrain_types.clone();levels=terrain.terrain_levels.clone();pool=[]
+        for t,(a,b) in enumerate(zip(current,target)):
+            if a>b:
+                ids=(kind==t).nonzero().flatten()
+                # Uniform indices preserve interleaved teacher/student providers.
+                chosen=ids[torch.linspace(0,len(ids)-1,a-b,device=self.device).round().long()]
+                pool.extend(chosen.tolist())
+        offset=0
+        for t,(a,b) in enumerate(zip(current,target)):
+            if b>a:
+                ids=torch.tensor(pool[offset:offset+b-a],device=self.device,dtype=torch.long);offset+=b-a
+                cols=(self.terrain_lookup.column_types==t).nonzero().flatten()
+                desired[ids]=cols[ids%len(cols)]
+                levels[ids]=terrain.terrain_levels[kind==t].median()
+        if offset!=len(pool):raise RuntimeError('Allocation transfer imbalance')
+        self.desired_terrain_types=desired;self.desired_terrain_levels=levels
+        if pool:self.allocation_version+=1
+        return bool(pool)
+
+    def flush_training_groups(self):
+        from .task import WEIGHTS
+        result={};width=len(self.terrain_names)*4
+        for group,row in enumerate(self.group_sums.cpu().tolist()):
+            count=row[0]
+            if count<100:continue
+            branch=group//width;t=(group%width)//4;band=group%4
+            result[f'{branch}/{t}/{band}']={'count':count,'reward':row[1]/count,'xy_rmse':(row[2]/count)**.5,
+                'falls':row[3]/count*60/self.cfg.dt,'yaw_rmse':(row[4]/count)**.5,'height':row[5]/count,
+                'reward_terms':{k:row[6+i]/count for i,k in enumerate(WEIGHTS)}}
+        self.group_sums.zero_()
+        return result

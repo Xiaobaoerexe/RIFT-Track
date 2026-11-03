@@ -49,7 +49,7 @@ class WorldModel(nn.Module):
     y = self.out_norm.unnormalize(self.net(self.in_norm(self._inputs(s,a,a_prev,xi,relief))))
     return s+y[:,:st.STATE_DIM], y[:,st.STATE_DIM:st.STATE_DIM+3], y[:,st.STATE_DIM+3:]
 
-  def loss(self, s0, actions, actions_prev, xi, reliefs, s_targets, pose_targets, valid, aux_targets):
+  def loss(self, s0, actions, actions_prev, xi, reliefs, s_targets, pose_targets, valid, aux_targets, scale_override=None):
     """k-step autoregressive loss in normalized output units.
 
     s0 (B, S); actions, actions_prev (B, k, 12); xi (B, C); reliefs (B, k, P) at
@@ -57,7 +57,7 @@ class WorldModel(nn.Module):
     masks steps after a reset inside the window.
     """
     k = actions.shape[1]
-    scale = self.out_norm.var.sqrt() + 1e-6
+    scale = self.out_norm.var.sqrt() + 1e-6 if scale_override is None else scale_override
     s = s0
     total, denom = 0.0, valid.sum().clamp(min=1.0)
     for j in range(k):

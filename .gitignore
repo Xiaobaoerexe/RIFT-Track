@@ -22,3 +22,6 @@ checkpoints/
 
 .training.lock
 physx_training.lock
+
+# Preserve existing Go2 evaluation evidence locally; do not commit generated videos.
+/reports/SIDE_OFFICIAL_COMPARE_20261103/

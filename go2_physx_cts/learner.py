@@ -47,6 +47,10 @@ def branch_loss(objectives,branch,sizes):
         return -objectives[:sizes[0]].sum()/sizes[0]-objectives[sizes[0]:].sum()/sizes[1]
     return -objectives.sum()/sizes[branch]
 
+def critic_branch_loss(prediction,target,tags,delta=1.):
+    per=2*torch.nn.functional.huber_loss(prediction,target,reduction='none',delta=delta)
+    return .5*sum((per*tags[:,b]).sum()/tags[:,b].sum().clamp_min(1) for b in (0,1))
+
 class Learner:
     def __init__(self,cfg,env,output,driver=None,expert=None):
         self.cfg,self.env,self.output=cfg,env,Path(output);self.output.mkdir(parents=True,exist_ok=True)
@@ -67,12 +71,20 @@ class Learner:
         self.index=torch.arange(cfg.num_envs,device=cfg.device)
         self.source=provider_assignment(cfg.num_envs,cfg.driver_frac,cfg.expert_frac,cfg.teacher_fraction,cfg.device)
         self.ou=torch.zeros((cfg.num_envs,12),device=cfg.device)
-        self.it=0;self.lr_scale=1.;self.ramp_start=cfg.warmup_iterations;self.actor_frozen_until=cfg.warmup_iterations+cfg.critic_warmup_iterations
+        self.it=0;self.actor_frozen_until=cfg.warmup_iterations+cfg.critic_warmup_iterations
         from .schedules import LearningRateController
         self.schedule=LearningRateController(cfg)
-        self._critic_trial_data=None
-        self.native_teacher_history=[]
-        self.last_good=None;self.collapse_strikes=0;self.collapse_history=[];self.nonfinite=0
+        self.last_checkpoint=None;self.nonfinite=0
+        from .terrain_allocation import TerrainAllocator
+        if env.field is None:base=[cfg.num_envs]
+        else:base=torch.bincount(env.terrain_lookup.column_types[env._original_terrain_types],minlength=len(env.terrain_names)).tolist()
+        self.allocator=TerrainAllocator(base)
+        self.fixed_reports=[];self.cts_stable=False
+        self.action_quality=torch.zeros(len(env.terrain_names),device=cfg.device)
+        self._validation_phase=None;self._wm_validation=None;self._anchor=None;self._anchor_reference=None
+        self._cts_stats={};self.window_stats=[];self._last_critic_quality={}
+        self.buf.wm_holdout_envs=torch.linspace(0,cfg.num_envs-1,max(2,cfg.num_envs//64),device=cfg.device).round().long()
+        env.source=self.source
         self.counts=dict(collect=0,transitions=0,wm=0,actor=0,critic=0,cts=0)
         self.metrics=[];self.start_time=time.monotonic()
         self.provider_counts=[int((self.source==i).sum()) for i in range(4)]
@@ -86,67 +98,45 @@ class Learner:
             for group in getattr(self,'opt_'+name).param_groups:group['lr']=rates[name]
         return rates
 
-    def _wm_window_loss(self,model,w):
+    @torch.no_grad()
+    def quality_diagnostics(self):
+        from .commands import RANGE_ITERATIONS
+        phase=(int(self.it>=self.cfg.terrain_start_iteration),int(self.it>=self.cfg.all_terrain_iteration),
+               sum(self.it>=v for v in RANGE_ITERATIONS),self.env.allocation_version,self.it//5000)
+        if self._validation_phase!=phase:
+            self._validation_phase=phase
+            self._wm_validation=self.buf.windows(self.cfg.wm_batch,self.cfg.wm_window,self.env.xi,env_ids=self.buf.wm_holdout_envs)
+            self._wm_validation_scale=self.wm.out_norm.var.sqrt().clone()+1e-6
+            self._anchor=self.buf.seeds(512,self.env.xi,source=1);self._anchor_reference=None
+            self._validation_identity=str(time.time_ns())
+        w=self._wm_validation
         dp=torch.stack([st.pose_delta(w['pose'][:,j],w['pose'][:,j+1]) for j in range(self.cfg.wm_window)],1)
-        return model.loss(w['s'][:,0],w['a'],w['a_prev'],w['xi'],w['relief'].float(),w['s'][:,1:],dp,w['valid'],w['aux'])
+        wmerror=float(self.wm.loss(w['s'][:,0],w['a'],w['a_prev'],w['xi'],w['relief'].float(),w['s'][:,1:],dp,w['valid'],w['aux'],scale_override=self._wm_validation_scale))
+        a=self._anchor;priv=st.privileged(a['s'],a['a_prev'],a['command'],a['xi'],a['relief'])
+        ta=self.policy(a['obs'],priv,0)*self.env.consts.action_scale
+        sa=self.policy(a['obs'],priv,1)*self.env.consts.action_scale
+        if self._anchor_reference is None:self._anchor_reference=ta.clone()
+        drift=float((ta-self._anchor_reference).square().mean().sqrt())
+        if self.it%1000==0:self._anchor_reference=ta.clone()
+        return {'wm_error':wmerror,'teacher_drift':drift,'cts_error':float((sa-ta).square().mean().sqrt()),
+                'context':self._validation_identity,'cts_stable':self.cts_stable}
 
-    def _cts_seed_loss(self,model,seed):
-        with torch.no_grad():
-            priv=st.privileged(seed['s'],seed['a_prev'],seed['command'],seed['xi'],seed['relief'])
-            label=self.policy.teacher_encoder(self.policy.teacher_norm(priv))
-            history=self.policy.history_norm(seed['obs'])
-        z,gate=model(history)
-        return (z-label).square().mean()+self.cfg.cts_balance*(gate.mean(0)-1/8).square().mean()
-
-    def adapt_learning_rates(self):
-        cfg=self.cfg
-        if not self.schedule.due('wm',self.it):return {}
-        train=self.buf.windows(cfg.wm_batch,cfg.wm_window,self.env.xi,env_parity=0)
-        val=self.buf.windows(cfg.wm_batch,cfg.wm_window,self.env.xi,env_parity=1)
-        result={'wm':self.schedule.supervised_trial('wm',self.wm,self.opt_wm,
-            lambda model:self._wm_window_loss(model,train),lambda model:self._wm_window_loss(model,val),self.it)}
-        if self._critic_trial_data is not None:
-            x,y=self._critic_trial_data
-            order=torch.randperm(len(x),device=self.device);left,right=torch.tensor_split(order,2)
-            result['critic']=self.schedule.supervised_trial('critic',self.critic,self.opt_critic,
-                lambda model:(model(x[left])-y[left]).square().mean(),
-                lambda model:(model(x[right])-y[right]).square().mean(),self.it)
-        if self.schedule.teacher_stable:
-            train_s=self.buf.seeds(cfg.cts_batch,self.env.xi,source=1)
-            val_s=self.buf.seeds(cfg.cts_batch,self.env.xi,source=1)
-            result['cts']=self.schedule.supervised_trial('cts',self.policy.student_encoder,self.opt_cts,
-                lambda model:self._cts_seed_loss(model,train_s),
-                lambda model:self._cts_seed_loss(model,val_s),self.it,teacher_stable=True)
-        from .diagnostics import native_candidate_probe
-        train_seed=self.buf.seeds(256,self.env.xi);val_seed=self.buf.seeds(256,self.env.xi)
-        split=(192,64)
-        def train_actor(policy):
-            obj,_=self.imag.rollout(self.wm,policy,self.critic,train_seed,split,iteration=self.it)
-            return branch_loss(obj,split,split)
-        def probe_actor(policy):
-            with torch.no_grad():
-                obj,_=self.imag.rollout(self.wm,policy,self.critic,val_seed,split,iteration=self.it)
-                metrics=native_candidate_probe(self,policy)
-                metrics['heldout_return']=float(obj[:192].mean()+obj[192:].mean())
-                return metrics
-        with frozen(self.wm,self.critic,self.policy.student_encoder):
-            result['actor']=self.schedule.actor_trial(self.policy,self.opt_actor,train_actor,probe_actor,self.it)
-        # A permanent fixed low-speed cohort releases CTS adaptation; changing
-        # terrain/command-course performance cannot be mistaken for stabilization.
-        stable_record=native_candidate_probe(self,self.policy,stability=True)
-        self.native_teacher_history=(self.native_teacher_history+[stable_record])[-3:]
-        rows=self.native_teacher_history
-        if len(rows)==3 and all(r['teacher_success']>=.8 for r in rows):
-            returns=[r['teacher_return'] for r in rows]
-            self.schedule.teacher_stable=(max(returns)-min(returns))/max(1.,abs(sum(returns)/3))<.05
-        result['cts_gate']={'native_history':rows,'teacher_stable':self.schedule.teacher_stable,
-            'scope':'fixed native flat cohort, not a sim2sim capability claim'}
-        self.ou.zero_()
-        if self.driver is not None:self.driver.reset(torch.ones(self.cfg.num_envs,dtype=torch.bool,device=self.device))
-        # Keep collected training metrics until log(); LR probes never append to them.
-        self.learning_rates()
-        with (self.output/'lr_trials.jsonl').open('a') as handle:handle.write(json.dumps({'iteration':self.it,**result},allow_nan=False)+'\n')
-        return result
+    def consume_fixed_report(self,report):
+        terrains=report['terrains']
+        for k,r in terrains.items():
+            if r.get('valid'):
+                self.action_quality[int(k)]=max(0.,min(1.,(r['branch_rates']['teacher']-.5)/.3))
+        old=self.fixed_reports[-1] if self.fixed_reports else None
+        self.cts_stable=bool(old and all(r.get('valid') and old.get(k,{}).get('cohort_id')==r['cohort_id']
+            and r['branch_rates']['teacher']>=.8 and old[k]['branch_rates']['teacher']>=.8
+            and r['branch_rates']['teacher']-r['branch_rates']['student']<=.1
+            and abs(r['branch_rates']['teacher']-old[k]['branch_rates']['teacher'])<.1
+            for k,r in terrains.items()))
+        self.fixed_reports=(self.fixed_reports+[terrains])[-2:]
+        record=self.allocator.observe(self.it,terrains,self.env.allocation_counts(),self.env.allocation_pending())
+        if record:
+            if record['changed']:self.env.queue_allocation(record['target'])
+            with (self.output/'terrain_allocation.jsonl').open('a') as f:f.write(json.dumps(record)+'\n')
 
     @torch.no_grad()
     def collect(self):
@@ -171,7 +161,7 @@ class Learner:
         after,done,metrics=self.env.step(a)
         self.buf.add(s=before['s'],pose=before['pose'],a=a,a_prev=before['a_prev'],obs=before['obs'],
                      command=before['command'],timer=before['timer'],cmd_state=before['cmd_state'],done=done,relief=before['relief'],
-                     source=self.source,episode=before['episode'],xi=xi,a_prev2=before['obs'][:,-24:-12],s_next=after['s'],pose_next=after['pose'],aux_next=after['aux'])
+                     terrain_id=before['terrain_id'],source=self.source,episode=before['episode'],xi=xi,a_prev2=before['obs'][:,-24:-12],s_next=after['s'],pose_next=after['pose'],aux_next=after['aux'])
         keep=torch.ones_like(done)
         if keep.any():self.wm.update_stats(before['s'][keep],a[keep],before['a_prev'][keep],xi[keep],before['relief'][keep],after['s'][keep],st.pose_delta(before['pose'][keep],after['pose'][keep]),after['aux'][keep])
         self.policy.update_stats(before['obs'],priv)
@@ -219,43 +209,65 @@ class Learner:
             valid=data['critic_valid'].reshape(-1).bool();x=x[valid];y=y[valid]
         if len(x)<cfg.critic_minibatches:raise RuntimeError('Insufficient valid pre-timeout critic samples')
         self.critic.norm.update(x)
-        self._critic_trial_data=(x.detach(),y.detach())
+
         losses=[]
         for _ in range(cfg.critic_epochs):
             order=torch.randperm(len(x),device=self.device)
             for ids in torch.tensor_split(order,cfg.critic_minibatches):
-                loss=(self.critic(x[ids])-y[ids]).square().mean()
+                loss=critic_branch_loss(self.critic(x[ids]),y[ids],x[ids,-2:],cfg.critic_huber_delta)
                 self.opt_critic.zero_grad(set_to_none=True);loss.backward();cgn=clip_grad(self.critic.parameters(),cfg.grad_clip)
                 if scalar_finite(cgn) and scalar_finite(loss):self.opt_critic.step();self.counts['critic']+=1
                 else:self.nonfinite+=1
                 losses.append(float(loss.detach()))
-        return {'branch_objectives':objective_means,'objective':sum(objective_means),
+        if self.it%50==0:
+            with torch.no_grad():
+                residual=self.critic(x)-y;scale=y.std().clamp_min(1.)
+                by_branch=[(residual[x[:,-2+b]>.5].square().mean()) for b in (0,1)]
+                self._last_critic_quality={'critic_error':float((.5*sum(by_branch)).sqrt()/scale),
+                    'critic_branch_mse':[float(v) for v in by_branch],'critic_target_p99':float(y.abs().quantile(.99)),
+                    'critic_target_max':float(y.abs().max()),'critic_residual_p99':float(residual.abs().quantile(.99)),
+                    'critic_explained_variance':float(1-residual.var()/y.var().clamp_min(1e-8))}
+        return {**self._last_critic_quality,'branch_objectives':objective_means,'objective':sum(objective_means),
                 'actor_grad_norm':float(gn),'critic_loss':sum(losses)/len(losses),'imagined_sources':source_counts.tolist(),
-                'immediate':float(data['immediate'].mean()),'bootstrap':float(data['bootstrap'].mean())}
+                'immediate':float(data['immediate'].mean()),'bootstrap':float(data['bootstrap'].mean()),
+                'imagined_reward_terms':dict(zip(__import__('go2_physx_cts.task',fromlist=['WEIGHTS']).WEIGHTS,data['reward_terms'].mean((0,1)).tolist()))}
 
     def update_cts(self):
-        cfg=self.cfg;losses=[]
+        cfg=self.cfg;values=[]
+        ramp=min(1.,max(0.,(self.it-2500)/2500))
         with frozen(self.wm,self.critic,self.policy.actor,self.policy.teacher_encoder):
             for _ in range(cfg.cts_updates):
                 seed=self.buf.seeds(cfg.cts_batch,self.env.xi,source=1)
                 priv=st.privileged(seed['s'],seed['a_prev'],seed['command'],seed['xi'],seed['relief'])
-                with torch.no_grad():label=self.policy.teacher_encoder(self.policy.teacher_norm(priv))
+                with torch.no_grad():
+                    label=self.policy.teacher_encoder(self.policy.teacher_norm(priv))
+                    single=self.policy.single_norm(st.single_from_history(seed['obs']))
+                    target_action=self.policy.actor(torch.cat((label,single),-1))
                 z,gate=self.policy.student_encoder(self.policy.history_norm(seed['obs']))
+                student_action=self.policy.actor(torch.cat((z,single),-1))
+                action_delta=(student_action-target_action)*self.env.consts.action_scale/.25
+                action_per=2*torch.nn.functional.huber_loss(action_delta,torch.zeros_like(action_delta),reduction='none',delta=1.).mean(-1)
+                kind=seed['terrain_id'][:,0].long()
+                quality=torch.where(kind>=0,self.action_quality[kind.clamp(0,len(self.action_quality)-1)],0.)
                 latent=(z-label).square().mean();balance=(gate.mean(0)-1/8).square().mean()
-                loss=latent+cfg.cts_balance*balance
+                action_loss=(action_per*quality).mean()
+                loss=latent+cfg.cts_balance*balance+cfg.cts_action_weight*ramp*action_loss
                 self.opt_cts.zero_grad(set_to_none=True);loss.backward();gn=clip_grad(self.policy.student_encoder.parameters(),cfg.grad_clip)
                 if scalar_finite(gn) and scalar_finite(loss):self.opt_cts.step();self.counts['cts']+=1
                 else:self.nonfinite+=1
-                losses.append(float(loss.detach()))
-        return sum(losses)/len(losses)
+                values.append(torch.stack((loss.detach(),latent.detach(),balance.detach(),action_loss.detach(),action_delta.detach().square().mean())))
+        value=torch.stack(values).mean(0).tolist()
+        self._cts_stats={'cts_latent_loss':value[1],'cts_balance_loss':value[2],'cts_action_loss':value[3],
+                         'cts_action_mse':value[4],'cts_action_coefficient':cfg.cts_action_weight*ramp}
+        return value[0]
 
     def save(self,path=None):
         path=Path(path) if path else self.output/f'model_{self.it:08d}.pt'
         value={'schema':'physx-cts-source-port-v1','upstream_commit':UPSTREAM_COMMIT,'cfg':asdict(self.cfg),
                'policy':self.policy.state_dict(),'critic':self.critic.state_dict(),'world_model':self.wm.state_dict(),
                'optimizers':{k:getattr(self,'opt_'+k).state_dict() for k in ('wm','actor','critic','cts')},
-               'iteration':self.it,'counts':self.counts,'lr_scale':self.lr_scale,'ramp_start':self.ramp_start,
-               'schedule':self.schedule.state_dict(),'native_teacher_history':self.native_teacher_history,
+               'iteration':self.it,'counts':self.counts,
+               'schedule':self.schedule.state_dict(),'allocator':self.allocator.state_dict(),'fixed_reports':self.fixed_reports,'cts_stable':self.cts_stable,'action_quality':self.action_quality,
                'curriculum':self.env.curriculum_state_dict(),
                'actor_frozen_until':self.actor_frozen_until,'rng':torch.get_rng_state(),
                'cuda_rng':torch.cuda.get_rng_state_all() if torch.cuda.is_available() else [],
@@ -280,8 +292,8 @@ class Learner:
             if k!='critic' or not reset_critic:getattr(self,'opt_'+k).load_state_dict(ck['optimizers'][k])
         if reset_critic:self.actor_frozen_until=self.cfg.warmup_iterations+self.cfg.critic_warmup_iterations
         if continue_run:
-            self.schedule.load_state_dict(ck['schedule']);self.native_teacher_history=ck.get('native_teacher_history',[])
-            self.it=ck['iteration'];self.counts=ck['counts'];self.lr_scale=ck['lr_scale'];self.ramp_start=ck['ramp_start']
+            self.schedule.load_state_dict(ck['schedule']);self.allocator.load_state_dict(ck['allocator']);self.fixed_reports=ck['fixed_reports'];self.cts_stable=ck['cts_stable'];self.action_quality.copy_(ck['action_quality'])
+            self.it=ck['iteration'];self.counts=ck['counts'];self._validation_phase=None
             self.actor_frozen_until=ck['actor_frozen_until']
             # Retired evaluator metadata in immutable checkpoints is ignored.
             torch.set_rng_state(ck['rng'].cpu())
@@ -294,52 +306,38 @@ class Learner:
         identity=json.loads(identity_path.read_text())
         identity.update(init='continue_run' if continue_run else 'new_stage_resume',parent_checkpoint=str(path),parent_iteration=ck['iteration'],reset_critic=reset_critic,actor_frozen_until=self.actor_frozen_until)
         identity_path.write_text(json.dumps(identity,indent=2))
-        # A reward-stage change needs a compatible critic in the rollback snapshot.
-        self.last_good=self.save(self.output/'stage_start.pt') if not continue_run else Path(path)
-
-    def rollback(self,path=None):
-        path=path or self.last_good
-        if path is None:return False
-        ck=torch.load(path,map_location=self.device,weights_only=False)
-        self.policy.load_state_dict(ck['policy']);self.critic.load_state_dict(ck['critic'])
-        self.schedule.rollback(self.it);self.lr_scale*=.5
-        self.collapse_strikes=0;self.collapse_history=[]
-        # Weight-only rollback: retain optimizer moments, WM, Replay and curriculum.
-        self.learning_rates()
-        return True
+        self.last_checkpoint=Path(path)
 
     def log(self,stats):
-        falls=sum(m['falls'] for m in self.metrics)/max(1,len(self.metrics))
-        own=max(1,self.provider_counts[0]+self.provider_counts[1])
-        falls_per_min=falls/own*60/self.cfg.dt
-        result={'iteration':self.it,'elapsed_seconds':time.monotonic()-self.start_time,'counts':self.counts.copy(),
-                'metrics':{k:sum(m[k] for m in self.metrics)/len(self.metrics) for k in ('height','xy_rmse','yaw_rmse','reward','falls')},
-                'falls_per_env_min':falls_per_min,'archive_size':self.archive.size,'nonfinite_skipped':self.nonfinite,**stats}
-        result['terrain_levels']=self.env.terrain_level_statistics
         from .task import reward_weights
         from .commands import RANGE_ITERATIONS,RANGE_STAGES
-        result['reward_weights']=reward_weights(self.it,self.cfg.stage)
-        result['command_ranges']=RANGE_STAGES[sum(self.it>=v for v in RANGE_ITERATIONS)]
-        falls_all=sum(m['falls_all'] for m in self.metrics)/max(1,len(self.metrics)) if self.metrics else falls
-        window_size=len(self.metrics);self.metrics=[]
-        result['falls_per_vector_step_all_providers']=falls_all
-        from .schedules import collapse_trend
-        active=self.it>max(self.cfg.warmup_iterations,self.actor_frozen_until)
-        if active and window_size==self.cfg.log_interval and self.it%self.cfg.log_interval==0:
-            row={'iteration':self.it,'falls':falls_all,'xy_rmse':result['metrics']['xy_rmse'],'reward':result['metrics']['reward']}
-            if self.collapse_history and self.it-self.collapse_history[-1]['iteration']!=self.cfg.log_interval:self.collapse_history=[]
-            self.collapse_history=(self.collapse_history+[row])[-3:]
-        else:self.collapse_history=[]
-        trigger=collapse_trend(self.collapse_history,self.cfg.collapse_falls)
-        self.collapse_strikes=int(active and falls_all>self.cfg.collapse_falls)
-        result['rollback_window_history']=list(self.collapse_history)
-        result['rollback_triggered']=trigger
-        result['rollback_checkpoint']=str(self.last_good) if trigger and self.last_good else None
-        result['rolled_back']=self.rollback() if trigger else False
-        result['lr_after_rollback']=self.schedule.rates(self.it) if result['rolled_back'] else None
+        own=max(1,self.provider_counts[0]+self.provider_counts[1])
+        metrics={k:sum(m[k] for m in self.metrics)/len(self.metrics) for k in ('height','xy_rmse','yaw_rmse','reward','falls')}
+        groups=self.env.flush_training_groups();quality=self.quality_diagnostics()
+        for k in ('wm_loss','critic_loss','cts_loss','cts_latent_loss','cts_balance_loss','cts_action_loss','cts_action_mse','actor_grad_norm'):
+            vals=[r[k] for r in self.window_stats if k in r]
+            if vals:stats[k]=sum(vals)/len(vals)
+        result={'iteration':self.it,'elapsed_seconds':time.monotonic()-self.start_time,'counts':self.counts.copy(),
+                'metrics':metrics,'falls_per_env_min':metrics['falls']/own*60/self.cfg.dt,
+                'archive_size':self.archive.size,'nonfinite_skipped':self.nonfinite,**stats,
+                'terrain_levels':self.env.terrain_level_statistics,'terrain_counts':self.env.allocation_counts(),
+                'reward_weights':reward_weights(self.it,self.cfg.stage),'command_ranges':RANGE_STAGES[sum(self.it>=v for v in RANGE_ITERATIONS)],
+                'falls_per_vector_step_all_providers':sum(m['falls_all'] for m in self.metrics)/len(self.metrics),
+                'groups':groups,'quality':quality,'automatic_weight_rollback':False}
+        if len(self.metrics)==50:
+            feedback={'iteration':self.it,'reward':metrics['reward'],'xy_rmse':metrics['xy_rmse'],
+                      'falls':result['falls_per_env_min'],'groups':groups,**quality,
+                      'critic_error':self._last_critic_quality.get('critic_error')}
+            self.schedule.observe(feedback)
+        decision=self.schedule.adjust(self.it)
+        if decision:
+            result['lr_decision']=decision;result['lr_next']=self.learning_rates()
+            with (self.output/'lr_windows.jsonl').open('a') as f:f.write(json.dumps(decision,allow_nan=False)+'\n')
+        self.metrics=[];self.window_stats=[]
         with (self.output/'training.jsonl').open('a') as f:f.write(json.dumps(result,allow_nan=False)+'\n')
         (self.output/'progress.json').write_text(json.dumps(result,indent=2,allow_nan=False))
-        print(json.dumps(result),flush=True)
+        # Full stratified evidence stays in JSONL, not duplicated into the console.
+        print(json.dumps({k:v for k,v in result.items() if k not in ('groups','lr_decision')},allow_nan=False),flush=True)
 
     def run(self,iterations=None):
         self.env.iteration=self.it
@@ -353,39 +351,44 @@ class Learner:
             self.collect();stats['wm_loss']=self.fit_world_model()
             if self.it>self.cfg.warmup_iterations:stats.update(self.improve_policy())
             stats['cts_loss']=self.update_cts()
-            if self.it>self.cfg.lr_fixed_until and self.it%self.cfg.lr_trial_interval==0:stats['lr_trials']=self.adapt_learning_rates()
+            stats.update(self._cts_stats);self.window_stats.append(stats.copy())
+            if self.nonfinite:
+                self.save(self.output/'nonfinite_stop.pt')
+                raise FloatingPointError('Nonfinite update rejected; stopped without automatic rollback')
             if self.it==1 or self.it%self.cfg.log_interval==0 or self.it==end:self.log(stats)
             if self.it==1 or self.it%self.cfg.save_interval==0 or self.it==end:
                 path=self.save()
-                if self.it>self.cfg.warmup_iterations and not self.collapse_strikes:self.last_good=path
+                self.last_checkpoint=path
             if self.it%self.cfg.evaluation_interval==0:
-                path=self.save();self.evaluate_feedback(path)
+                path=self.save();self.evaluate_feedback(path);self.save(path)
                 if getattr(self,'stop_requested',False):break
             if self.it==end and iterations is None:
                 (self.output/'training_complete.json').write_text(json.dumps({'iteration':self.it,'reason':'Configured iteration budget completed; capability must be read from measured diagnostics','B0':False}))
-        return self.last_good
+        return self.last_checkpoint
 
     def evaluate_feedback(self,path):
         from .robogauge_feedback import evaluate_checkpoint
         from .diagnostics import native_diagnostics,model_diagnostics
+        from .fixed_evaluation import fixed_native_diagnostics
         out=self.output/f'robogauge_{self.it:08d}'
         out.mkdir(parents=True,exist_ok=True)
-        jobs={'native':lambda:native_diagnostics(self),'model':lambda:model_diagnostics(self)}
+        jobs={'native':lambda:native_diagnostics(self),'model':lambda:model_diagnostics(self),'fixed_native':lambda:fixed_native_diagnostics(self)}
         if self.cfg.evaluation_python:jobs['transfer']=lambda:evaluate_checkpoint(path,out,self.it,self.cfg.evaluation_python)
         else:(out/'transfer_unavailable.json').write_text(json.dumps({'robot':self.cfg.robot,'reason':'No verified official sim2sim adapter; native results only'}))
         for name,job in jobs.items():
             try:
                 result=job()
                 if name!='transfer':(out/(name+'.json')).write_text(json.dumps(result,indent=2))
+                if name=='fixed_native':self.consume_fixed_report(result)
             except Exception as error:
                 # A diagnostic failure is actionable, but is not measured policy
-                # collapse. Source training-collapse logic remains in log().
+                # failure. Learning rate decisions use complete training windows only.
                 record={'error':str(error),'iteration':self.it,'training_continues':True}
                 (out/(name+'_error.json')).write_text(json.dumps(record,indent=2))
                 print(json.dumps({'diagnostic_error':name,**record}),flush=True)
         (self.output/'latest_diagnostics.json').write_text(json.dumps({
             'iteration':self.it,'native':str(out/'native.json'),'transfer':str(out/'result.json'),
-            'curriculum':'official iteration schedule','automatic_transfer_rollback':False,'B0':False},indent=2))
+            'fixed_native':str(out/'fixed_native.json'),'curriculum':'official speed/level + fixed PhysX allocation','automatic_transfer_rollback':False,'B0':False},indent=2))
 
     def export(self,path):
         module=copy.deepcopy(StudentExport(self.policy)).eval().cpu()

@@ -49,24 +49,26 @@ def run():
     torch.testing.assert_close(obj,torch.tensor([expected]))
     checks.append('without_timeout_preserves_original_soft_survival_objective')
 
-    cfg=SimpleNamespace(dt=.02,episode_seconds=20.,compile=False,horizon=3,gamma=.99,lam=.95,stage='flat')
+    cfg=SimpleNamespace(robot='go2',dt=.02,episode_seconds=20.,compile=False,horizon=3,gamma=.99,lam=.95,stage='flat')
     sampler=OfficialCommands(cfg.dt,cfg.episode_seconds)
     initial=torch.zeros(3,70);initial[:,0]=.3;initial[:,3]=-1.
     pose=torch.zeros(3,3);cmd=sampler.initial(pose[:,:2],pose[:,:2],0,random=torch.full((3,8),.9))
     cmd[:,EPISODE_ELAPSED]=torch.tensor([19.98,19.96,0.])
     seed={'s':initial,'pose':pose,'a_prev':torch.zeros(3,12),'obs':torch.zeros(3,450),
-          'cmd_state':cmd,'xi':torch.zeros(3,st.CONTEXT_DIM)}
+          'cmd_state':cmd,'xi':torch.zeros(3,st.CONTEXT_DIM),'a_prev2':torch.zeros(3,12)}
     class TinyPolicy(torch.nn.Module):
         def __init__(self):super().__init__();self.weight=torch.nn.Parameter(torch.tensor(.2))
         def forward(self,hist,priv,branch):return self.weight.expand(len(hist),12)
     class TinyWM:
-        def __call__(self,s,a,a_prev,xi,relief):
-            return torch.cat((s[:,:1]+a[:,:1]*.01,s[:,1:]),-1),torch.zeros(len(s),3)
+        def forward_reward(self,s,a,a_prev,xi,relief):
+            return torch.cat((s[:,:1]+a[:,:1]*.01,s[:,1:]),-1),torch.zeros(len(s),3),torch.zeros(len(s),st.AUX_DIM)
     class TinyCritic:
         features=staticmethod(Critic.features)
         def __call__(self,features):return features[...,0]
     policy=TinyPolicy();critic=TinyCritic();imagination=Imagination(cfg,None,None,sampler)
-    def reward_only_height(old,new,*args,**kwargs):return new[:,0],{},torch.zeros(len(new))
+    def reward_only_height(old,new,*args,**kwargs):
+        from go2_physx_cts.task import WEIGHTS
+        return new[:,0],{k:torch.zeros(len(new)) for k in WEIGHTS},torch.zeros(len(new))
     with patch('go2_physx_cts.imagine.reward',reward_only_height):
         objective,data=imagination.rollout(TinyWM(),policy,critic,seed,0,iteration=5000)
     assert data['critic_valid'].tolist()==[[True,False,False],[True,True,False],[True,True,True]]

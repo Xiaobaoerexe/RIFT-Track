@@ -51,7 +51,7 @@ def learner_smoke(l,iterations):
     l.env.iteration=l.it;l.env.reset(l.env.ids);l.env._snapshot=l.env._observe()
     while l.buf.size<=l.cfg.wm_window+1:l.collect()
     torch.cuda.reset_peak_memory_stats();measures=[]
-    l.learning_rates()
+    l.learning_rates();l.action_quality.fill_(1.)
     teacher=parameter_copy(l.policy.teacher_encoder);actor=parameter_copy(l.policy.actor);student=parameter_copy(l.policy.student_encoder)
     wm=parameter_copy(l.wm);critic=parameter_copy(l.critic)
     geometry={}
@@ -76,7 +76,12 @@ def learner_smoke(l,iterations):
             assert changed(l.policy.teacher_encoder,teacher) and changed(l.policy.actor,actor)
             assert not changed(l.policy.student_encoder,student),'Student parameters changed during actor step'
             assert all(p.grad is None for p in l.wm.parameters()),'Frozen WM accumulated actor gradients'
+        actor_before_cts=parameter_copy(l.policy.actor) if i==0 else None
+        teacher_before_cts=parameter_copy(l.policy.teacher_encoder) if i==0 else None
         cl=l.update_cts();torch.cuda.synchronize();end=time.monotonic()
+        if i==0:
+            assert not changed(l.policy.actor,actor_before_cts)
+            assert not changed(l.policy.teacher_encoder,teacher_before_cts)
         measures.append({'start_unix':start_unix,'end_unix':time.time(),'collect':tc-t,'wm':tw-tc,'actor_critic':ta-tw,'cts':end-ta,'total':end-t})
         l.it+=1
     assert changed(l.wm,wm) and changed(l.critic,critic) and changed(l.policy.student_encoder,student)
@@ -97,22 +102,38 @@ def learner_smoke(l,iterations):
         assert all(torch.equal(v,expected[key][k]) for k,v in mod.state_dict().items()),f'{key} restore mismatch'
     assert l.counts==expected_count
     assert all(len(getattr(l,'opt_'+k).state)>0 for k in ('wm','actor','critic','cts'))
-    l.last_good=path;w_before=parameter_copy(l.wm);archive_size=l.archive.size;replay_size=l.buf.size
-    assert l.rollback() and not changed(l.wm,w_before) and archive_size==l.archive.size and replay_size==l.buf.size
-    l.it=6000;l.env.iteration=l.it;l.env.reset(l.env.ids);l.env._snapshot=l.env._observe()
-    l.schedule.teacher_stable=True
-    # Exercise the actual run-loop ordering: collect/update, LR trial, log, save.
-    l.it=5999
+    assert not hasattr(l,'rollback')
+    l.it=5999;l.env.iteration=l.it;l.metrics=[];l.window_stats=[]
+    l.env.group_sums.zero_()
     l.run(iterations=2)
-    adaptive=json.loads((l.output/'lr_trials.jsonl').read_text().splitlines()[-1])
-    logged=[json.loads(row) for row in (l.output/'training.jsonl').read_text().splitlines()]
-    assert [row['iteration'] for row in logged[-2:]]==[6000,6001]
-    assert all(row['metrics']['height']>0 for row in logged[-2:])
-    assert (l.output/'model_00006000.pt').is_file()
-
-    assert all(k in adaptive for k in ('wm','actor','critic','cts'))
-    assert all(adaptive[k] is not None for k in ('wm','actor','critic','cts'))
+    adaptive=json.loads((l.output/'lr_windows.jsonl').read_text().splitlines()[-1])
+    assert adaptive['iteration']==6000 and not adaptive['complete']
+    assert adaptive['before']==adaptive['after']
     assert all(torch.isfinite(param).all() for param in l.policy.parameters())
+
+    # Pending allocation changes no running episode; only selected next reset moves.
+    allocation_verified=False
+    if l.env.field is not None:
+        env=l.env;saved=env.curriculum_state_dict();terrain=env.scene.terrain
+        current=env.allocation_counts();donor=max(range(len(current)),key=lambda i:current[i])
+        recipient=(donor+1)%len(current);target=current[:];target[donor]-=8;target[recipient]+=8
+        types=terrain.terrain_types.clone();episode=env.episode.clone();mass=env.xi[:,4].clone()
+        assert env.queue_allocation(target)
+        assert torch.equal(terrain.terrain_types,types) and torch.equal(env.episode,episode)
+        assert torch.equal(env.xi[:,4],mass)
+        moved=(env.desired_terrain_types!=types).nonzero().flatten();assert len(moved)==8
+        env.reset(moved[:4])
+        pending=(env.desired_terrain_types!=terrain.terrain_types).nonzero().flatten()
+        assert len(pending)==4 and torch.equal(env.xi[pending,4],mass[pending])
+        env.reset(pending);assert env.allocation_counts()==target and not env.allocation_pending()
+        env.load_curriculum_state_dict(saved);env.steps.zero_();env.reset(env.ids);env._snapshot=env._observe()
+        assert env.allocation_counts()==current
+        allocation_verified=True
+
+    from .fixed_evaluation import fixed_native_diagnostics
+    fixed=fixed_native_diagnostics(l,steps=60,levels=(2,),seeds=(17,))
+    assert fixed['rows'] and all(r['valid'] for r in fixed['terrains'].values())
+    l.consume_fixed_report(fixed)
     from .diagnostics import native_diagnostics,model_diagnostics
     levels=l.env.curriculum_state_dict();counts=copy.deepcopy(l.counts);replay_size=l.buf.size
     native=native_diagnostics(l,steps=100);model=model_diagnostics(l,batch=256)
@@ -124,7 +145,7 @@ def learner_smoke(l,iterations):
             'wm_batch':l.cfg.wm_batch,'buffer_len':l.cfg.buffer_len,'replay_bytes':l.buf.storage_bytes,
             'timings':measures,'peak_allocated_bytes':torch.cuda.max_memory_allocated(),'peak_reserved_bytes':torch.cuda.max_memory_reserved(),
             'adaptive_lr_verification':adaptive,'restore_max_error':err,'full_model_optimizer_restore':True,'export_max_error':export_err,'counts':l.counts,'last_stats':stats,
-            'gradient_ownership':True,'rollback_retains_wm_and_data':True,'wm_loss':wl,'cts_loss':cl,
+            'gradient_ownership':True,'allocation_episode_boundary_verified':allocation_verified,'automatic_rollback_removed':True,'wm_loss':wl,'cts_loss':cl,
             'geometry':geometry,'fixed_episode_mass_checks':fixed_mass_checks,
             'diagnostic_smoke':{'native_rows':len(native['rows']),'model_rows':len(model['rows']),
                 'no_optimizer_replay_or_course_updates':True}}

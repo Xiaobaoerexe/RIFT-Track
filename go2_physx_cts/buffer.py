@@ -14,7 +14,7 @@ class Replay:
         for name,dim,dtype in [('s',70,torch.float32),('pose',3,torch.float32),('s_next',70,torch.float32),('pose_next',3,torch.float32),('aux_next',st.AUX_DIM,torch.float32),('a',12,torch.float32),
                               ('a_prev',12,torch.float32),('a_prev2',12,torch.float32),('obs',450,torch.float16),('relief',77,torch.float16),
                               ('command',3,torch.float32),('timer',1,torch.float32),('cmd_state',CMD_STATE_DIM,torch.float32),('done',1,torch.bool),
-                              ('source',1,torch.uint8),('episode',1,torch.int32),('xi',st.CONTEXT_DIM,torch.float32)]:
+                              ('terrain_id',1,torch.int16),('source',1,torch.uint8),('episode',1,torch.int32),('xi',st.CONTEXT_DIM,torch.float32)]:
             self.data[name]=torch.zeros((n,length,dim),device=device,dtype=dtype)
     def add(self,**values):
         if set(values)!=set(self.data):raise ValueError('Replay schema mismatch')
@@ -37,12 +37,19 @@ class Replay:
         out={k:v[e,t].float() for k,v in self.data.items()}
         out['env']=e
         return out
-    def windows(self,batch,k,xi,env_range=None,env_parity=None):
+    def windows(self,batch,k,xi,env_range=None,env_parity=None,env_ids=None):
         if self.size<=k+1:raise ValueError('Not enough contiguous history')
         low,high=(0,self.n) if env_range is None else env_range
         e=torch.randint(low,high,(batch,),device=self.device)
         if env_parity is not None:
             candidates=torch.arange(int(env_parity),self.n,2,device=self.device)
+            e=candidates[torch.randint(len(candidates),(batch,),device=self.device)]
+        if env_ids is not None:
+            e=env_ids[torch.randint(len(env_ids),(batch,),device=self.device)]
+        elif getattr(self,'wm_holdout_envs',None) is not None:
+            candidates=torch.arange(low,high,device=self.device)
+            candidates=candidates[~torch.isin(candidates,self.wm_holdout_envs)]
+            if env_parity is not None:candidates=candidates[candidates%2==env_parity]
             e=candidates[torch.randint(len(candidates),(batch,),device=self.device)]
         t=torch.randint(self.size-k,(batch,),device=self.device)
         idx=self.physical(t[:,None]+torch.arange(k+1,device=self.device));ee=e[:,None]

@@ -34,13 +34,16 @@ class TrainCfg:
     actor_lr_scale: float = 1.
     wm_lr: float = 2e-4
     teacher_lr: float = 2e-4
-    lr_trial_factor: float = 1.3
-    lr_trial_interval: int = 1000
+    lr_adjust_factor: float = 1.3
+    wm_fixed_until: int = 40000
+    cts_fixed_until: int = 40000
+    cts_action_weight: float = .1
+    critic_huber_delta: float = 1.
     lr_fixed_until: int = 5000
-    wm_lr_bounds: tuple = (2e-5, 5e-4)
-    actor_lr_bounds: tuple = (4e-6, 2e-3)
-    critic_lr_bounds: tuple = (4e-6, 2e-3)
-    cts_lr_bounds: tuple = (1e-5, 3e-4)
+    wm_lr_bounds: tuple = (5e-5, 2e-4)
+    actor_lr_bounds: tuple = (5e-5, 2e-4)
+    critic_lr_bounds: tuple = (5e-5, 2e-4)
+    cts_lr_bounds: tuple = (1e-4, 3e-4)
     terrain_start_iteration: int = 2500
     all_terrain_iteration: int = 5000
     actor_ramp_iterations: int = 1000
@@ -58,7 +61,6 @@ class TrainCfg:
     expert_policy: str = ""
     expert_frac: float = 0.
     allow_missing_flat_expert: bool = False
-    collapse_falls: float = 5.
     log_interval: int = 50
     save_interval: int = 1000
     seed: int = 17
@@ -76,7 +78,7 @@ class TrainCfg:
     def from_record(cls, record):
         """Migrate historical configuration metadata without changing checkpoint bytes."""
         values=dict(record)
-        for key in ('lr_final_frac','lr_decay_iterations'):values.pop(key,None)
+        for key in ('lr_final_frac','lr_decay_iterations','lr_trial_factor','lr_trial_interval','collapse_falls'):values.pop(key,None)
         for obsolete in ('evaluation_xml','evaluation_profile','adaptive_iterations',
                          'terrain_curriculum_iterations','command_max'):
             values.pop(obsolete,None)

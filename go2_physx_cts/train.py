@@ -51,7 +51,7 @@ def main():
         contract['reward_height_target_m']=env.profile.reward_height
         contract['terrain']=None if env.field is None else {'allocation':env.terrain_lookup.metadata,'collision_height_map':env.field.metadata}
         contract['actual_base_mass_range_kg']=[float(env.actual_base_mass_kg.min()),float(env.actual_base_mass_kg.max())]
-        contract['reward_scope']='Go2RLLab PhysX15 weights and formulas; As2 height target retained; learned40D reward telemetry; sigmoid contact threshold only in imagination; reward ramps finish3000'
+        contract['reward_scope']='Go2RLLab PhysX15 weights and formulas; As2 height target retained; learned40D reward telemetry; sigmoid contact threshold only in imagination; reward ramps finish3000; project flat>2m/s tracking-kernel blend'
         contract['physx_preset']={k:getattr(physics,k) for k in ('gpu_max_rigid_patch_count','gpu_collision_stack_size','enable_external_forces_every_iteration')}
         (out/'physics_contract.json').write_text(json.dumps(contract,indent=2))
         identity={'pid':os.getpid(),'started_unix':time.time(),'backend':type(env.robot).__module__,'mode':'smoke' if args.smoke else 'formal','command':sys.argv,'code_commit':code_commit,'config_sha256':hashlib.sha256(Path(args.config).read_bytes()).hexdigest()}

@@ -1,187 +1,81 @@
-"""Validation-driven bounded learning-rate trials for model-based BPTT.
-
-No PPO likelihood/KL rule is applied to this deterministic return optimizer.
-Candidate updates start from identical model, optimizer, data and RNG state.
-The selected rate is used by subsequent ordinary updates; probes are rolled back.
-"""
-import copy
-import math
-import torch
-
-def collapse_trend(rows,threshold=5.):
-    if len(rows)!=3:return False
-    if not all(math.isfinite(r[k]) for r in rows for k in ('falls','xy_rmse','reward')):return False
-    return (all(r['falls']>threshold for r in rows)
-            and all(a['falls']<b['falls'] and a['xy_rmse']<b['xy_rmse'] and a['reward']>b['reward']
-                    for a,b in zip(rows,rows[1:])))
-
+"""Window-level feedback controller. No candidate updates or weight rollback."""
+import copy, math, statistics
 class LearningRateController:
     def __init__(self,cfg):
         self.cfg=cfg
         self.current={'wm':cfg.wm_lr,'actor':cfg.lr,'critic':cfg.lr,'cts':cfg.cts_lr}
-        self.bounds={'wm':cfg.wm_lr_bounds,'actor':cfg.actor_lr_bounds,
-                     'critic':cfg.critic_lr_bounds,'cts':cfg.cts_lr_bounds}
-        self.last_trial={name:-1 for name in self.current}
-        self.history=[]
-        self.teacher_stable=False
-        self.teacher_evaluations=[]
-        self.transfer_evaluations=[]
+        self.bounds={'wm':cfg.wm_lr_bounds,'actor':cfg.actor_lr_bounds,'critic':cfg.critic_lr_bounds,'cts':cfg.cts_lr_bounds}
         self.ramp_start=cfg.warmup_iterations+cfg.critic_warmup_iterations
-        self.rollback_recovery={}
-
-    def rates(self,iteration,teacher_stable=False):
-        self.teacher_stable=self.teacher_stable or teacher_stable
-        ramp=min(1.,max(0.,(iteration-self.ramp_start)/self.cfg.actor_ramp_iterations))
-        for name,record in list(self.rollback_recovery.items()):
-            fraction=min(1.,max(0.,(iteration-record['start'])/(record['end']-record['start'])))
-            self.current[name]=record['initial']+(record['target']-record['initial'])*fraction
-            if fraction>=1.:del self.rollback_recovery[name]
-        rates=dict(self.current)
-        rates['actor']*=ramp
-        rates['teacher']=rates['actor']*self.cfg.teacher_lr/self.cfg.lr
-        rates['actor_ramp']=ramp
-        return rates
-
-    def due(self,name,iteration,teacher_stable=False):
-        if iteration<=self.cfg.lr_fixed_until:return False
-        if name=='cts' and not(self.teacher_stable or teacher_stable):return False
-        return iteration%self.cfg.lr_trial_interval==0 and self.last_trial[name]!=iteration
-
-    def _candidates(self,name):
-        rate=self.current[name];factor=self.cfg.lr_trial_factor
-        lo,hi=self.bounds[name]
-        return sorted(set(max(lo,min(hi,rate*f)) for f in (1/factor,1.,factor)))
-
+        self.rows=[];self.previous=None;self.streak={k:0 for k in ('actor_bad','actor_good','wm_bad','wm_good','critic_bad','critic_good','cts_bad','cts_good')}
+        self.last_change={k:-10000 for k in self.current};self.history=[];self.teacher_stable=False
+    def rates(self,it):
+        out=dict(self.current);ramp=min(1.,max(0.,(it-self.ramp_start)/self.cfg.actor_ramp_iterations))
+        out['actor']*=ramp;out['teacher']=out['actor']*self.cfg.teacher_lr/self.cfg.lr;out['actor_ramp']=ramp
+        return out
+    def observe(self,row):
+        self.rows.append(copy.deepcopy(row));self.rows=self.rows[-20:]
     @staticmethod
-    def _set_rate(optimizer,rate,original_rates,base_rate):
-        for group,old in zip(optimizer.param_groups,original_rates):
-            group['lr']=rate*(old/base_rate if base_rate else 1.)
-
-    def supervised_trial(self,name,module,optimizer,train_loss_fn,validation_fn,iteration,teacher_stable=False):
-        if name not in ('wm','critic','cts'):raise ValueError('Supervised trials require an actual held-out supervised objective')
-        if not self.due(name,iteration,teacher_stable):return None
-        base=copy.deepcopy(module.state_dict());moments=copy.deepcopy(optimizer.state_dict())
-        rates=[g['lr'] for g in optimizer.param_groups]
-        base_rate=self.current[name];records=[]
-        flags=module.training
-        cpu_rng=torch.get_rng_state();cuda_rng=torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None
-        try:
-            for candidate in self._candidates(name):
-                module.load_state_dict(base);optimizer.load_state_dict(copy.deepcopy(moments))
-                torch.set_rng_state(cpu_rng)
-                if cuda_rng:torch.cuda.set_rng_state_all(cuda_rng)
-                self._set_rate(optimizer,candidate,rates,base_rate)
-                module.train();optimizer.zero_grad(set_to_none=True)
-                loss=train_loss_fn(module)
-                loss.backward()
-                norm=torch.nn.utils.clip_grad_norm_([p for group in optimizer.param_groups for p in group['params']],self.cfg.grad_clip)
-                if torch.isfinite(loss).all() and torch.isfinite(norm).all():
-                    optimizer.step();module.eval()
-                    with torch.no_grad():score=float(validation_fn(module))
-                else:score=float('inf')
-                records.append({'lr':candidate,'validation_error':score})
-        finally:
-            module.load_state_dict(base);optimizer.load_state_dict(copy.deepcopy(moments));optimizer.zero_grad(set_to_none=True);module.train(flags)
-            torch.set_rng_state(cpu_rng)
-            if cuda_rng:torch.cuda.set_rng_state_all(cuda_rng)
-        finite=[r for r in records if math.isfinite(r['validation_error'])]
-        winner=min(finite,key=lambda r:(r['validation_error'],abs(math.log(r['lr']/base_rate)))) if finite else None
-        if winner:self.current[name]=winner['lr']
-        return self._record(name,iteration,base_rate,records)
-
-    def actor_trial(self,policy,optimizer,train_loss_fn,probe_fn,iteration):
-        if not self.due('actor',iteration):return None
-        if probe_fn is None:raise ValueError('Actor LR trials require a real fixed-PhysX probe')
-        base=copy.deepcopy(policy.state_dict());moments=copy.deepcopy(optimizer.state_dict())
-        rates=[g['lr'] for g in optimizer.param_groups];base_rate=self.current['actor']
-        cpu_rng=torch.get_rng_state();cuda_rng=torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None
-        records=[];training=policy.training
-        try:
-            for candidate in self._candidates('actor'):
-                policy.load_state_dict(base);optimizer.load_state_dict(copy.deepcopy(moments))
-                torch.set_rng_state(cpu_rng)
-                if cuda_rng:torch.cuda.set_rng_state_all(cuda_rng)
-                self._set_rate(optimizer,candidate,rates,base_rate)
-                optimizer.zero_grad(set_to_none=True)
-                loss=train_loss_fn(policy)
-                loss.backward()
-                params=[p for g in optimizer.param_groups for p in g['params']]
-                norm=torch.nn.utils.clip_grad_norm_(params,self.cfg.grad_clip)
-                for p in params:
-                    if p.grad is not None:p.grad.clamp_(-self.cfg.grad_clip_elem,self.cfg.grad_clip_elem)
-                if not torch.isfinite(loss).all() or not torch.isfinite(norm).all():
-                    records.append({'lr':candidate,'accepted':False,'reason':'nonfinite_gradient'});continue
-                optimizer.step();policy.eval()
-                result=probe_fn(policy)
-                required=('heldout_return','real_return','falls_per_env_min','tracking_rmse')
-                if any(k not in result or not math.isfinite(float(result[k])) for k in required):
-                    raise ValueError('Incomplete/nonfinite fixed-task real Actor validation')
-                records.append({'lr':candidate,**{k:float(result[k]) for k in required},'accepted':True})
-        finally:
-            policy.load_state_dict(base);optimizer.load_state_dict(copy.deepcopy(moments));optimizer.zero_grad(set_to_none=True);policy.train(training)
-            torch.set_rng_state(cpu_rng)
-            if cuda_rng:torch.cuda.set_rng_state_all(cuda_rng)
-        baseline=min((r for r in records if r['accepted']),key=lambda r:abs(r['lr']-base_rate),default=None)
-        eligible=[]
-        if baseline:
-            for r in records:
-                if not r['accepted']:continue
-                # Candidate must not trade real falls/tracking for hallucinated
-                # gain. Small cohort tolerances are logged, never called proof.
-                safe=r['falls_per_env_min']<=baseline['falls_per_env_min']+.05 and r['tracking_rmse']<=baseline['tracking_rmse']*1.05+.01
-                supported=r['heldout_return']>=baseline['heldout_return']-.01*max(1.,abs(baseline['heldout_return']))
-                r['accepted']=safe and supported
-                if r['accepted']:eligible.append(r)
-        if eligible:
-            winner=max(eligible,key=lambda r:(r['real_return'],r['heldout_return'],-abs(math.log(r['lr']/base_rate))))
-            self.current['actor']=winner['lr']
-        return self._record('actor',iteration,base_rate,records)
-
-    def _record(self,name,iteration,previous,candidates):
-        self.last_trial[name]=iteration
-        candidates=copy.deepcopy(candidates)
-        for candidate in candidates:
-            for key,value in list(candidate.items()):
-                if isinstance(value,float) and not math.isfinite(value):
-                    candidate[key]=None
-                    candidate['reason']='nonfinite_candidate_rejected'
-        record={'component':name,'iteration':iteration,'previous':previous,'selected':self.current[name],'factor':self.cfg.lr_trial_factor,'candidates':candidates}
-        self.history.append(record)
-        self.history=self.history[-1000:]
+    def _mean(rows,k):
+        vals=[r.get(k) for r in rows]
+        return statistics.mean(vals) if vals and all(v is not None and math.isfinite(v) for v in vals) else None
+    def adjust(self,it):
+        if it%1000:return None
+        rr=self.rows
+        complete=len(rr)==20 and [r['iteration'] for r in rr]==list(range(it-950,it+1,50))
+        contexts={r['context'] for r in rr}
+        agg={k:self._mean(rr,k) for k in ('reward','xy_rmse','falls','wm_error','critic_error','cts_error','teacher_drift')}
+        agg.update(iteration=it,context=rr[-1]['context'] if rr else '',complete=complete and len(contexts)==1,
+                   cts_stable=all(r.get('cts_stable',False) for r in rr))
+        p=self.previous;matched=bool(p and p['complete'] and agg['complete'] and p['iteration']==it-1000 and p['context']==agg['context'])
+        # Fixed composition: compare exactly the same branch/terrain/command bins.
+        if matched:
+            def composition(block):
+                keys=set(block[0].get('groups',{}))
+                for r in block:keys &= set(r.get('groups',{}))
+                return {k:{m:statistics.mean(r['groups'][k][m] for r in block) for m in ('reward','xy_rmse','falls')} for k in keys}
+            a,b=composition(self.previous_rows),composition(rr);keys=sorted(set(a)&set(b))
+            # At least 70% of the previously represented strata, no missing branch.
+            if len(keys)<max(2,math.ceil(.7*len(a))) or not all(any(k.startswith(str(br)+'/') for k in keys) for br in (0,1)):
+                matched=False
+            else:
+                p=dict(p)
+                for m in ('reward','xy_rmse','falls'):
+                    p[m]=statistics.mean(a[k][m] for k in keys);agg[m]=statistics.mean(b[k][m] for k in keys)
+                agg['matched_strata']=len(keys)
+        before=dict(self.current);reasons={k:'hold' for k in self.current}
+        if matched and it>self.cfg.lr_fixed_until:
+            finite=lambda *keys:all(p[k] is not None and agg[k] is not None for k in keys)
+            bad=finite('reward','xy_rmse','falls') and agg['reward']<p['reward']-.1*max(abs(p['reward']),.005) and agg['xy_rmse']>1.1*p['xy_rmse'] and agg['falls']>max(1.2*p['falls'],p['falls']+.1)
+            good=finite('reward','xy_rmse','falls','critic_error','cts_error') and agg['reward']>=p['reward']-.02*max(abs(p['reward']),.005) and agg['xy_rmse']<=1.02*p['xy_rmse'] and agg['falls']<=p['falls']+.05 and agg['critic_error']<=1.1*p['critic_error'] and agg['cts_error']<=1.1*p['cts_error']
+            conditions={'actor_bad':bad,'actor_good':good}
+            for name,key,threshold,start in [('wm','wm_error',1.10,self.cfg.wm_fixed_until),('critic','critic_error',1.25,self.cfg.lr_fixed_until),('cts','cts_error',1.25,self.cfg.cts_fixed_until)]:
+                eligible=it>=start and finite(key)
+                conditions[name+'_bad']=eligible and agg[key]>threshold*max(p[key],1e-8)
+                conditions[name+'_good']=eligible and agg[key]<.95*max(p[key],1e-8)
+                if name=='cts':
+                    conditions[name+'_bad'] &= agg['teacher_drift'] is not None and agg['teacher_drift']<.01
+            for k,v in conditions.items():self.streak[k]=self.streak[k]+1 if v else 0
+            for name in self.current:
+                if it-self.last_change[name]<2000:continue
+                direction=-1 if self.streak[name+'_bad']>=2 else 1 if self.streak[name+'_good']>=2 else 0
+                if name=='cts' and not direction and it>=self.cfg.cts_fixed_until and it-self.last_change[name]>=5000 and agg['cts_stable'] and agg['teacher_drift'] is not None and agg['teacher_drift']<.01:
+                    direction=-1;reasons[name]='multi_terrain_target_stable'
+                if direction:
+                    lo,hi=self.bounds[name];v=self.current[name]*(self.cfg.lr_adjust_factor**direction)
+                    self.current[name]=min(hi,max(lo,v))
+                    if self.current[name]!=before[name]:
+                        self.last_change[name]=it
+                        if reasons[name]=='hold':reasons[name]='two_full_windows_degraded' if direction<0 else 'two_full_windows_recovered'
+                        self.streak[name+'_bad']=self.streak[name+'_good']=0
+        else:
+            self.streak={k:0 for k in self.streak}
+        record={'iteration':it,'complete':agg['complete'],'comparable':matched,'window':agg,'previous_window':p,
+                'before':before,'after':dict(self.current),'reasons':reasons,'algorithm':'actual_1000_iteration_windows_v2'}
+        self.previous=agg;self.previous_rows=copy.deepcopy(rr)
+        self.history=(self.history+[record])[-128:]
         return record
-
-    def observe(self,record):
-        """Only matching fixed-task evaluations may release student LR adaptation."""
-        if record.get('kind') not in ('teacher_fixed_eval','teacher_transfer_fixed_eval') or not record.get('valid'):return
-        name='teacher_evaluations' if record['kind']=='teacher_fixed_eval' else 'transfer_evaluations'
-        rows=getattr(self,name)+[dict(record)];setattr(self,name,rows[-3:])
-        def stable(records):
-            if len(records)<3:return False
-            first=records[0]
-            if any(r.get('cohort_id')!=first.get('cohort_id') for r in records):return False
-            if any(float(r['success_rate'])<.8 for r in records):return False
-            values=[float(r['return']) for r in records]
-            return (max(values)-min(values))/max(1.,abs(sum(values)/len(values)))<.05
-        self.teacher_stable=stable(self.teacher_evaluations) and stable(self.transfer_evaluations)
-
-    def rollback(self,iteration):
-        self.rates(iteration)
-        end=self.ramp_start+self.cfg.actor_ramp_iterations
-        for name in ('actor','critic'):
-            target=self.rollback_recovery.get(name,{}).get('target',self.current[name])
-            self.current[name]*=.5
-            if iteration<end:
-                self.rollback_recovery[name]={'start':iteration,'end':end,'initial':self.current[name],'target':target}
-            else:self.rollback_recovery.pop(name,None)
-
     def state_dict(self):
-        return {'current':self.current,'last_trial':self.last_trial,'history':self.history,
-                'teacher_stable':self.teacher_stable,'teacher_evaluations':self.teacher_evaluations,
-                'transfer_evaluations':self.transfer_evaluations,'ramp_start':self.ramp_start,'rollback_recovery':self.rollback_recovery,'original_ramp_semantics':True}
-
-    def load_state_dict(self,state):
-        for key,value in state.items():setattr(self,key,value)
-        if not state.get('original_ramp_semantics',False):
-            self.ramp_start=self.cfg.warmup_iterations+self.cfg.critic_warmup_iterations
-            self.rollback_recovery={}
-
+        return {k:copy.deepcopy(v) for k,v in vars(self).items() if k!='cfg'}
+    def load_state_dict(self,s):
+        if 'rows' not in s:raise ValueError('Retired single-step LR state cannot resume this experiment')
+        for k,v in s.items():setattr(self,k,copy.deepcopy(v))

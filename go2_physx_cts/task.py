@@ -71,7 +71,10 @@ def reward(s0,s1,a,previous,command,c,stage='flat',soft=False,*,iteration=0,pose
     hip=hip*torch.where((command[:,1:].norm(dim=-1)<1e-3)&on_flat,10.,1.)
     legs=legs*torch.where((command.norm(dim=-1)<1e-3)&on_flat,10.,1.)
     def capped(x,maximum):return torch.where(torch.isfinite(x),x.clamp_max(maximum),x)
-    terms={'track_xy':torch.exp(-(vb[:,:2]-command[:,:2]).square().sum(-1)/.25),
+    error=(vb[:,:2]-command[:,:2]).square().sum(-1)
+    alpha=.25*((command[:,0].abs()-2.)/1.).clamp(0.,1.)*on_flat.to(s1.dtype)
+    tracking=(1-alpha)*torch.exp(-error/.25)+alpha*torch.exp(-error/1.)
+    terms={'track_xy':tracking,
       'track_yaw':torch.exp(-(s1[:,9]-command[:,2]).square()/.25),
       'lin_vel_z_l2':vb[:,2].square(),'ang_vel_xy_l2':s1[:,7:9].square().sum(-1),
       'joint_acc_l2':capped(acc.square().sum(-1),1e8),'joint_power':(tau*s1[:,st.QD]).abs().sum(-1),

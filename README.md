@@ -1,4 +1,4 @@
-> Current blind revision: see [BLIND_REVISION.md](BLIND_REVISION.md). On server175 run ./start_blind_sequence.sh for Go2 then As2. Original release notes below remain historical context.
+> Current server175 release: see [BLIND_REVISION.md](BLIND_REVISION.md). Run `python3 run_blind_as2.py` for As2 only (120k,no experts). Everything below is archived release documentation/source snapshots; use current source/configs for active behavior.
 
 # Go2 / As2 · PhysX + SuperMimic + CTS
 

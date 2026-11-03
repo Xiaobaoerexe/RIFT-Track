@@ -1,0 +1,39 @@
+{
+  "time": 1793717153.9668884,
+  "removed": [
+    {
+      "path": "/home/abc/Admin/go2_supermimic_blind/runs/_AS2_REVISION_SMOKE_20261103_223822",
+      "bytes": 167751761
+    },
+    {
+      "path": "/home/abc/Admin/go2_supermimic_blind/runs/_as2_smoke_launch.json",
+      "bytes": 776
+    },
+    {
+      "path": "/home/abc/Admin/go2_supermimic_blind/go2_physx_cts/__pycache__",
+      "bytes": 457401
+    },
+    {
+      "path": "/home/abc/Admin/go2_supermimic_blind/runs/_AS2_REVISION_SMOKE_20261103_223721.log",
+      "bytes": 721
+    },
+    {
+      "path": "/home/abc/Admin/go2_supermimic_blind/runs/_as2_smoke_gpu.csv",
+      "bytes": 7537
+    },
+    {
+      "path": "/home/abc/Admin/go2_supermimic_blind/tests/__pycache__",
+      "bytes": 95836
+    },
+    {
+      "path": "/home/abc/Admin/go2_supermimic_blind/runs/_AS2_REVISION_SMOKE_20261103_223822.log",
+      "bytes": 21540
+    },
+    {
+      "path": "/home/abc/Admin/go2_supermimic_blind/__pycache__",
+      "bytes": 5288
+    }
+  ],
+  "total_bytes": 168340860,
+  "preserved": "Regression test sources,compact validation report,Go2 training logs/weights and prior comparison evidence; runtime compilation caches retained for formal startup."
+}
