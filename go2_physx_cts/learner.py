@@ -411,6 +411,16 @@ class Learner:
         self.archive.admission_tick.zero_(); self.metrics.clear()
         self.env.reset(self.env.ids); self.env._snapshot=self.env._observe(); self.refresh_providers()
         self.reset_rollout_state(); self.last_good=Path(path)
+        # Checkpoints intentionally omit Replay. Refill a complete student
+        # sequence before any resumed optimization, without advancing curriculum
+        # or LR clocks. Otherwise the first Actor update uses one reset frame
+        # while its student burn-in and the dynamics window are still missing.
+        self._resume_refill_steps=max(self.cfg.wm_window,self.cfg.cts_burnin+self.cfg.cts_sequence_steps)
+        identity_path=self.output/'run_identity.json'
+        identity=json.loads(identity_path.read_text())
+        identity.update(init='resume',checkpoint=str(Path(path).resolve()),resume_iteration=self.it,
+                        replay_restored=False,refill_collections=self._resume_refill_steps)
+        identity_path.write_text(json.dumps(identity,indent=2))
     def rollback(self,path=None):
         path=path or self.last_good
         if path is None: return False
@@ -461,6 +471,14 @@ class Learner:
         (self.output/'progress.json').write_text(json.dumps(result,indent=2,allow_nan=False)); print(json.dumps(result),flush=True)
     def run(self,iterations=None):
         end=self.cfg.iterations if iterations is None else self.it+iterations
+        refill=getattr(self,'_resume_refill_steps',0)
+        if refill:
+            print(json.dumps({'resume_replay_refill':refill,'iteration_held':self.it}),flush=True)
+            for _ in range(refill):
+                if getattr(self,'stop_requested',False):return self.last_good
+                self.collect()
+            self.metrics.clear()
+            self._resume_refill_steps=0
         while self.it<end:
             if getattr(self,'stop_requested',False): self.save(); break
             self.it+=1; self.env.iteration=self.it; stats={'lr':self.learning_rates()}; timings={}

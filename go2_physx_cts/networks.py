@@ -195,9 +195,15 @@ class Critic(nn.Module):
         self.register_buffer('pop_scale',torch.ones(10,2)); self.register_buffer('pop_count',torch.zeros(10,2))
         # Compile functions rather than wrapping submodules, preserving state_dict
         # keys and optimizer ownership. Dynamic batch sizes cover per-task splits.
-        self._value_fn=torch.compile(_task_value_forward,dynamic=True,fullgraph=True) if compile else _task_value_forward
-        self._encode_geometry_fn=torch.compile(_encode_critic_geometry,dynamic=True,fullgraph=True) if compile else _encode_critic_geometry
-        self._geometry_fn=torch.compile(_critic_geometry,dynamic=True,fullgraph=True) if compile else _critic_geometry
+        # Frozen input-gradient rollouts, no-grad TD targets and parameter fitting
+        # legitimately specialize these calls differently, including task tails
+        # of size one. Keep compiled fast paths, but allow PyTorch's normal eager
+        # fallback when its bounded variant cache fills. fullgraph=True instead
+        # turns this ordinary cache limit into a fatal error at task transitions.
+        # Eager execution retains the same autograd path and parameter ownership.
+        self._value_fn=torch.compile(_task_value_forward,dynamic=True,fullgraph=False) if compile else _task_value_forward
+        self._encode_geometry_fn=torch.compile(_encode_critic_geometry,dynamic=True,fullgraph=False) if compile else _encode_critic_geometry
+        self._geometry_fn=torch.compile(_critic_geometry,dynamic=True,fullgraph=False) if compile else _critic_geometry
     def features(self,priv,branch,task_ids,context,pose):
         tag=priv.new_zeros((len(priv),2))
         if isinstance(branch,tuple): tag[:branch[0],0]=1; tag[branch[0]:,1]=1

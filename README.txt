@@ -114,3 +114,16 @@ PD/默认姿态/动作缩放读取checkpoint，保留官方XML被动参数，不
 恢复运行重新开始物理episode及Replay，与上游一致，不声称仿真逐位续接。
 训练产物在data2。临时测试脚本、旧测试接口、冒烟权重/视频/导出在正式启动前删除。
 源码事实、论文/作者训练记录、本项目验证、实际控制能力必须分别陈述。
+2026-11-03 checkpoint continuation / Critic compiler cache
+Critic task heads, geometry encoder and geometry query retain dynamic compilation,
+with fullgraph=False so legitimate gradient-mode/task-tail variants can fall back
+to eager execution at PyTorch's bounded recompile limit. This changes execution
+only: task ownership, input derivatives, losses, minibatches and optimizer steps
+are unchanged. No global cache-limit increase or exception suppression is used.
+Checkpoint continuation restores models, four optimizers, normalization and
+curriculum/schedule state. Replay is not serialized. Before resumed optimization,
+collect max(WM window, student burn-in + loss sequence) = 80 vector steps at the
+saved iteration, without advancing course/LR clocks. Resume provenance and this
+fresh-Replay contract are recorded in run_identity.json. Failed-run evidence is
+kept in its original run directory; continuation uses a new output directory.
+
