@@ -130,6 +130,7 @@ def export_allocation_maps(env,output):
                     level=5 if task==6 else 0
                     ids=env.ids[:min(128,env.num_envs)] if task==6 else env.ids[:1]
                     env.task_ids[ids]=task;env.terrain_ids[ids]=terrain;env.terrain_levels[ids]=level
+                    env.task_assignment_version+=1
                     env.reset(ids,advance_curriculum=False)
                     # A fixed column/layout is necessary for matched task cohorts.
                     index=int(ids[0]);origin=env.origins[index].cpu().numpy()

@@ -11,6 +11,7 @@ from go2_physx_cts.task_allocation import BASE_COUNTS,redistribute
 class Transfers(unittest.TestCase):
     def env(self):
         e=PhysXEnv.__new__(PhysXEnv);e.num_envs=4096;e.device='cpu';e.cfg=SimpleNamespace(seed=17);e.iteration=25000
+        e.task_assignment_version=0
         e.task_ids=task_assignments(4096,25000,'cpu');e.terrain_ids=torch.zeros(4096,dtype=torch.long)
         e.terrain_levels=torch.zeros_like(e.terrain_ids);e._assign_terrains()
         e.terrain_levels[e.task_ids!=6]=3;e.recovery_kind=torch.full_like(e.task_ids,-1)
@@ -24,6 +25,7 @@ class Transfers(unittest.TestCase):
         for i in ids:
             t=int(e.pending_task[i]);self.assertEqual(int(e.pending_level[i]),5 if t==6 else 3)
         e._apply_task_transfers(first)
+        self.assertEqual(e.task_assignment_version,1)
         self.assertTrue(torch.equal(e.task_ids[second],before[second]))
         self.assertTrue((e.pending_task[first]==-1).all());self.assertTrue((e.pending_task[second]>=0).all())
         e._apply_task_transfers(second);self.assertEqual(e.allocation_status()['actual'],target)

@@ -1,7 +1,7 @@
 """Collection source ownership and episode reset regressions; no simulator."""
 import unittest
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock,patch
 import torch
 from go2_physx_cts.config import TrainCfg
 from go2_physx_cts.learner import Learner
@@ -16,7 +16,7 @@ class CollectionProviders(unittest.TestCase):
         l.source=torch.zeros(n,dtype=torch.uint8)
         l.real_hidden=torch.ones(n,256);l.camera_episode=torch.full((n,),-1)
         l.before={'task_ids':torch.zeros(n,dtype=torch.long)}
-        l.env=SimpleNamespace(iteration=0,snapshot=lambda:l.before)
+        l.env=SimpleNamespace(iteration=0,task_assignment_version=0,snapshot=lambda:l.before)
         l.refresh_providers()
         return l
 
@@ -34,11 +34,12 @@ class CollectionProviders(unittest.TestCase):
         l.before['task_ids']=torch.arange(10).repeat_interleave(4)
         l.sync_providers(l.before)
         self.assertFalse((l.source==2).any())
-        self.assertTrue(torch.equal(l._provider_tasks,l.before['task_ids']))
+        self.assertEqual(l._provider_task_version,l.env.task_assignment_version)
 
     def test_task_change_without_phase_change(self):
         l=self.learner();l.it=l.env.iteration=5001;l.sync_providers(l.before)
         l.before['task_ids'].fill_(5);l.it=l.env.iteration=5002
+        l.env.task_assignment_version+=1
         l.sync_providers(l.before)
         self.assertFalse((l.source==2).any())
 
@@ -47,6 +48,22 @@ class CollectionProviders(unittest.TestCase):
         self.assertEqual(l._provider_phase,1)
         l.it=8500;l.sync_providers(l.before)
         self.assertFalse((l.source==2).any())
+
+    def test_unchanged_assignment_needs_no_device_comparison(self):
+        l=self.learner();l.it=l.env.iteration=8500;l.sync_providers(l.before)
+        l.refresh_providers=Mock(wraps=l.refresh_providers)
+        with patch('torch.equal',side_effect=AssertionError('device comparison')):
+            for it in (8501,9000,10000):
+                l.it=l.env.iteration=it;l.sync_providers(l.before)
+        l.refresh_providers.assert_not_called()
+        l.env.task_assignment_version+=1;l.sync_providers(l.before)
+        l.refresh_providers.assert_called_once()
+
+    def test_held_iteration_refreshes_only_once(self):
+        l=self.learner();l.it=l.env.iteration=4000
+        l.refresh_providers=Mock(wraps=l.refresh_providers)
+        for _ in range(4):l.sync_providers(l.before)
+        l.refresh_providers.assert_called_once()
 
     def test_episode_reset_clears_official_history(self):
         l=self.learner(3);l.source.zero_();l.camera_episode=torch.tensor([7,8,9])
@@ -60,6 +77,8 @@ class CollectionProviders(unittest.TestCase):
         self.assertEqual(float(l.driver.hist[1].sum()),0.)
         self.assertEqual(float(l.driver.last[1].sum()),0.)
         self.assertTrue((l.driver.hist[[0,2]]==1).all())
+        l.it=8500;l.driver=Mock();l.camera_inputs(before)
+        l.driver.reset.assert_not_called()
 
     def test_no_official_inference_after_cutoff(self):
         l=self.learner(4);l.cfg.num_envs=4;l.it=l.env.iteration=8500

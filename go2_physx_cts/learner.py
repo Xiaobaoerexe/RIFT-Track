@@ -116,7 +116,8 @@ class Learner:
             frac=self.providers.fraction(task,self.it)
             self.source[ids]=provider_assignment(len(ids),frac,self.cfg.teacher_fraction,self.device)
         self.provider_requested=self.source.clone()
-        self._provider_tasks=tasks.clone()
+        self._provider_task_version=self.env.task_assignment_version
+        self._provider_refresh_bucket=self.it//1000
         self._provider_phase=phase(self.env.iteration)
         self._provider_before_stop=self.it<self.providers.stop_iteration
         changed=self.source!=old; self.real_hidden[changed]=0; self.camera_episode[changed]=-1
@@ -126,10 +127,10 @@ class Learner:
         # snapshot() may change tasks/reset episodes even when the caller skips
         # a curriculum boundary. Refresh from the actual assignment, not a list
         # of exact iteration numbers.
-        tasks=flat_ids(before['task_ids'])
         if (phase(self.env.iteration)!=self._provider_phase
             or (self.it<self.providers.stop_iteration)!=self._provider_before_stop
-            or self.it%1000==0 or not torch.equal(tasks,self._provider_tasks)):
+            or (self.it<self.providers.stop_iteration and self.it//1000!=self._provider_refresh_bucket)
+            or self.env.task_assignment_version!=self._provider_task_version):
             self.refresh_providers(before)
     def learning_rates(self):
         rates=self.schedule.rates(self.it)
@@ -145,7 +146,7 @@ class Learner:
         # Curriculum phase changes can reset inside snapshot(), before step()
         # returns a done mask. Recurrent memory must follow episode identity.
         self.real_hidden[episode_changed]=0
-        if self.driver is not None:self.driver.reset(episode_changed)
+        if self.driver is not None and self.it<self.providers.stop_iteration:self.driver.reset(episode_changed)
         refresh=(frame%self.cfg.depth_period==0)|episode_changed
         self.depth_pose[refresh]=before['pose'][refresh]
         self.depth_scene_ids[refresh]=flat_ids(before['scene_ids'])[refresh]
@@ -163,12 +164,12 @@ class Learner:
         # Eligibility is decided from this exact frame's command, and Replay
         # and curriculum statistics record the actually executed provider.
         self.source=self.provider_requested.clone()
-        unsupported=((before['command'][:,:2].norm(dim=-1)>4.)
-                     |(flat_ids(before['task_ids'])>=5)
-                     |(self.it>=self.providers.stop_iteration))&(self.source==2)
-        self.source[unsupported]=0
+        if self.it<self.providers.stop_iteration:
+            unsupported=((before['command'][:,:2].norm(dim=-1)>4.)
+                         |(flat_ids(before['task_ids'])>=5))&(self.source==2)
+            self.source[unsupported]=0
         self.env.own_mask=self.source<2
-        self.provider_counts=torch.bincount(self.source.long(),minlength=3).tolist()
+        source_counts=torch.bincount(self.source.long(),minlength=3)
         priv=st.privileged(before['s'],before['a_prev'],before['command'],before['xi'],before['relief'])
         depth=self.camera_inputs(before); a=torch.empty((cfg.num_envs,12),device=self.device)
         for branch in (0,1):
@@ -185,7 +186,7 @@ class Learner:
         noise=torch.where((self.index<int(cfg.num_envs*cfg.explore_frac))[:,None],self.ou,cfg.action_noise*torch.randn_like(a))
         a=a+noise
         if not scalar_finite(a): raise FloatingPointError('Nonfinite real action')
-        after,done,metrics=self.env.step(a)
+        after,done,metrics=self.env.step(a,defer_metrics=True)
         # `after` is pre-reset; snapshot() is the next episode when done is true.
         values={k:before[k] for k in self.buf.data if k in before}
         values.update(s_next=after['s'],pose_next=after['pose'],a=a,source=self.source,done=done,
@@ -200,9 +201,9 @@ class Learner:
             st.pose_delta(before['pose'][training],after['pose'][training]),telemetry,pose=before['pose'][training])
         self.policy.update_stats(before['obs'][training],priv[training])
         self.ou[done]=0; self.real_hidden[done]=0; self.camera_episode[done]=-1
-        if self.driver is not None: self.driver.reset(done)
+        if self.driver is not None and self.it<self.providers.stop_iteration: self.driver.reset(done)
         self.counts['collect']+=1; self.counts['transitions']+=cfg.num_envs
-        metrics['source_counts']=self.provider_counts; self.metrics.append(metrics)
+        metrics['source_counts']=source_counts; self.metrics.append(metrics)
     def fit_world_model(self):
         losses=[]
         for _ in range(self.cfg.wm_updates_for(self.it)):
@@ -211,20 +212,22 @@ class Learner:
             self.opt_wm.zero_grad(set_to_none=True); loss.backward(); gn=clip_grad(self.wm.parameters(),self.cfg.grad_clip)
             if scalar_finite(gn) and scalar_finite(loss): self.opt_wm.step(); self.counts['wm']+=1
             else: self.nonfinite+=1
-            losses.append(float(loss.detach()))
-        return sum(losses)/len(losses)
+            losses.append(loss.detach())
+        return sum(torch.stack(losses).tolist())/len(losses)
     def _actor_ready(self,seed):
         tasks=flat_ids(seed['task_ids'])
         activation=tasks.new_tensor([1000,5000,5000,5000,5000,8000,8000,8000,8000,8000])
         return (self.it>=activation[tasks]+self.cfg.critic_warmup_iterations).to(seed['s'].dtype)
-    def improve_policy(self):
+    def improve_policy(self,*,detailed_timing=True):
         cfg=self.cfg; nt=int(cfg.imag_batch*cfg.teacher_fraction); sizes=(nt,cfg.imag_batch-nt)
         objective_means=[]
         use_cuda=str(self.device).startswith('cuda'); spans=[]
         def stamp():
+            if not detailed_timing:return None
             if not use_cuda:return time.monotonic()
             mark=torch.cuda.Event(enable_timing=True);mark.record();return mark
-        def span(name,start):spans.append((name,start,stamp()))
+        def span(name,start):
+            if detailed_timing:spans.append((name,start,stamp()))
         actor_active=self.it>=cfg.policy_start and self.it>=self.actor_frozen_until
         if actor_active:self.feedback.before_actor()
         self.opt_actor.zero_grad(set_to_none=True)
@@ -235,8 +238,9 @@ class Learner:
             seed={k:torch.cat((value,student_seed[k]),0) for k,value in teacher_seed.items()}
             seed['student_prefix']=student_seed['prefix']
             span('seed_sampling',sample_start)
-            source_counts=torch.bincount(flat_ids(seed['source']),minlength=3)
-            imagined_tasks=torch.bincount(flat_ids(seed['task_ids']),minlength=10).tolist()
+            if detailed_timing:
+                source_counts=torch.bincount(flat_ids(seed['source']),minlength=3)
+                imagined_tasks=torch.bincount(flat_ids(seed['task_ids']),minlength=10).tolist()
             # One fused mixed cohort, not separate teacher/student rollouts or
             # renamed microbatching. Both branch means retain their own divisor.
             with torch.enable_grad() if actor_active else torch.no_grad():
@@ -246,7 +250,7 @@ class Learner:
                 if actor_active:
                     backward_start=stamp();branch_loss(obj*self._actor_ready(seed),sizes,sizes).backward()
                     span('mixed_imagination_backward',backward_start)
-            objective_means=[float(obj[:nt].float().mean().detach()),float(obj[nt:].float().mean().detach())]
+            objective_means=torch.stack((obj[:nt].float().mean().detach(),obj[nt:].float().mean().detach())).tolist()
             del teacher_seed,student_seed,seed
             actor_step_start=stamp()
             gn=clip_grad(self.actor_params,cfg.grad_clip,cfg.grad_clip_elem) if actor_active else torch.tensor(0.)
@@ -302,7 +306,8 @@ class Learner:
         # No terrain pixels or encoded features survive into the CTS update.
         del geometry,geometry_indices
         self.feedback.after_critic()
-        if use_cuda:torch.cuda.synchronize(self.device)
+        if not detailed_timing:return {}
+        if use_cuda and detailed_timing:torch.cuda.synchronize(self.device)
         update_times={}
         for name,start,end in spans:
             update_times[name]=update_times.get(name,0.)+(start.elapsed_time(end)/1000. if use_cuda else end-start)
@@ -357,8 +362,8 @@ class Learner:
                 self.opt_cts.zero_grad(set_to_none=True); loss.backward(); gn=clip_grad(self.policy.student_encoder.parameters(),self.cfg.grad_clip)
                 if scalar_finite(gn) and scalar_finite(loss): self.opt_cts.step(); self.counts['cts']+=1
                 else: self.nonfinite+=1
-                losses.append(float(loss.detach()))
-        return sum(losses)/len(losses)
+                losses.append(loss.detach())
+        return sum(torch.stack(losses).tolist())/len(losses)
     def save(self,path=None):
         path=Path(path) if path else self.output/f'model_{self.it:08d}.pt'
         contract_path=self.output/'physics_contract.json'
@@ -435,6 +440,9 @@ class Learner:
         self.real_hidden.zero_(); self.camera_episode.fill_(-1)
         return True
     def log(self,stats):
+        from .physx_env import materialize_metrics
+        self.metrics=materialize_metrics(self.metrics)
+        if self.metrics and 'source_counts' in self.metrics[-1]:self.provider_counts=self.metrics[-1]['source_counts']
         metrics=self.metrics; count=max(1,len(metrics)); own=max(1,self.provider_counts[0]+self.provider_counts[1])
         falls=sum(m.get('falls',0) for m in metrics)/count
         result={'iteration':self.it,'elapsed_seconds':time.monotonic()-self.start_time,'counts':self.counts.copy(),
@@ -486,7 +494,7 @@ class Learner:
             if self.buf.size>=self.cfg.wm_window:
                 tick=time.monotonic(); stats['wm_loss']=self.fit_world_model(); timings['wm_seconds']=time.monotonic()-tick
             if self.it>=self.cfg.warmup_iterations:
-                tick=time.monotonic(); stats.update(self.improve_policy()); timings['actor_critic_seconds']=time.monotonic()-tick
+                tick=time.monotonic(); stats.update(self.improve_policy(detailed_timing=self.it%self.cfg.log_interval==0 or self.it==end)); timings['actor_critic_seconds']=time.monotonic()-tick
             if self.it>=self.cfg.policy_start and self.buf.size>=self.cfg.cts_burnin+self.cfg.cts_sequence_steps:
                 tick=time.monotonic(); stats['cts_loss']=self.update_cts(); timings['cts_seconds']=time.monotonic()-tick
             stats['phase_times']=timings
@@ -496,11 +504,12 @@ class Learner:
                 stats['lr_feedback']=feedback
                 with (self.output/'lr_feedback.jsonl').open('a') as f:f.write(json.dumps(feedback,allow_nan=False)+'\n')
             if self.it==1 or self.it%self.cfg.log_interval==0 or self.it==end: self.log(stats)
+            path=None
             if self.it==1 or self.it%self.cfg.save_interval==0 or self.it==end:
                 path=self.save()
                 if self.it>=self.cfg.policy_start and not self.collapse_strikes: self.last_good=path
             if self.cfg.evaluation_python and self.it%self.cfg.evaluation_interval==0:
-                self.evaluate_feedback(self.save())
+                self.evaluate_feedback(path if path is not None else self.save())
             previous_start=self.schedule.student_start
             self.schedule.check_student(self.it)
             self.teacher_stable=self.schedule.teacher_stable
@@ -553,7 +562,7 @@ class Learner:
     @torch.no_grad()
     def reset_rollout_state(self):
         self.real_hidden.zero_(); self.real_depth.zero_(); self.ou.zero_(); self.camera_episode.fill_(-1)
-        if self.driver is not None: self.driver.reset(torch.ones(self.cfg.num_envs,dtype=torch.bool,device=self.device))
+        if self.driver is not None and self.it<self.providers.stop_iteration: self.driver.reset(torch.ones(self.cfg.num_envs,dtype=torch.bool,device=self.device))
     @torch.no_grad()
     def policy_action(self,snapshot,branch,hidden,depth=None,policy=None):
         policy=self.policy if policy is None else policy

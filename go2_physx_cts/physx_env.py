@@ -9,6 +9,23 @@ from .terrain import relief,ground
 def tensor(value):return value.torch if hasattr(value,'torch') else value
 quat_inverse=st.quat_inverse
 
+
+def materialize_metrics(metrics):
+    """Transfer a log window once; retain each step's original reductions."""
+    if not metrics or '_packed' not in metrics[0]:return metrics
+    has_sources='source_counts' in metrics[0]
+    packed=[torch.cat((m['_packed'],m['source_counts'].double())) if has_sources else m['_packed'] for m in metrics]
+    rows=torch.stack(packed).tolist()
+    result=[]
+    for row in rows:
+        item=dict(zip(('height','xy_rmse','yaw_rmse','reward'),row[:4]))
+        item.update(falls=int(row[4]),falls_all=int(row[5]),task_metrics={
+            str(t):{'falls_per_env_min':row[6+t],'own_envs':int(row[16+t])}
+            for t in range(10) if row[16+t]>0})
+        if has_sources:item['source_counts']=[int(v) for v in row[26:29]]
+        result.append(item)
+    return result
+
 def motor_values(device):
     inertia=torch.tensor([.000111842*(6.33*(1.5 if j=='calf' else 1))**2 for _ in st.LEGS for j in ('hip','thigh','calf')],device=device)
     kp=inertia*(2*math.pi*10)**2;kd=4*inertia*(2*math.pi*10);effort=torch.tensor([23.7,23.7,45.43]*4,device=device)
@@ -83,6 +100,7 @@ class PhysXEnv:
         self.terrain_names=self.terrain_lookup.names;self.terrain_metadata=dict(self.terrain_lookup.metadata,collision_heightfield=self.field.metadata,contacts=self.contact_metadata,background_boxes=self.scene.terrain.background_boxes)
         n=cfg.num_envs;dev=cfg.device;self.ids=torch.arange(n,device=dev)
         self.origins=torch.zeros(n,3,device=dev);self.goals=torch.zeros_like(self.origins);self.bounds=torch.zeros(n,4,device=dev)
+        self.task_assignment_version=0
         self.task_ids=task_assignments(n,0,dev);self.terrain_ids=torch.full((n,),7,dtype=torch.long,device=dev);self.terrain_levels=torch.zeros(n,dtype=torch.long,device=dev)
         self.pending_task=torch.full((n,),-1,dtype=torch.long,device=dev)
         self.pending_terrain=self.pending_task.clone();self.pending_level=self.pending_task.clone()
@@ -105,7 +123,8 @@ class PhysXEnv:
     @property
     def task_id(self):return self.task_ids
     @task_id.setter
-    def task_id(self,v):self.task_ids=v
+    def task_id(self,v):
+        self.task_ids=v;self.task_assignment_version+=1
     def _assign_terrains(self):
         for t in range(10):
             ids=(self.task_ids==t).nonzero().flatten();n=len(ids)
@@ -126,6 +145,7 @@ class PhysXEnv:
         if not self.evaluation_mode and p!=self._phase:
             old_tasks=self.task_ids.clone();old_terrain=self.terrain_ids.clone();old_levels=self.terrain_levels.clone()
             self.task_ids=task_assignments(self.num_envs,self.iteration,self.device);self._phase=p;self._assign_terrains()
+            self.task_assignment_version+=1
             retained=(old_tasks==self.task_ids)&(old_terrain==self.terrain_ids)&(self.task_ids!=6)
             self.terrain_levels[retained]=old_levels[retained]
             self.reset(self.ids,advance_curriculum=False)
@@ -262,6 +282,7 @@ class PhysXEnv:
     def place_calibration_flat(self):
         self.evaluation_mode=True;self.calibration_flat=True
         self.task_ids.zero_();self.terrain_ids.fill_(7);self.terrain_levels.zero_()
+        self.task_assignment_version+=1
         self.reset(self.ids,advance_curriculum=False)
     prepare_flat_calibration=place_calibration_flat
     def set_diagnostic_levels(self,level=0):
@@ -273,6 +294,7 @@ class PhysXEnv:
                 'allocation_target':self.allocation_target,**{k:getattr(self,k).clone() for k in ('pending_task','pending_terrain','pending_level')}}
     def load_curriculum_state_dict(self,s):
         for name in ('terrain_levels','terrain_ids','task_ids'):getattr(self,name).copy_(s[name])
+        self.task_assignment_version+=1
         self.allocation_target=s.get('allocation_target')
         for name in ('pending_task','pending_terrain','pending_level'):
             if name in s:getattr(self,name).copy_(s[name])
@@ -313,6 +335,7 @@ class PhysXEnv:
         moved=ids[self.pending_task[ids]>=0]
         if not len(moved):return
         self.task_ids[moved]=self.pending_task[moved];self.terrain_ids[moved]=self.pending_terrain[moved]
+        self.task_assignment_version+=1
         self.terrain_levels[moved]=self.pending_level[moved];self.recovery_kind[moved]=-1
         self.pending_task[moved]=-1;self.pending_terrain[moved]=-1;self.pending_level[moved]=-1
     def _record_grid(self,before,after,done):
@@ -332,7 +355,7 @@ class PhysXEnv:
         self._segment_progress[ends]=0;self._segment_required[ends]=0;self._segment_steps[ends]=0;self._segment_yaw[ends]=0
         self.command_sampler.grid.update(self.iteration)
     @torch.no_grad()
-    def step(self,a):
+    def step(self,a,*,defer_metrics=False):
         before=self.snapshot();self._command_views();target=self.consts.default_q+a*self.consts.action_scale
         for _ in range(round(self.cfg.dt/self.cfg.physics_dt)):
             self.target_ring[self.ring_ptr]=target;delayed=self.target_ring[(self.ring_ptr-self.delay)%3,self.ids];self.ring_ptr=(self.ring_ptr+1)%3
@@ -345,10 +368,14 @@ class PhysXEnv:
         after.update(reward=r,positive_reward=terms['positive'],negative_reward=terms['negative'],terminated=terminated,timeout=timeout,success=success,task_context=context.clone(),done=done)
         self.last_transition=after
         if not self.evaluation_mode:self._record_grid(before,after,done)
-        own=self.own_mask;vb=st.velocity_body(s);metrics={'height':float(s[own,0].mean()),'xy_rmse':float((vb[own,:2]-self.command[own,:2]).square().mean().sqrt()),'yaw_rmse':float((s[own,9]-self.command[own,2]).square().mean().sqrt()),'reward':float(r[own].mean()),'falls':int((terminated.bool()&own).sum()),'falls_all':int(terminated.sum())}
+        own=self.own_mask;vb=st.velocity_body(s)
+        scalars=(s[own,0].mean(),(vb[own,:2]-self.command[own,:2]).square().mean().sqrt(),
+                 (s[own,9]-self.command[own,2]).square().mean().sqrt(),r[own].mean(),
+                 (terminated.bool()&own).sum(),terminated.sum())
         counts=torch.bincount(self.task_ids[own],minlength=10).float();bad=torch.bincount(self.task_ids[own&terminated.bool()],minlength=10).float()
-        task_rates=(bad/counts.clamp_min(1)*60/self.cfg.dt).tolist();task_counts=counts.tolist()
-        metrics['task_metrics']={str(t):{'falls_per_env_min':task_rates[t],'own_envs':int(task_counts[t])} for t in range(10) if task_counts[t]>0}
+        rates=bad/counts.clamp_min(1)*60/self.cfg.dt
+        metrics={'_packed':torch.cat((torch.stack([v.double() for v in scalars]),rates.double(),counts.double())).detach()}
+        if not defer_metrics:metrics=materialize_metrics([metrics])[0]
         self.last2=self.last.clone();self.last=a.clone()
         if self.command_override is None:self.cmd_state=self.command_sampler.advance(self.cmd_state,after['pose'][:,:2],self.iteration)
         self._command_views();self.hist=st.push_history(self.hist,st.frame(s,a,self.command,noise=True))
