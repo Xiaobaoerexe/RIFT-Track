@@ -21,7 +21,7 @@ def main():
             raise RuntimeError('This release requires As2,120000 iterations,no external experts')
         commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
         stamp=time.strftime('%Y%m%d_%H%M%S');runs=ROOT/'runs';runs.mkdir(exist_ok=True)
-        output=runs/('AS2_BLIND_WINDOWED_s17_'+stamp+'_175')
+        output=runs/('AS2_BLIND_WINDOWED_s17_'+stamp+'_137')
         state_path=runs/('as2_launch_'+stamp+'.json')
         command=[str(RUNTIME),'-m','go2_physx_cts.train','--config',str(cfg_path),
                  '--output',str(output),'--usd',str(ROOT/'assets/as2/as2.usd')]

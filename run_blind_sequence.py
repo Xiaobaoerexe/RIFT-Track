@@ -27,7 +27,7 @@ def main():
         for robot in ('go2','as2'):
             if stopped:break
             cfg_path=root/'configs'/('blind_'+robot+'.json');cfg=json.loads(cfg_path.read_text())
-            output=records/(robot.upper()+'_BLIND_OFFICIAL_s17_'+stamp+'_175')
+            output=records/(robot.upper()+'_BLIND_OFFICIAL_s17_'+stamp+'_137')
             usd=root/'assets'/robot/('usd/go2.usd' if robot=='go2' else 'as2.usd')
             command=[str(runtime),'-m','go2_physx_cts.train','--config',str(cfg_path),'--output',str(output),'--usd',str(usd)]
             if robot=='go2' and args.resume_go2:command+=['--resume',str(Path(args.resume_go2).resolve()),'--continue-run']

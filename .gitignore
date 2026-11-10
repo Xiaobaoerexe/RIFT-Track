@@ -25,3 +25,7 @@ physx_training.lock
 
 # Preserve existing Go2 evaluation evidence locally; do not commit generated videos.
 /reports/SIDE_OFFICIAL_COMPARE_20261103/
+
+# Imported historical videos and the data2 runs symlink are not source files.
+/reports/AS2_STUDENT_VIDEOS_20261104_175/
+/runs

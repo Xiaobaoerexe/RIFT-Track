@@ -1,0 +1,16 @@
+Blind Go2 / As2 migration to server 137, 2026-11-10
+Source release: 2ac31fbf72be71943dd5f260fb0d9400454f48d1
+Reference: last As2 run AS2_BLIND_WINDOWED_s17_20261103_224658_175, 120000 iterations.
+Project: /home/abc/Documents/go2_supermimic_lab/physx_dual_robot_20261029
+Runs: /home/abc/data2/go2_supermimic_blind/runs
+Both robot configurations and TrainCfg defaults use the exact As2 learning-rate parameters.
+The source window controller is byte-identical: 1000-iteration windows, comparable strata,
+two-window decisions, factor 1.3, 2000-iteration change cooldown, original bounds and CTS stability gate.
+Actor/teacher ramp: iterations 1500-2500. Actor/Critic fixed through 5000; WM/CTS fixed before 40000.
+Actor/teacher, Critic, WM initial LR 2e-4; CTS initial LR 3e-4.
+No new scheduler, trial update, cosine schedule, or training launch was added.
+Historical Go2 checkpoints retain their original earlier scheduler state; this migration does not retrofit their training.
+The old 137 project is replaced without backup. Source 175 is retained as requested.
+Depth project and shared runtime are not modified.
+Use configs/blind_go2.json and configs/blind_as2.json via the existing supervisors.
+Generated historical videos remain on disk and are ignored by git for clean-release launch checks.
