@@ -1,0 +1,51 @@
+{
+  "repository": "https://github.com/project-instinct/InstinctMJ",
+  "branch": "supermimic",
+  "commit": "03563ee02665f327425106372264070315673748",
+  "license": "CC BY-NC 4.0; inherited supermimic_vibed MIT attribution retained",
+  "attribution": "InstinctMJ contributors; based on SuperMimic and Chong Zhang supermimic_vibed independent reproduction",
+  "source_files": [
+    {
+      "path": "src/instinct_mj/rl/supermimic/runner.py",
+      "sha256": "507f1c726f700597b6db89a20b1e70fd0d1ec6eddb7f3fa00a149896dc557e85",
+      "url": "https://github.com/project-instinct/InstinctMJ/blob/03563ee02665f327425106372264070315673748/src/instinct_mj/rl/supermimic/runner.py"
+    },
+    {
+      "path": "src/instinct_mj/rl/supermimic/networks.py",
+      "sha256": "b6356b59cef81a01b1c86ced8247f83a7060fab9407a7ad943f8425e092e38f5",
+      "url": "https://github.com/project-instinct/InstinctMJ/blob/03563ee02665f327425106372264070315673748/src/instinct_mj/rl/supermimic/networks.py"
+    },
+    {
+      "path": "src/instinct_mj/rl/supermimic/config.py",
+      "sha256": "52a26cd28f25209a8fafe157410dfbd2fa93a9704411d49f4db109096e112d24",
+      "url": "https://github.com/project-instinct/InstinctMJ/blob/03563ee02665f327425106372264070315673748/src/instinct_mj/rl/supermimic/config.py"
+    },
+    {
+      "path": "src/instinct_mj/rl/supermimic/README.md",
+      "sha256": "7ce56e1607b2305850b24be6176cfd3d3d3e0fa319c07711b23dea0a05b9ce3a",
+      "url": "https://github.com/project-instinct/InstinctMJ/blob/03563ee02665f327425106372264070315673748/src/instinct_mj/rl/supermimic/README.md"
+    },
+    {
+      "path": "src/instinct_mj/tasks/shadowing/perceptive/perceptive_env_cfg.py",
+      "sha256": "57608ed06343412d490fdfd120251677111699f5a116f8f8b600007c41d34927",
+      "url": "https://github.com/project-instinct/InstinctMJ/blob/03563ee02665f327425106372264070315673748/src/instinct_mj/tasks/shadowing/perceptive/perceptive_env_cfg.py"
+    }
+  ],
+  "ported_mechanisms": [
+    "shared policy depth CNN owned by WM reconstruction optimizer",
+    "detached current encoder latent targets, no EMA target encoder",
+    "latent delta output and EMA latent/delta normalization",
+    "training-only clean depth reconstruction decoder; L1 loss",
+    "autoregressive visual latent dynamics; no future image renderer",
+    "new latent delta output rows initialized to zero following Instinct; existing physical output initialization retained"
+  ],
+  "project_adaptations": [
+    "AS2 full-pose physical WM, 1024x3 unchanged",
+    "128-dimensional features and 48x64 images",
+    "5Hz held capture latent with phase and relative SE(3) capture context; supervise real refreshes only",
+    "CNN/decoder reconstruction normalized clean frozen-generator output; not exact simulator raycast",
+    "latent prediction loss averaged over valid refreshes rather than all control steps",
+    "preserve predicted latent -> student GRU -> Actor input derivatives; unlike upstream z.detach()",
+    "teacher has geometry but no task label; CTS handles proprio MoE, GRU and fusion only"
+  ]
+}

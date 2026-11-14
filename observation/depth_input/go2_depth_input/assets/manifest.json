@@ -1,0 +1,44 @@
+{
+  "geometry_checkpoint": "/home/abc/Documents/go2_supermimic_runtime/depth_observation/runs/DEPTH_GO2_11T_s317_20261031/model/best.pt",
+  "geometry_checkpoint_sha256": "d2583b588920c48335d14d58539bdf9024731b00fde41708a2d43ddf0f2ffae3",
+  "geometry_step": 42500,
+  "noise_checkpoint": "/home/abc/data2/depth_noise/runs/DEPTH_NOISE_LOCAL_D455_s317_20261031_162934/best_local_calibration.pt",
+  "noise_checkpoint_sha256": "a966c6f53a7db39ae4e98fba44663ea9e658b2f7986b4919926bcf2dee116001",
+  "noise_step": 100,
+  "weights_sha256": "137f90824abc604c03e19a3f15edc232f168c64bb9d1c47930d48bfe6260d8ae",
+  "defaults": {
+    "hole_strength": 2.0,
+    "site": "local D455 calibration",
+    "output_shape": [
+      "N",
+      1,
+      48,
+      64
+    ],
+    "units": "optical-axis metres",
+    "range_m": [
+      0.1,
+      6.0
+    ],
+    "invalid": 0,
+    "mount_xyz_m": [
+      0.101958,
+      0,
+      0.327
+    ],
+    "camera_forward": "body forward",
+    "pose_rotation": "world_from_optical; optical right/down/forward",
+    "atlas_shape": [
+      512,
+      512
+    ],
+    "atlas_extent_m": 25.6
+  },
+  "gradient": "weights frozen; first-order pose VJP; hard masks have Concrete/sigmoid straight-through surrogate gradients",
+  "runtime": {
+    "torch": "2.11.0+cu130",
+    "cuda": "13.0",
+    "python": "3.12.16"
+  },
+  "training_not_modified": true
+}

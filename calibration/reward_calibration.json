@@ -1,0 +1,2381 @@
+{
+  "schema": "as2_depth_event_budget_v1",
+  "robot": "as2",
+  "reference_net_max": 57.771751403808594,
+  "positive_cap": 51.99457626342774,
+  "failure_penalty": 5.7771751403808596,
+  "source": {
+    "policy_path": "/home/abc/data2/go2_supermimic_blind/runs/AS2_BLIND_WINDOWED_s17_20261103_224658_175/model_00120000.pt",
+    "policy_sha256": "e195fceb90c725a8fd4a1cddb28023cbef36860b70e91b542ce84fb6495394a5",
+    "branch": "student",
+    "robot": "as2",
+    "baseline_commit": "2061be6",
+    "backend": "IsaacSim/PhysX",
+    "reward_iteration": 3000,
+    "duration": 20.0,
+    "num_envs": 128,
+    "startup_included": true,
+    "reference": "maximum net return among complete tracking-qualified episodes",
+    "reference_project": "/home/abc/Documents/go2_supermimic_lab/physx_dual_robot_20261029",
+    "reference_source_commit": "2061be6b0d592afe9e81223206cf5f864e45b9f4",
+    "source_network_sha256": "9dc476a6bb1cb31d3c4938d2f7d5b9703dfa6a5ae0c8b867b3197aa53ddbe630"
+  },
+  "qualified_episodes": 128,
+  "total_episodes": 128,
+  "reference_statistics": {
+    "mean": 55.97435262799263,
+    "median": 55.96094512939453,
+    "min": 54.270477294921875,
+    "max": 57.771751403808594
+  },
+  "tasks": [
+    {
+      "task_id": 0,
+      "episode_seconds": 20.0,
+      "base_positive_rate_bound": 3.0,
+      "base_positive_return_bound": 60.0,
+      "success_bonus": 0.0,
+      "unfinished_rate": 0.0
+    },
+    {
+      "task_id": 1,
+      "episode_seconds": 20.0,
+      "base_positive_rate_bound": 3.0,
+      "base_positive_return_bound": 60.0,
+      "success_bonus": 0.0,
+      "unfinished_rate": 0.0
+    },
+    {
+      "task_id": 2,
+      "episode_seconds": 20.0,
+      "base_positive_rate_bound": 3.0,
+      "base_positive_return_bound": 60.0,
+      "success_bonus": 0.0,
+      "unfinished_rate": 0.0
+    },
+    {
+      "task_id": 3,
+      "episode_seconds": 8.0,
+      "base_positive_rate_bound": 3.0,
+      "base_positive_return_bound": 24.0,
+      "success_bonus": 27.99457626342774,
+      "unfinished_rate": 0.11554350280761719
+    },
+    {
+      "task_id": 4,
+      "episode_seconds": 8.0,
+      "base_positive_rate_bound": 3.0,
+      "base_positive_return_bound": 24.0,
+      "success_bonus": 27.99457626342774,
+      "unfinished_rate": 0.11554350280761719
+    }
+  ],
+  "episodes": [
+    {
+      "env": 0,
+      "command": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 59.802337646484375,
+      "negative_return": -3.6813604831695557,
+      "net_return": 56.120975494384766,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.020808983594179153,
+      "yaw_rmse": 0.0403054915368557,
+      "qualified_complete": true
+    },
+    {
+      "env": 1,
+      "command": [
+        0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 59.42976379394531,
+      "negative_return": -3.0512282848358154,
+      "net_return": 56.378536224365234,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.046756621450185776,
+      "yaw_rmse": 0.060944147408008575,
+      "qualified_complete": true
+    },
+    {
+      "env": 2,
+      "command": [
+        0.5,
+        0.20000000298023224,
+        0.4000000059604645
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 59.4561882019043,
+      "negative_return": -1.7430933713912964,
+      "net_return": 57.713096618652344,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.046371493488550186,
+      "yaw_rmse": 0.05911538004875183,
+      "qualified_complete": true
+    },
+    {
+      "env": 3,
+      "command": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 59.203678131103516,
+      "negative_return": -4.308454990386963,
+      "net_return": 54.89522171020508,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.08674927055835724,
+      "yaw_rmse": 0.06617008149623871,
+      "qualified_complete": true
+    },
+    {
+      "env": 4,
+      "command": [
+        -0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 58.912715911865234,
+      "negative_return": -3.1374435424804688,
+      "net_return": 55.775272369384766,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.06467777490615845,
+      "yaw_rmse": 0.07766614854335785,
+      "qualified_complete": true
+    },
+    {
+      "env": 5,
+      "command": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 59.7787971496582,
+      "negative_return": -3.838508129119873,
+      "net_return": 55.94028854370117,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.02332167886197567,
+      "yaw_rmse": 0.04116976633667946,
+      "qualified_complete": true
+    },
+    {
+      "env": 6,
+      "command": [
+        0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 59.43498992919922,
+      "negative_return": -3.0857651233673096,
+      "net_return": 56.34922409057617,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.047475364059209824,
+      "yaw_rmse": 0.05903998389840126,
+      "qualified_complete": true
+    },
+    {
+      "env": 7,
+      "command": [
+        0.5,
+        0.20000000298023224,
+        0.4000000059604645
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 59.43856430053711,
+      "negative_return": -1.8655073642730713,
+      "net_return": 57.573055267333984,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.04951401427388191,
+      "yaw_rmse": 0.05600542947649956,
+      "qualified_complete": true
+    },
+    {
+      "env": 8,
+      "command": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 59.109928131103516,
+      "negative_return": -4.651957035064697,
+      "net_return": 54.457969665527344,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.09226906299591064,
+      "yaw_rmse": 0.07041579484939575,
+      "qualified_complete": true
+    },
+    {
+      "env": 9,
+      "command": [
+        -0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 58.585845947265625,
+      "negative_return": -3.4169297218322754,
+      "net_return": 55.168914794921875,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.07352156192064285,
+      "yaw_rmse": 0.08868385851383209,
+      "qualified_complete": true
+    },
+    {
+      "env": 10,
+      "command": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 59.77837371826172,
+      "negative_return": -4.217405319213867,
+      "net_return": 55.56096649169922,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.02197217009961605,
+      "yaw_rmse": 0.0427536740899086,
+      "qualified_complete": true
+    },
+    {
+      "env": 11,
+      "command": [
+        0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 59.291717529296875,
+      "negative_return": -3.1109726428985596,
+      "net_return": 56.18074417114258,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.04852481931447983,
+      "yaw_rmse": 0.0719112828373909,
+      "qualified_complete": true
+    },
+    {
+      "env": 12,
+      "command": [
+        0.5,
+        0.20000000298023224,
+        0.4000000059604645
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 59.43319320678711,
+      "negative_return": -1.986133337020874,
+      "net_return": 57.447059631347656,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.04852871596813202,
+      "yaw_rmse": 0.05810008570551872,
+      "qualified_complete": true
+    },
+    {
+      "env": 13,
+      "command": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 59.02814483642578,
+      "negative_return": -4.4481987953186035,
+      "net_return": 54.5799446105957,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.09162203222513199,
+      "yaw_rmse": 0.07677637040615082,
+      "qualified_complete": true
+    },
+    {
+      "env": 14,
+      "command": [
+        -0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 58.501468658447266,
+      "negative_return": -3.4887897968292236,
+      "net_return": 55.01268005371094,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.07392715662717819,
+      "yaw_rmse": 0.09417935460805893,
+      "qualified_complete": true
+    },
+    {
+      "env": 15,
+      "command": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 59.80519485473633,
+      "negative_return": -3.6584272384643555,
+      "net_return": 56.146766662597656,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.022173428907990456,
+      "yaw_rmse": 0.03831948712468147,
+      "qualified_complete": true
+    },
+    {
+      "env": 16,
+      "command": [
+        0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 59.42686080932617,
+      "negative_return": -3.021127700805664,
+      "net_return": 56.405731201171875,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.0476391576230526,
+      "yaw_rmse": 0.06076566129922867,
+      "qualified_complete": true
+    },
+    {
+      "env": 17,
+      "command": [
+        0.5,
+        0.20000000298023224,
+        0.4000000059604645
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 59.44507598876953,
+      "negative_return": -1.786128044128418,
+      "net_return": 57.6589469909668,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.04829937964677811,
+      "yaw_rmse": 0.05666293203830719,
+      "qualified_complete": true
+    },
+    {
+      "env": 18,
+      "command": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 59.20774459838867,
+      "negative_return": -4.372847080230713,
+      "net_return": 54.834896087646484,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.08967159688472748,
+      "yaw_rmse": 0.06414201110601425,
+      "qualified_complete": true
+    },
+    {
+      "env": 19,
+      "command": [
+        -0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 58.749542236328125,
+      "negative_return": -3.27795147895813,
+      "net_return": 55.47159194946289,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.06893549859523773,
+      "yaw_rmse": 0.08430004119873047,
+      "qualified_complete": true
+    },
+    {
+      "env": 20,
+      "command": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 59.76457977294922,
+      "negative_return": -3.8767037391662598,
+      "net_return": 55.887874603271484,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.0242434311658144,
+      "yaw_rmse": 0.04229637607932091,
+      "qualified_complete": true
+    },
+    {
+      "env": 21,
+      "command": [
+        0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 59.429161071777344,
+      "negative_return": -3.0875465869903564,
+      "net_return": 56.34161376953125,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.046277984976768494,
+      "yaw_rmse": 0.06177036836743355,
+      "qualified_complete": true
+    },
+    {
+      "env": 22,
+      "command": [
+        0.5,
+        0.20000000298023224,
+        0.4000000059604645
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 59.327239990234375,
+      "negative_return": -1.81473708152771,
+      "net_return": 57.51250457763672,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.04556766152381897,
+      "yaw_rmse": 0.07321634888648987,
+      "qualified_complete": true
+    },
+    {
+      "env": 23,
+      "command": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 59.072853088378906,
+      "negative_return": -4.7367167472839355,
+      "net_return": 54.33613586425781,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.09239467233419418,
+      "yaw_rmse": 0.07288773357868195,
+      "qualified_complete": true
+    },
+    {
+      "env": 24,
+      "command": [
+        -0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 58.792396545410156,
+      "negative_return": -3.2501449584960938,
+      "net_return": 55.54225158691406,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.0687837153673172,
+      "yaw_rmse": 0.08098895847797394,
+      "qualified_complete": true
+    },
+    {
+      "env": 25,
+      "command": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 59.773712158203125,
+      "negative_return": -4.469934940338135,
+      "net_return": 55.303775787353516,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.022262239828705788,
+      "yaw_rmse": 0.04317651689052582,
+      "qualified_complete": true
+    },
+    {
+      "env": 26,
+      "command": [
+        0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 59.400245666503906,
+      "negative_return": -3.205388307571411,
+      "net_return": 56.19485855102539,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.047546301037073135,
+      "yaw_rmse": 0.06253840774297714,
+      "qualified_complete": true
+    },
+    {
+      "env": 27,
+      "command": [
+        0.5,
+        0.20000000298023224,
+        0.4000000059604645
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 59.38530731201172,
+      "negative_return": -2.0089826583862305,
+      "net_return": 57.37632369995117,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.04978235810995102,
+      "yaw_rmse": 0.06160920858383179,
+      "qualified_complete": true
+    },
+    {
+      "env": 28,
+      "command": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 59.07539749145508,
+      "negative_return": -4.701968669891357,
+      "net_return": 54.37342834472656,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.09400400519371033,
+      "yaw_rmse": 0.07014770060777664,
+      "qualified_complete": true
+    },
+    {
+      "env": 29,
+      "command": [
+        -0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 58.43101501464844,
+      "negative_return": -3.4636154174804688,
+      "net_return": 54.96739959716797,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.07610522210597992,
+      "yaw_rmse": 0.09594955295324326,
+      "qualified_complete": true
+    },
+    {
+      "env": 30,
+      "command": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 59.78718948364258,
+      "negative_return": -3.759000062942505,
+      "net_return": 56.02819061279297,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.02330571599304676,
+      "yaw_rmse": 0.03989274799823761,
+      "qualified_complete": true
+    },
+    {
+      "env": 31,
+      "command": [
+        0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 59.49905776977539,
+      "negative_return": -3.0389955043792725,
+      "net_return": 56.46006393432617,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.04695924371480942,
+      "yaw_rmse": 0.05236172676086426,
+      "qualified_complete": true
+    },
+    {
+      "env": 32,
+      "command": [
+        0.5,
+        0.20000000298023224,
+        0.4000000059604645
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 59.44123458862305,
+      "negative_return": -1.6694830656051636,
+      "net_return": 57.771751403808594,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.04789702221751213,
+      "yaw_rmse": 0.05837167054414749,
+      "qualified_complete": true
+    },
+    {
+      "env": 33,
+      "command": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 59.143455505371094,
+      "negative_return": -4.294553756713867,
+      "net_return": 54.848899841308594,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.0875440314412117,
+      "yaw_rmse": 0.07270791381597519,
+      "qualified_complete": true
+    },
+    {
+      "env": 34,
+      "command": [
+        -0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 58.963321685791016,
+      "negative_return": -3.0336246490478516,
+      "net_return": 55.92969512939453,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.06282466650009155,
+      "yaw_rmse": 0.07692364603281021,
+      "qualified_complete": true
+    },
+    {
+      "env": 35,
+      "command": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 59.76545715332031,
+      "negative_return": -3.6700024604797363,
+      "net_return": 56.095455169677734,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.023096708580851555,
+      "yaw_rmse": 0.043476998805999756,
+      "qualified_complete": true
+    },
+    {
+      "env": 36,
+      "command": [
+        0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 59.38277053833008,
+      "negative_return": -3.1799042224884033,
+      "net_return": 56.20286560058594,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.052666597068309784,
+      "yaw_rmse": 0.05835842713713646,
+      "qualified_complete": true
+    },
+    {
+      "env": 37,
+      "command": [
+        0.5,
+        0.20000000298023224,
+        0.4000000059604645
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 59.42549514770508,
+      "negative_return": -1.866115927696228,
+      "net_return": 57.55937957763672,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.047272343188524246,
+      "yaw_rmse": 0.061407480388879776,
+      "qualified_complete": true
+    },
+    {
+      "env": 38,
+      "command": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 59.091156005859375,
+      "negative_return": -4.372002124786377,
+      "net_return": 54.719154357910156,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.09101295471191406,
+      "yaw_rmse": 0.07181651890277863,
+      "qualified_complete": true
+    },
+    {
+      "env": 39,
+      "command": [
+        -0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 58.74827194213867,
+      "negative_return": -3.2178659439086914,
+      "net_return": 55.5304069519043,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.07012602686882019,
+      "yaw_rmse": 0.08197644352912903,
+      "qualified_complete": true
+    },
+    {
+      "env": 40,
+      "command": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 59.767425537109375,
+      "negative_return": -3.9949114322662354,
+      "net_return": 55.77251434326172,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.022719241678714752,
+      "yaw_rmse": 0.04357818886637688,
+      "qualified_complete": true
+    },
+    {
+      "env": 41,
+      "command": [
+        0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 59.43942642211914,
+      "negative_return": -3.2127327919006348,
+      "net_return": 56.22669219970703,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.048877835273742676,
+      "yaw_rmse": 0.056352607905864716,
+      "qualified_complete": true
+    },
+    {
+      "env": 42,
+      "command": [
+        0.5,
+        0.20000000298023224,
+        0.4000000059604645
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 59.13572311401367,
+      "negative_return": -1.9445170164108276,
+      "net_return": 57.19120788574219,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.05095338076353073,
+      "yaw_rmse": 0.0843462124466896,
+      "qualified_complete": true
+    },
+    {
+      "env": 43,
+      "command": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 59.070499420166016,
+      "negative_return": -4.42617130279541,
+      "net_return": 54.64432907104492,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.0904657319188118,
+      "yaw_rmse": 0.07414977252483368,
+      "qualified_complete": true
+    },
+    {
+      "env": 44,
+      "command": [
+        -0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 58.41804504394531,
+      "negative_return": -3.5038912296295166,
+      "net_return": 54.914154052734375,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.07634338736534119,
+      "yaw_rmse": 0.0962638258934021,
+      "qualified_complete": true
+    },
+    {
+      "env": 45,
+      "command": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 59.66342544555664,
+      "negative_return": -4.575438976287842,
+      "net_return": 55.08798599243164,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.02616085484623909,
+      "yaw_rmse": 0.05376209318637848,
+      "qualified_complete": true
+    },
+    {
+      "env": 46,
+      "command": [
+        0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 59.46442413330078,
+      "negative_return": -3.045413017272949,
+      "net_return": 56.419010162353516,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.050118885934352875,
+      "yaw_rmse": 0.05298420786857605,
+      "qualified_complete": true
+    },
+    {
+      "env": 47,
+      "command": [
+        0.5,
+        0.20000000298023224,
+        0.4000000059604645
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 59.33155822753906,
+      "negative_return": -1.748119831085205,
+      "net_return": 57.583438873291016,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.04803212732076645,
+      "yaw_rmse": 0.07071548700332642,
+      "qualified_complete": true
+    },
+    {
+      "env": 48,
+      "command": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 59.127845764160156,
+      "negative_return": -4.601012229919434,
+      "net_return": 54.526832580566406,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.09194700419902802,
+      "yaw_rmse": 0.06865893304347992,
+      "qualified_complete": true
+    },
+    {
+      "env": 49,
+      "command": [
+        -0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 58.953468322753906,
+      "negative_return": -3.04109263420105,
+      "net_return": 55.912376403808594,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.06356266140937805,
+      "yaw_rmse": 0.07662931084632874,
+      "qualified_complete": true
+    },
+    {
+      "env": 50,
+      "command": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 59.802520751953125,
+      "negative_return": -3.715179443359375,
+      "net_return": 56.08734130859375,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.021233225241303444,
+      "yaw_rmse": 0.03981633856892586,
+      "qualified_complete": true
+    },
+    {
+      "env": 51,
+      "command": [
+        0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 59.44186782836914,
+      "negative_return": -3.1611130237579346,
+      "net_return": 56.28075408935547,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.05208229273557663,
+      "yaw_rmse": 0.051696330308914185,
+      "qualified_complete": true
+    },
+    {
+      "env": 52,
+      "command": [
+        0.5,
+        0.20000000298023224,
+        0.4000000059604645
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 59.29121398925781,
+      "negative_return": -1.8535419702529907,
+      "net_return": 57.43767166137695,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.04629739746451378,
+      "yaw_rmse": 0.07621508836746216,
+      "qualified_complete": true
+    },
+    {
+      "env": 53,
+      "command": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 59.104705810546875,
+      "negative_return": -4.400177955627441,
+      "net_return": 54.70452880859375,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.0878949835896492,
+      "yaw_rmse": 0.0731218233704567,
+      "qualified_complete": true
+    },
+    {
+      "env": 54,
+      "command": [
+        -0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 58.828731536865234,
+      "negative_return": -3.1383962631225586,
+      "net_return": 55.69033432006836,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.06680546700954437,
+      "yaw_rmse": 0.0812789648771286,
+      "qualified_complete": true
+    },
+    {
+      "env": 55,
+      "command": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 59.777374267578125,
+      "negative_return": -4.115661144256592,
+      "net_return": 55.661712646484375,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.02183075249195099,
+      "yaw_rmse": 0.04307102784514427,
+      "qualified_complete": true
+    },
+    {
+      "env": 56,
+      "command": [
+        0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 59.27106857299805,
+      "negative_return": -3.0787384510040283,
+      "net_return": 56.19232940673828,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.04866236075758934,
+      "yaw_rmse": 0.07448434084653854,
+      "qualified_complete": true
+    },
+    {
+      "env": 57,
+      "command": [
+        0.5,
+        0.20000000298023224,
+        0.4000000059604645
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 59.14741516113281,
+      "negative_return": -1.9824286699295044,
+      "net_return": 57.16498565673828,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.04959605261683464,
+      "yaw_rmse": 0.08573449403047562,
+      "qualified_complete": true
+    },
+    {
+      "env": 58,
+      "command": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 59.018707275390625,
+      "negative_return": -4.470997333526611,
+      "net_return": 54.54771041870117,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.09057383984327316,
+      "yaw_rmse": 0.0782814621925354,
+      "qualified_complete": true
+    },
+    {
+      "env": 59,
+      "command": [
+        -0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 58.45741653442383,
+      "negative_return": -3.453483819961548,
+      "net_return": 55.00393295288086,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.07553277164697647,
+      "yaw_rmse": 0.09449848532676697,
+      "qualified_complete": true
+    },
+    {
+      "env": 60,
+      "command": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 59.80923843383789,
+      "negative_return": -3.562098741531372,
+      "net_return": 56.24713897705078,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.022178638726472855,
+      "yaw_rmse": 0.03762758895754814,
+      "qualified_complete": true
+    },
+    {
+      "env": 61,
+      "command": [
+        0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 59.49567794799805,
+      "negative_return": -3.0805046558380127,
+      "net_return": 56.4151725769043,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.049859821796417236,
+      "yaw_rmse": 0.04847988858819008,
+      "qualified_complete": true
+    },
+    {
+      "env": 62,
+      "command": [
+        0.5,
+        0.20000000298023224,
+        0.4000000059604645
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 59.3846549987793,
+      "negative_return": -1.7195278406143188,
+      "net_return": 57.66512680053711,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.0451977476477623,
+      "yaw_rmse": 0.06871240586042404,
+      "qualified_complete": true
+    },
+    {
+      "env": 63,
+      "command": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 59.16614532470703,
+      "negative_return": -4.3198113441467285,
+      "net_return": 54.84633255004883,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.08796659111976624,
+      "yaw_rmse": 0.06874565035104752,
+      "qualified_complete": true
+    },
+    {
+      "env": 64,
+      "command": [
+        -0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 58.91261672973633,
+      "negative_return": -3.129063606262207,
+      "net_return": 55.78355407714844,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.06738369166851044,
+      "yaw_rmse": 0.07313220947980881,
+      "qualified_complete": true
+    },
+    {
+      "env": 65,
+      "command": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 59.808349609375,
+      "negative_return": -4.0735764503479,
+      "net_return": 55.734771728515625,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.020768532529473305,
+      "yaw_rmse": 0.03941824287176132,
+      "qualified_complete": true
+    },
+    {
+      "env": 66,
+      "command": [
+        0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 59.40925216674805,
+      "negative_return": -3.070164680480957,
+      "net_return": 56.339088439941406,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.04646545648574829,
+      "yaw_rmse": 0.06310594826936722,
+      "qualified_complete": true
+    },
+    {
+      "env": 67,
+      "command": [
+        0.5,
+        0.20000000298023224,
+        0.4000000059604645
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 59.274452209472656,
+      "negative_return": -1.8193429708480835,
+      "net_return": 57.455108642578125,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.04626908525824547,
+      "yaw_rmse": 0.07788903266191483,
+      "qualified_complete": true
+    },
+    {
+      "env": 68,
+      "command": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 59.063411712646484,
+      "negative_return": -4.39411735534668,
+      "net_return": 54.66929626464844,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.09045955538749695,
+      "yaw_rmse": 0.07598147541284561,
+      "qualified_complete": true
+    },
+    {
+      "env": 69,
+      "command": [
+        -0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 58.88486099243164,
+      "negative_return": -3.1169376373291016,
+      "net_return": 55.767921447753906,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.06473583728075027,
+      "yaw_rmse": 0.08036097139120102,
+      "qualified_complete": true
+    },
+    {
+      "env": 70,
+      "command": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 59.752384185791016,
+      "negative_return": -3.919248580932617,
+      "net_return": 55.83313751220703,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.023334814235568047,
+      "yaw_rmse": 0.045126233249902725,
+      "qualified_complete": true
+    },
+    {
+      "env": 71,
+      "command": [
+        0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 59.38660430908203,
+      "negative_return": -3.254694700241089,
+      "net_return": 56.13190841674805,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.05094065144658089,
+      "yaw_rmse": 0.05939052999019623,
+      "qualified_complete": true
+    },
+    {
+      "env": 72,
+      "command": [
+        0.5,
+        0.20000000298023224,
+        0.4000000059604645
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 59.3277473449707,
+      "negative_return": -1.9891642332077026,
+      "net_return": 57.338584899902344,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.04812462627887726,
+      "yaw_rmse": 0.07079391181468964,
+      "qualified_complete": true
+    },
+    {
+      "env": 73,
+      "command": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 59.042518615722656,
+      "negative_return": -4.772042274475098,
+      "net_return": 54.270477294921875,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.09401636570692062,
+      "yaw_rmse": 0.07371117174625397,
+      "qualified_complete": true
+    },
+    {
+      "env": 74,
+      "command": [
+        -0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 58.743743896484375,
+      "negative_return": -3.213549852371216,
+      "net_return": 55.53019332885742,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.06931526958942413,
+      "yaw_rmse": 0.08385623246431351,
+      "qualified_complete": true
+    },
+    {
+      "env": 75,
+      "command": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 59.797245025634766,
+      "negative_return": -3.699467182159424,
+      "net_return": 56.0977783203125,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.021877391263842583,
+      "yaw_rmse": 0.03994956985116005,
+      "qualified_complete": true
+    },
+    {
+      "env": 76,
+      "command": [
+        0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 59.44869613647461,
+      "negative_return": -3.075843095779419,
+      "net_return": 56.37285232543945,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.04649035260081291,
+      "yaw_rmse": 0.05896500498056412,
+      "qualified_complete": true
+    },
+    {
+      "env": 77,
+      "command": [
+        0.5,
+        0.20000000298023224,
+        0.4000000059604645
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 59.375518798828125,
+      "negative_return": -1.7503974437713623,
+      "net_return": 57.6251220703125,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.04427532106637955,
+      "yaw_rmse": 0.07041631639003754,
+      "qualified_complete": true
+    },
+    {
+      "env": 78,
+      "command": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 59.20386505126953,
+      "negative_return": -4.290502071380615,
+      "net_return": 54.91336441040039,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.08632619678974152,
+      "yaw_rmse": 0.06679375469684601,
+      "qualified_complete": true
+    },
+    {
+      "env": 79,
+      "command": [
+        -0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 58.6789436340332,
+      "negative_return": -3.2697460651397705,
+      "net_return": 55.40919876098633,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.07176003605127335,
+      "yaw_rmse": 0.08505894243717194,
+      "qualified_complete": true
+    },
+    {
+      "env": 80,
+      "command": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 59.794105529785156,
+      "negative_return": -3.715843439102173,
+      "net_return": 56.07826232910156,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.02191963605582714,
+      "yaw_rmse": 0.040393464267253876,
+      "qualified_complete": true
+    },
+    {
+      "env": 81,
+      "command": [
+        0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 59.43659210205078,
+      "negative_return": -3.2068872451782227,
+      "net_return": 56.229705810546875,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.05150218307971954,
+      "yaw_rmse": 0.05292337387800217,
+      "qualified_complete": true
+    },
+    {
+      "env": 82,
+      "command": [
+        0.5,
+        0.20000000298023224,
+        0.4000000059604645
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 59.3441276550293,
+      "negative_return": -1.8485702276229858,
+      "net_return": 57.49555587768555,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.04923876374959946,
+      "yaw_rmse": 0.06762447953224182,
+      "qualified_complete": true
+    },
+    {
+      "env": 83,
+      "command": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 59.055381774902344,
+      "negative_return": -4.713001251220703,
+      "net_return": 54.34238052368164,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.09292468428611755,
+      "yaw_rmse": 0.07312170416116714,
+      "qualified_complete": true
+    },
+    {
+      "env": 84,
+      "command": [
+        -0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 58.75909423828125,
+      "negative_return": -3.1306707859039307,
+      "net_return": 55.628421783447266,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.06804367154836655,
+      "yaw_rmse": 0.08485900610685349,
+      "qualified_complete": true
+    },
+    {
+      "env": 85,
+      "command": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 59.70359420776367,
+      "negative_return": -3.910839080810547,
+      "net_return": 55.792755126953125,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.024538293480873108,
+      "yaw_rmse": 0.050408735871315,
+      "qualified_complete": true
+    },
+    {
+      "env": 86,
+      "command": [
+        0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 59.398101806640625,
+      "negative_return": -3.1346919536590576,
+      "net_return": 56.26340866088867,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.04752475395798683,
+      "yaw_rmse": 0.06270851939916611,
+      "qualified_complete": true
+    },
+    {
+      "env": 87,
+      "command": [
+        0.5,
+        0.20000000298023224,
+        0.4000000059604645
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 59.22397232055664,
+      "negative_return": -1.9225620031356812,
+      "net_return": 57.30141067504883,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.04793578386306763,
+      "yaw_rmse": 0.08038420230150223,
+      "qualified_complete": true
+    },
+    {
+      "env": 88,
+      "command": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 59.08945846557617,
+      "negative_return": -4.453289031982422,
+      "net_return": 54.63616943359375,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.09222549945116043,
+      "yaw_rmse": 0.07134107500314713,
+      "qualified_complete": true
+    },
+    {
+      "env": 89,
+      "command": [
+        -0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 58.77016067504883,
+      "negative_return": -3.244415044784546,
+      "net_return": 55.5257453918457,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.06846417486667633,
+      "yaw_rmse": 0.08316344767808914,
+      "qualified_complete": true
+    },
+    {
+      "env": 90,
+      "command": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 59.819969177246094,
+      "negative_return": -3.618070363998413,
+      "net_return": 56.201900482177734,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.020915595814585686,
+      "yaw_rmse": 0.037295930087566376,
+      "qualified_complete": true
+    },
+    {
+      "env": 91,
+      "command": [
+        0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 59.45045852661133,
+      "negative_return": -3.03255033493042,
+      "net_return": 56.41790771484375,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.0464983694255352,
+      "yaw_rmse": 0.058432240039110184,
+      "qualified_complete": true
+    },
+    {
+      "env": 92,
+      "command": [
+        0.5,
+        0.20000000298023224,
+        0.4000000059604645
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 59.361534118652344,
+      "negative_return": -1.7421272993087769,
+      "net_return": 57.619407653808594,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.046053096652030945,
+      "yaw_rmse": 0.0704791396856308,
+      "qualified_complete": true
+    },
+    {
+      "env": 93,
+      "command": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 59.164833068847656,
+      "negative_return": -4.303422451019287,
+      "net_return": 54.861412048339844,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.08893732726573944,
+      "yaw_rmse": 0.06840591877698898,
+      "qualified_complete": true
+    },
+    {
+      "env": 94,
+      "command": [
+        -0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 58.761138916015625,
+      "negative_return": -3.265841245651245,
+      "net_return": 55.495296478271484,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.06877290457487106,
+      "yaw_rmse": 0.08342307806015015,
+      "qualified_complete": true
+    },
+    {
+      "env": 95,
+      "command": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 59.82558059692383,
+      "negative_return": -4.142356872558594,
+      "net_return": 55.683223724365234,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.01784318871796131,
+      "yaw_rmse": 0.039528366178274155,
+      "qualified_complete": true
+    },
+    {
+      "env": 96,
+      "command": [
+        0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 59.37523651123047,
+      "negative_return": -3.0764992237091064,
+      "net_return": 56.298736572265625,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.04703935980796814,
+      "yaw_rmse": 0.06622044742107391,
+      "qualified_complete": true
+    },
+    {
+      "env": 97,
+      "command": [
+        0.5,
+        0.20000000298023224,
+        0.4000000059604645
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 59.4114875793457,
+      "negative_return": -1.8876278400421143,
+      "net_return": 57.523860931396484,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.04978344589471817,
+      "yaw_rmse": 0.058084383606910706,
+      "qualified_complete": true
+    },
+    {
+      "env": 98,
+      "command": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 59.13951110839844,
+      "negative_return": -4.485128879547119,
+      "net_return": 54.654380798339844,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.09073875099420547,
+      "yaw_rmse": 0.06886613368988037,
+      "qualified_complete": true
+    },
+    {
+      "env": 99,
+      "command": [
+        -0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 58.87166213989258,
+      "negative_return": -3.106867551803589,
+      "net_return": 55.764793395996094,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.06537330150604248,
+      "yaw_rmse": 0.08016311377286911,
+      "qualified_complete": true
+    },
+    {
+      "env": 100,
+      "command": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 59.708011627197266,
+      "negative_return": -3.9842188358306885,
+      "net_return": 55.723793029785156,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.02494041435420513,
+      "yaw_rmse": 0.04941331222653389,
+      "qualified_complete": true
+    },
+    {
+      "env": 101,
+      "command": [
+        0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 59.371883392333984,
+      "negative_return": -3.264315366744995,
+      "net_return": 56.107566833496094,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.05202723667025566,
+      "yaw_rmse": 0.059848956763744354,
+      "qualified_complete": true
+    },
+    {
+      "env": 102,
+      "command": [
+        0.5,
+        0.20000000298023224,
+        0.4000000059604645
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 59.34362030029297,
+      "negative_return": -1.9643986225128174,
+      "net_return": 57.37922286987305,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.04872657358646393,
+      "yaw_rmse": 0.06784208118915558,
+      "qualified_complete": true
+    },
+    {
+      "env": 103,
+      "command": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 59.083309173583984,
+      "negative_return": -4.743743419647217,
+      "net_return": 54.33956527709961,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.09564930200576782,
+      "yaw_rmse": 0.06943375617265701,
+      "qualified_complete": true
+    },
+    {
+      "env": 104,
+      "command": [
+        -0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 58.701332092285156,
+      "negative_return": -3.214596748352051,
+      "net_return": 55.48673629760742,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.06978904455900192,
+      "yaw_rmse": 0.08641287684440613,
+      "qualified_complete": true
+    },
+    {
+      "env": 105,
+      "command": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 59.815643310546875,
+      "negative_return": -3.938290596008301,
+      "net_return": 55.87735366821289,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.015768885612487793,
+      "yaw_rmse": 0.04284253343939781,
+      "qualified_complete": true
+    },
+    {
+      "env": 106,
+      "command": [
+        0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 59.47719192504883,
+      "negative_return": -3.127683401107788,
+      "net_return": 56.349510192871094,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.05200160667300224,
+      "yaw_rmse": 0.04698304831981659,
+      "qualified_complete": true
+    },
+    {
+      "env": 107,
+      "command": [
+        0.5,
+        0.20000000298023224,
+        0.4000000059604645
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 59.47642135620117,
+      "negative_return": -1.7946248054504395,
+      "net_return": 57.68179702758789,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.048543673008680344,
+      "yaw_rmse": 0.05276491865515709,
+      "qualified_complete": true
+    },
+    {
+      "env": 108,
+      "command": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 59.11225509643555,
+      "negative_return": -4.570376396179199,
+      "net_return": 54.54187774658203,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.0925389900803566,
+      "yaw_rmse": 0.06852581351995468,
+      "qualified_complete": true
+    },
+    {
+      "env": 109,
+      "command": [
+        -0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 58.99928665161133,
+      "negative_return": -3.038341760635376,
+      "net_return": 55.96094512939453,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.06130099296569824,
+      "yaw_rmse": 0.07596966624259949,
+      "qualified_complete": true
+    },
+    {
+      "env": 110,
+      "command": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 59.77687072753906,
+      "negative_return": -3.781284809112549,
+      "net_return": 55.99558639526367,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.023508356884121895,
+      "yaw_rmse": 0.041287388652563095,
+      "qualified_complete": true
+    },
+    {
+      "env": 111,
+      "command": [
+        0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 59.454689025878906,
+      "negative_return": -3.136604070663452,
+      "net_return": 56.318084716796875,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.049857597798109055,
+      "yaw_rmse": 0.053110528737306595,
+      "qualified_complete": true
+    },
+    {
+      "env": 112,
+      "command": [
+        0.5,
+        0.20000000298023224,
+        0.4000000059604645
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 59.46355438232422,
+      "negative_return": -1.867806315422058,
+      "net_return": 57.59574890136719,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.04883347079157829,
+      "yaw_rmse": 0.05438052862882614,
+      "qualified_complete": true
+    },
+    {
+      "env": 113,
+      "command": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 59.18443298339844,
+      "negative_return": -4.419572830200195,
+      "net_return": 54.764862060546875,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.090728260576725,
+      "yaw_rmse": 0.06587884575128555,
+      "qualified_complete": true
+    },
+    {
+      "env": 114,
+      "command": [
+        -0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 58.54627227783203,
+      "negative_return": -3.4089012145996094,
+      "net_return": 55.13737106323242,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.07341349869966507,
+      "yaw_rmse": 0.0919007658958435,
+      "qualified_complete": true
+    },
+    {
+      "env": 115,
+      "command": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 59.78663635253906,
+      "negative_return": -3.9544677734375,
+      "net_return": 55.83216857910156,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.02148178592324257,
+      "yaw_rmse": 0.0419972687959671,
+      "qualified_complete": true
+    },
+    {
+      "env": 116,
+      "command": [
+        0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 59.42164611816406,
+      "negative_return": -3.2220304012298584,
+      "net_return": 56.199615478515625,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.04821701720356941,
+      "yaw_rmse": 0.059419963508844376,
+      "qualified_complete": true
+    },
+    {
+      "env": 117,
+      "command": [
+        0.5,
+        0.20000000298023224,
+        0.4000000059604645
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 59.23208236694336,
+      "negative_return": -1.9739701747894287,
+      "net_return": 57.258113861083984,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.04908733069896698,
+      "yaw_rmse": 0.07743076235055923,
+      "qualified_complete": true
+    },
+    {
+      "env": 118,
+      "command": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 59.14435577392578,
+      "negative_return": -4.700562000274658,
+      "net_return": 54.44379425048828,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.09319598227739334,
+      "yaw_rmse": 0.0657593384385109,
+      "qualified_complete": true
+    },
+    {
+      "env": 119,
+      "command": [
+        -0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 2.0,
+      "steps": 1000,
+      "positive_return": 58.57653045654297,
+      "negative_return": -3.304539203643799,
+      "net_return": 55.27199172973633,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.07406768947839737,
+      "yaw_rmse": 0.08852284401655197,
+      "qualified_complete": true
+    },
+    {
+      "env": 120,
+      "command": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 59.812599182128906,
+      "negative_return": -3.6371023654937744,
+      "net_return": 56.17549514770508,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.02156175673007965,
+      "yaw_rmse": 0.037793274968862534,
+      "qualified_complete": true
+    },
+    {
+      "env": 121,
+      "command": [
+        0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 59.50020980834961,
+      "negative_return": -3.1059823036193848,
+      "net_return": 56.39422607421875,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.04633698984980583,
+      "yaw_rmse": 0.053173504769802094,
+      "qualified_complete": true
+    },
+    {
+      "env": 122,
+      "command": [
+        0.5,
+        0.20000000298023224,
+        0.4000000059604645
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 59.450958251953125,
+      "negative_return": -1.7199816703796387,
+      "net_return": 57.73097610473633,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.047116685658693314,
+      "yaw_rmse": 0.0585484579205513,
+      "qualified_complete": true
+    },
+    {
+      "env": 123,
+      "command": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 59.165706634521484,
+      "negative_return": -4.285788536071777,
+      "net_return": 54.87991714477539,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.0873737782239914,
+      "yaw_rmse": 0.0684918761253357,
+      "qualified_complete": true
+    },
+    {
+      "env": 124,
+      "command": [
+        -0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 0.0,
+      "steps": 1000,
+      "positive_return": 58.717994689941406,
+      "negative_return": -3.3212084770202637,
+      "net_return": 55.396785736083984,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.069560706615448,
+      "yaw_rmse": 0.08534078299999237,
+      "qualified_complete": true
+    },
+    {
+      "env": 125,
+      "command": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 59.77962112426758,
+      "negative_return": -3.7448008060455322,
+      "net_return": 56.034820556640625,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.02220320701599121,
+      "yaw_rmse": 0.04233590513467789,
+      "qualified_complete": true
+    },
+    {
+      "env": 126,
+      "command": [
+        0.5,
+        0.0,
+        0.0
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 59.3885612487793,
+      "negative_return": -3.048983573913574,
+      "net_return": 56.339576721191406,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.047376539558172226,
+      "yaw_rmse": 0.06403877586126328,
+      "qualified_complete": true
+    },
+    {
+      "env": 127,
+      "command": [
+        0.5,
+        0.20000000298023224,
+        0.4000000059604645
+      ],
+      "payload_kg": 1.0,
+      "steps": 1000,
+      "positive_return": 59.41420364379883,
+      "negative_return": -1.879189372062683,
+      "net_return": 57.53501510620117,
+      "complete": true,
+      "failure": false,
+      "xy_rmse": 0.04702596738934517,
+      "yaw_rmse": 0.06298718601465225,
+      "qualified_complete": true
+    }
+  ],
+  "accounting": "AS2 continuous coefficients unchanged; rate rewards multiply dt=.02. Hard success and failure bonuses occur once. Positive cap applies to event tasks 3/4; ordinary AS2 tasks keep their original 20 s horizon. Recovery shaping <=1.5/s before completion, tracking <=3/s after completion, so 3/s bounds their real positive total.",
+  "design_status": "Measured scale plus explicitly chosen event coefficients; not AS2 upstream reward facts"
+}

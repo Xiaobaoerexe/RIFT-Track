@@ -1,16 +1,22 @@
-"""Approved depth multitask training contract; one active implementation."""
+"""Three AS2 perception experiments, pinned to blind baseline 2061be6."""
 from dataclasses import dataclass, fields
 
 @dataclass
 class TrainCfg:
-    stage: str = 'multitask'
+    robot: str = 'as2'
+    variant: str = 'simple'
+    stage: str = 'terrain'
     num_envs: int = 4096
     buffer_len: int = 1000
+    replay_storage: str = 'device'
     collect_steps: int = 1
     iterations: int = 120000
     warmup_iterations: int = 1000
     critic_warmup_iterations: int = 500
     actor_ramp_iterations: int = 1000
+    policy_start: int = 1500
+    terrain_start_iteration: int = 2500
+    all_terrain_iteration: int = 5000
     wm_hidden: tuple = (1024, 1024, 1024)
     wm_window: int = 8
     wm_batch: int = 2048
@@ -24,47 +30,35 @@ class TrainCfg:
     horizon: int = 32
     actor_microbatch: int = 8192
     actor_hidden: tuple = (512, 256, 128)
-    critic_hidden: tuple = (256, 128)
-    actor_experts: int = 3
+    critic_hidden: tuple = (512, 256, 128)
+    actor_experts: int = 1
     proprio_experts: int = 8
-    task_count: int = 10
+    task_count: int = 1
     task_context_dim: int = 21
     cts_updates: int = 2
-    cts_batch: int = 128
+    cts_batch: int = 160
     cts_sequence_steps: int = 64
     cts_burnin: int = 16
     cts_lr: float = 3e-4
-    critic_epochs: int = 1
-    critic_minibatches: int = 5
-    critic_microbatch: int = 4096
+    cts_balance: float = .01
+    cts_action_weight: float = .1
+    critic_epochs: int = 5
+    critic_minibatches: int = 4
+    critic_microbatch: int = 16384
+    critic_huber_delta: float = 1.
+    event_batch: int = 2048
     lr: float = 2e-4
+    teacher_lr: float = 2e-4
     wm_lr: float = 2e-4
-    policy_start: int = 1500
-    lr_feedback_start: int = 2500
-    lr_observe_interval: int = 200
-    lr_feedback_interval: int = 1000
     lr_adjust_factor: float = 1.3
-    lr_cosine_start: int = 80000
-    lr_cosine_end: int = 120000
-    lr_final: float = 1e-6
-    wm_lr_bounds: tuple = (2e-5, 2e-4)
-    actor_lr_bounds: tuple = (4e-6, 2e-4)
-    critic_lr_bounds: tuple = (4e-6, 2e-4)
-    cts_stability_start: int = 30000
-    cts_stability_interval: int = 1000
-    cts_early_end: int = 80000
-    cts_late_end: int = 120000
-    cts_final_lr: float = 3e-6
+    lr_fixed_until: int = 5000
+    wm_fixed_until: int = 40000
+    cts_fixed_until: int = 40000
+    wm_lr_bounds: tuple = (5e-5, 2e-4)
+    actor_lr_bounds: tuple = (5e-5, 2e-4)
+    critic_lr_bounds: tuple = (5e-5, 2e-4)
+    cts_lr_bounds: tuple = (1e-4, 3e-4)
     lr_holdout_modulus: int = 32
-    lr_probe_windows: int = 256
-    lr_probe_sequences: int = 128
-    lr_probe_imaginations: int = 128
-    lr_min_episodes: int = 8
-    lr_wm_threshold: float = .01
-    lr_critic_threshold: float = .001
-    lr_actor_high: float = 2.
-    lr_actor_low: float = 1.25
-    lr_tracking_threshold: float = .1
     grad_clip: float = 1.
     grad_clip_elem: float = .1
     gamma: float = .99
@@ -74,16 +68,14 @@ class TrainCfg:
     explore_noise: float = .3
     explore_theta: float = 2.
     driver_policy: str = ''
-    driver_frac: float = .1
-    provider_fade_iterations: int = 5000
-    collapse_falls: float = 5.
+    driver_frac: float = 0.
     log_interval: int = 50
     save_interval: int = 1000
     seed: int = 17
     dt: float = .02
     physics_dt: float = .005
     episode_seconds: float = 20.
-    payload_max_kg: float = 1.2
+    payload_max_kg: float = 2.
     reward_calibration: str = ''
     evaluation_interval: int = 5000
     evaluation_python: str = ''
@@ -91,70 +83,44 @@ class TrainCfg:
     depth_chunk_size: int = 32
     depth_period: int = 10
     mixed_precision: bool = True
-    # Original frozen depth BF16 failed the independent pose-VJP acceptance.
-    # Neural policy/dynamics computations remain BF16; a direct-depth candidate
-    # can select BF16 only after its own precision-specific acceptance passes.
     depth_precision: str = 'fp32'
     fast_depth_checkpoint: str = ''
     compile: bool = True
     device: str = 'cuda:0'
 
     def wm_updates_for(self, iteration):
-        return 2 if iteration < 2500 else 4
+        return 2 if iteration < self.terrain_start_iteration else 4
 
     @classmethod
     def from_record(cls, record):
         unknown = set(record) - {f.name for f in fields(cls)}
         if unknown:
-            raise ValueError('Obsolete or unknown configuration fields: ' + ', '.join(sorted(unknown)))
+            raise ValueError('Retired/unknown configuration fields: ' + ', '.join(sorted(unknown)))
         return cls(**record)
 
     def validate(self, production=True):
-        if (self.policy_start,self.warmup_iterations,self.critic_warmup_iterations,self.actor_ramp_iterations)!=(1500,1000,500,1000):
-            raise ValueError('Approved warmup is WM0/Critic1000/policy+student1500/ramp1000')
-        if (self.lr_feedback_start,self.lr_observe_interval,self.lr_feedback_interval,self.lr_cosine_start,self.lr_cosine_end)!=(2500,200,1000,80000,120000):
-            raise ValueError('Approved feedback/cosine clocks changed')
-        if self.lr_final!=1e-6 or self.cts_final_lr!=3e-6 or self.cts_lr!=3e-4:
-            raise ValueError('Approved learning-rate endpoints changed')
-        if (self.cts_stability_start,self.cts_stability_interval,self.cts_early_end,self.cts_late_end)!=(30000,1000,80000,120000):
-            raise ValueError('Approved student stability/cosine clocks changed')
-        if self.lr_adjust_factor!=1.3 or self.lr!=2e-4 or self.wm_lr!=2e-4:
-            raise ValueError('Approved initial rates or feedback factor changed')
-        if self.lr_holdout_modulus<2 or self.lr_probe_imaginations<=0 or self.lr_probe_imaginations%4:
-            raise ValueError('Invalid held-out diagnostic configuration')
-        if self.collapse_falls != 5. or self.log_interval != 50:
-            raise ValueError('Rollback requires threshold5 and complete50-iteration windows; update legacy launch config')
-        if self.stage != 'multitask':
-            raise ValueError('Only the approved depth multitask architecture is supported')
+        if self.robot != 'as2' or self.variant not in ('simple', 'events', 'moe'):
+            raise ValueError('Only the three AS2 experiments are supported')
+        if self.replay_storage not in ('device','cpu'):
+            raise ValueError('Replay storage must be device or cpu')
+        expected = (1, 1) if self.variant == 'simple' else (5, 3 if self.variant == 'moe' else 1)
+        if (self.task_count, self.actor_experts) != expected:
+            raise ValueError('Variant/task/actor mismatch')
+        if self.driver_frac or self.driver_policy:
+            raise ValueError('The AS2 baseline has no external training provider')
         if (self.collect_steps, self.horizon, self.wm_window) != (1, 32, 8):
-            raise ValueError('Collect/H/K contract must remain 1/32/8')
-        if production and (self.num_envs, self.buffer_len, self.imag_batch, self.wm_batch) != (4096,1000,8192,2048):
-            raise ValueError('Formal scale must be 4096/1000/8192/2048')
+            raise ValueError('Source collect/H/K contract is 1/32/8')
+        if production and (self.num_envs, self.buffer_len, self.imag_batch, self.wm_batch) != (4096, 1000, 8192, 2048):
+            raise ValueError('Production scale must be 4096/1000/8192/2048')
         if production and self.iterations != 120000:
-            raise ValueError('Approved formal budget is 120000 iterations')
-        if production and (self.cts_updates,self.cts_batch,self.cts_sequence_steps,self.cts_burnin) != (2,128,64,16):
-            raise ValueError('Student sequence contract must be 2 x 128 x (16 burn-in + 64 loss)')
-        if self.actor_experts != 3 or self.proprio_experts != 8 or self.task_count != 10:
-            raise ValueError('Network expert/task counts changed')
-        if self.actor_microbatch <= 0 or self.actor_microbatch > self.imag_batch:
-            raise ValueError('Invalid actor microbatch; total cohort remains8192')
-        if production and self.actor_microbatch != self.imag_batch:
-            raise ValueError('V2 production uses one fused8192 imagination cohort')
-        if self.teacher_fraction != .75:
-            raise ValueError('Imagination split must remain6144teacher/2048student, equal branch means')
-        if not 0 <= self.driver_frac < 1 or (self.driver_frac and not self.driver_policy):
-            raise ValueError('A declared official collection provider must exist')
-        if not 0 <= self.payload_max_kg <= 1.2:
-            raise ValueError('Payload must remain0..1.2kg and fixed within each episode')
-        if (self.critic_epochs,self.critic_minibatches) != (1,5):
-            raise ValueError('Critic uses exactly one full pass divided into five optimizer steps')
-        if self.depth_period != 10:
-            raise ValueError('Approved visual cadence is5Hz at50Hz control')
-        if self.depth_precision not in ('fp32','bf16'):
-            raise ValueError('Unsupported depth precision')
-        if production and not self.reward_calibration:
-            raise ValueError('Formal launch requires measured reward budgets')
-        if production and not self.evaluation_python:
-            raise ValueError('Formal launch requires the pinned official evaluation runtime')
+            raise ValueError('Production budget is 120000 iterations')
+        if production and (self.cts_updates,self.cts_batch,self.cts_sequence_steps,self.cts_burnin) != (2,160,64,16):
+            raise ValueError('Visual CTS adaptation is 2 x 160 x (16 burn + 64 loss)')
+        if (self.critic_epochs,self.critic_minibatches) != (5,4):
+            raise ValueError('Keep the AS2 five passes / four minibatches')
+        if not 0 < self.actor_microbatch <= self.imag_batch or self.teacher_fraction != .75:
+            raise ValueError('Invalid equivalent imagination partition')
+        if self.payload_max_kg != 2. or self.depth_period != 10:
+            raise ValueError('AS2 payload and 5Hz visual cadence changed')
         if production and not self.fast_depth_checkpoint:
-            raise ValueError('V3 formal training requires the accepted compact depth observer')
+            raise ValueError('A qualified frozen depth generator is required')

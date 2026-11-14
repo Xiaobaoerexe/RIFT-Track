@@ -46,7 +46,7 @@ def main():
     if not bench['passed'] or not bench['restore_passed']:failures.append('Full PhysX update/restore validation failed')
     if bench['config']['actor_experts']!=3 or bench['config']['imag_batch']!=8192 or bench['config']['teacher_fraction']!=.75:
         failures.append('Formal workload changed')
-    required={'gap','indoor_obstacles','obstacle_up','obstacle_down'}
+    required={'gap','obstacle_up','obstacle_down'}
     if not required.issubset(boxes['candidate']):failures.append('Missing new-task physical geometry')
     ck=torch.load(a.weights,map_location='cpu',weights_only=False)
     record={'profile':'learned_approximation_v3','passed':not failures,'failures':failures,'weights_sha256':digest,

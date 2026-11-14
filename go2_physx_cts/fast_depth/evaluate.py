@@ -19,7 +19,7 @@ THRESHOLDS={'common_valid_mae_m':.05,'common_valid_p95_m':.20,
             'validity_f1_min':.98,'edge_mae_m':.08,'pose_vjp_relative_l2_max':.05,
             'rtx_relative_degradation_max':.10}
 FAMILIES={0:'nominal',1:'transition',2:'fallen',3:'full_orientation'}
-NEW_TERRAINS={'indoor_obstacles','obstacle_up','obstacle_down'}
+NEW_TERRAINS={'obstacle_up','obstacle_down'}
 
 
 def terrain_name(name):

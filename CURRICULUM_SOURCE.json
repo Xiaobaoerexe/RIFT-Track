@@ -1,44 +1,191 @@
 {
-  "parent_training_commit": "fa3c776af150986776b5c513130c0e7a8b38b4c6",
-  "go2_rl_lab": {
-    "repository": "https://github.com/wty-yy/go2_rl_lab",
-    "commit": "6c95d9feef4814c25eb6536e61bb38e1d1d718d4",
-    "scope": "CTS shared Actor and distillation ownership, dense terrain recipe, official reward ingredients and distance curriculum"
-  },
-  "go2_supermimic": {
-    "repository": "https://github.com/Zhengtianjin/go2-supermimic",
-    "commit": "d9eee9b3f248e5300e636c433255db2c1c3e086a",
-    "scope": "shared Replay starts, 8-step WM, 32-step BPTT, TD-lambda, source priorities/FIFO archive, OU, optimizer/clipping and collapse rollback"
-  },
-  "robogauge": {
-    "repository": "https://github.com/wty-yy/RoboGauge",
-    "commit": "add2c7ee0185ea8fd93d242f86e1c8cac6e9913b",
-    "mujoco": "3.2.3",
-    "scope": "unchanged simulation/PD/reset loop and robot XML; expanded perceptive ABI"
-  },
-  "rapid_locomotion": {
-    "repository": "https://github.com/Improbable-AI/rapid-locomotion-rl",
-    "commit": "f5143ef940e934849c00284e34caf164d6ce7b6e",
-    "file": "mini_gym/envs/base/curriculum.py",
-    "selected": true,
-    "scope": "weighted cells, within-cell draws, successful neighbor expansion; explicit project downgrade/macro terrain score adaptations"
-  },
-  "cts_moe_paper": {
-    "arxiv": "2606.19633v1",
-    "source_level": "paper; no author training code acquired",
-    "scope": "depth CNN+GRU fusion, task teacher input, dense action experts and task critics; adaptations specified in BUILD_CONTRACT.txt"
-  },
-  "project_adaptations": [
-    "Isaac Sim/PhysX, three-dimensional velocity commands, ten tasks",
-    "8 action experts and 8 proprio experts; student params distillation-only",
-    "6144 teacher/2048 student imagined trajectories, equal branch mean weights1+1",
-    "frozen supplied depth generator/noise0.1.0 and25Hz recurrent observations",
-    "new approved task geometries, calibrated rewards and full-pose physical WM",
-    "120000 learner iterations, task/terrain/velocity curricula separated",
-    "bounded validation LR trials, not PPO KL",
-    "rigid payload0..1.2kg per episode",
-    "available official collection task1..5 only; missing skill experts explicit",
-    "cold initialization; old baseline checkpoint NOT loaded"
+  "schema": "as2-perceptive-curriculum-v1",
+  "baseline_commit": "2061be6b0d592afe9e81223206cf5f864e45b9f4",
+  "terrain_names": [
+    "wave",
+    "slope_up",
+    "slope_down",
+    "rough_slope",
+    "stairs_up",
+    "stairs_down",
+    "obstacles",
+    "flat",
+    "wheels",
+    "small_squares",
+    "gap",
+    "obstacle_up",
+    "obstacle_down"
   ],
-  "evidence_boundary": "Source facts and paper results do not certify this new composition. Full-stack smoke proves execution and stated invariants, not learned locomotion."
+  "removed": "tall indoor obstacle-avoidance geometry, task and reward; original low traversable obstacles remains",
+  "phases": [
+    {
+      "from": 0,
+      "to": 2500,
+      "tasks": [
+        0
+      ],
+      "terrains": [
+        "flat"
+      ]
+    },
+    {
+      "from": 2500,
+      "to": 5000,
+      "tasks": [
+        0
+      ],
+      "terrains": "original ten source terrain proportions"
+    },
+    {
+      "from": 5000,
+      "variant": "simple",
+      "tasks": [
+        0
+      ],
+      "terrains": "original20sourcecolumns plus2slots each gap/up/down"
+    },
+    {
+      "from": 5000,
+      "variant": "events/moe",
+      "tasks": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "counts_4096": [
+        820,
+        819,
+        819,
+        819,
+        819
+      ]
+    }
+  ],
+  "tasks": {
+    "0": "velocity tracking on original ten terrains",
+    "1": "flat forward running",
+    "2": "flat rapid command changes",
+    "3": "gap/up/down, once-only hard completion then continuing motion",
+    "4": "flat fallen-pose recovery"
+  },
+  "positive_vx_hard_caps": {
+    "0": 0.5,
+    "5000": 1.0,
+    "10000": 2.0,
+    "20000": 4.0,
+    "30000": 6.0,
+    "35000": 8.0
+  },
+  "other_ranges": "AS2 source negative-vx/vy/yaw stages and per-terrain limits retained; completed special3D command capped2m/s",
+  "velocity_grid": {
+    "variants": [
+      "events",
+      "moe"
+    ],
+    "source_commit": "f5143ef940e934849c00284e34caf164d6ce7b6e",
+    "axes_steps": [
+      0.5,
+      0.2,
+      0.1
+    ],
+    "update_iterations": 1000,
+    "split": "task and actual terrain independently",
+    "upgrade_gt": 0.75,
+    "downgrade_lt": 0.5,
+    "ordinary_measure": "actual signed command-direction displacement / integrated requested displacement",
+    "special_measure": "hard episode success attributed to initial approach bin and assigned special terrain",
+    "own_data_only": true,
+    "recovery_excluded": true,
+    "pure_vx_fraction_min": 0.3,
+    "empty_cells": "hold"
+  },
+  "special_command": "Hold pure positivevx within an attempt; dynamically deadline-aware lowerbound; initialrange[.6,1.] at8s; maximum2m/s; resample ordinary3D immediately after hard completion.",
+  "rapid_turn_command_period_seconds": 1.0,
+  "ordinary_command_period_seconds": 5.0,
+  "terrain_progression": {
+    "source": "Go2RLLab/AS2 TerrainLevelsVelGym",
+    "levels": [
+      0,
+      9
+    ],
+    "upgrade": "maximum displacement > half effective tile length",
+    "downgrade": "maximum displacement < half requested source command distance and not upgrading",
+    "special_events": "hard success/failure upgrades/downgrades",
+    "recovery": "flat fixed level0"
+  },
+  "geometry": {
+    "gap": {
+      "depth_m": 0.8,
+      "width_m": "0.20+0.07*level",
+      "far_bank_x_fraction": 0.5,
+      "goal_x_fraction": 0.7
+    },
+    "obstacle_up_down": {
+      "height_m": "0.25+0.03*level",
+      "platform_extension": "2*episode_seconds+3m beyond nominal arena; no tall pillars"
+    },
+    "flat_runway": "geometry built for8m/s; effective progression length recomputed from currently unlocked speed and episode duration"
+  },
+  "success_region": "forward continuation channel beyond goal entrance with lateral/height/stability checks; no forward circular exit",
+  "cold_start": true,
+  "iteration_budget": 120000,
+  "wall_clock_cap": null,
+  "terrain_allocation": {
+    "source_commit": "2061be6b0d592afe9e81223206cf5f864e45b9f4",
+    "observe_from": 20000,
+    "adjust_from": 25000,
+    "interval": 5000,
+    "requires": "two consecutive matching fixed PhysX cohorts",
+    "poor_lt": 0.5,
+    "good_gte": 0.8,
+    "max_good_drop_lt": 0.1,
+    "transfer_fraction": 0.1,
+    "maximum": "2*initial terrain allocation",
+    "minimum": "round(200*eligible_environment_count/4096), capped by initial allocation; 200 forsimple,40 for820-env task0",
+    "simple_eligible": "all13 terrains/all environments",
+    "events_moe_eligible": "task0 original10 terrains only; zero-base special terrains remainzero; other task counts unchanged"
+  },
+  "special_command_reachability": {
+    "kind": "explicit project adaptation; not upstream recipe",
+    "max_gap_level": 9,
+    "gap_spawn_x_m": 3.77,
+    "goal_x_m": 8.4,
+    "target_radius_m": 0.8,
+    "maximum_entry_distance_m": 3.83,
+    "stable_seconds": 0.64,
+    "startup_allowance_seconds": 0.5,
+    "formula": "ceil_to_0.1(3.83/(episode_seconds-0.64-0.5))",
+    "default_episode_seconds": 8.0,
+    "default_minimum_speed_mps": 0.6,
+    "initial_grid_extent_mps": 1.0,
+    "minimum_grid_extent": "ceil_to_0.5(minimum_speed)",
+    "default_initial_sampling_interval": [
+      0.6,
+      1.0
+    ],
+    "initial_frontier_cells": "both0.5 and1.0center cells weighted; samples clipped into reachable interval",
+    "maximum_speed_mps": 2.0,
+    "short_episode_behavior": "recompute lowerbound; reject when infeasible under current unlocked cap or2m/s limit; no silent unreachable sample",
+    "cpu_perfect_tracking_result": {
+      "gap_levels": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "speed_mps": 0.6,
+      "startup_wait_seconds": 0.5,
+      "latest_hard_success_seconds": 7.52,
+      "success_bonus_count_each": 1
+    },
+    "evidence_boundary": "Geometry/clock feasibility under idealtracking and stable support; does not establish realphysics jumping capability."
+  }
 }

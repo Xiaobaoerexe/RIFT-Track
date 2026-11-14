@@ -11,6 +11,24 @@ from . import state as st
 from .camera_geometry import verify_camera_contract,ATLAS_STRIDE_M
 from .capture_cache import CapturedImages
 
+
+def _paired_core(core,cache,origins,position,rotation,scene_ids,keys):
+    """Same pinned geometry/noise math as FrozenCore.forward, with clean output.
+
+    This supervised-only split avoids performing the expensive surface query
+    twice to obtain a noisy/clean pair. No geometry/noise parameters are trained.
+    """
+    import math
+    from go2_depth_input.core import fields_from_keys
+    clean,logit=core.geometry_cached(cache,scene_ids,position-origins[scene_ids],rotation)
+    probability=logit.sigmoid()
+    valid=(logit>0).float().detach()-probability.detach()+probability if core.hard else probability
+    site=torch.ones_like(scene_ids)
+    fields,epsilon=fields_from_keys(keys,core.noise_counter)
+    logits,sigma=core.noise.parameters_at(clean,site)
+    noisy,_,_=core.noise.corrupt(clean,site,logits+math.log(core.hole_strength),sigma,fields,epsilon,valid,core.hard,.5)
+    return noisy[:,None],clean[:,None]
+
 class DepthObservation:
     def __init__(self,cfg,field):
         package=Path(cfg.depth_package)
@@ -62,6 +80,7 @@ class DepthObservation:
         cache_bytes=owned.numel()*4+lf.numel()*4+cf.numel()*4
         self.seed=cfg.seed
         self.period=cfg.depth_period
+        self._paired_fn=torch.compile(_paired_core,dynamic=False,fullgraph=True) if cfg.compile else _paired_core
         self.images=CapturedImages(cfg.num_envs*((cfg.buffer_len+cfg.depth_period-1)//cfg.depth_period+2),cfg.device)
         self.metadata={'package_version':'0.1.0','frozen':True,'precision':cfg.depth_precision,
                        'weights_sha256':hashlib.sha256((package/'go2_depth_input/assets/weights.pt').read_bytes()).hexdigest(),
@@ -81,8 +100,38 @@ class DepthObservation:
 
     @torch.no_grad()
     def captured(self,pose,scene_ids,frame_index,episode_ids,trajectory_ids,capture_keys=None):
-        """Only for already collected poses; future imagination uses render()."""
+        """Real captures and imagined starting observations; future steps use WM latent."""
         return self.images.get(self.render,pose,scene_ids,frame_index,episode_ids,trajectory_ids,capture_keys=capture_keys)
+
+    @torch.no_grad()
+    def paired(self,pose,scene_ids=None,frame_index=0,episode_ids=0,trajectory_ids=None):
+        """Real-state noisy/clean supervision pair in metric optical depth.
+
+        Clean means the frozen geometry module's output before sensor noise,
+        not a claim of exact ray-traced ground truth. Pairing retains exact pose,
+        scene and stateless noise keys; it is never called on imagined futures.
+        """
+        if trajectory_ids is None:raise ValueError('Explicit trajectory IDs required for paired depth')
+        if scene_ids is None:scene_ids=self.field.scene_ids(pose)
+        ids=scene_ids.reshape(-1).long()
+        coverage=self.field.scene_coverage(pose,scene_ids=ids,return_details=True)
+        if not bool(coverage['valid'].all()):raise RuntimeError('Paired depth outside represented geometry')
+        n=len(pose)
+        if not n:return pose.new_empty((0,1,48,64)),pose.new_empty((0,1,48,64))
+        def index(x):return torch.as_tensor(x,device=pose.device).reshape(-1).long().expand(n)
+        keys=self.noise_keys(index(trajectory_ids),index(frame_index),seed=self.seed,episode_ids=index(episode_ids))
+        from go2_depth_input.vendor.camera import MOUNT,optical_rotation
+        rotation=self.rotation(pose).float()
+        camera=pose[:,:3].float()-self.scene_origins[ids]+(rotation@pose.new_tensor(MOUNT)[None,:,None]).squeeze(-1)
+        optical=optical_rotation(rotation)
+        noisy,clean=[],[]
+        engine=self.engine
+        for lo in range(0,n,engine.chunk_size):
+            sl=slice(lo,min(n,lo+engine.chunk_size))
+            with engine._precision_context(),engine._autocast():
+                pair=self._paired_fn(engine.core,self.cache.tensors,self.cache.origins,camera[sl],optical[sl],self.scene_remap[ids[sl]],keys[sl])
+            noisy.append(pair[0]);clean.append(pair[1])
+        return torch.cat(noisy).float(),torch.cat(clean).float()
 
     @staticmethod
     def rotation(pose):

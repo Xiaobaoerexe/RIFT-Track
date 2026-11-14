@@ -8,7 +8,10 @@ JOINT_NAMES=tuple(f"{leg}_{joint}_joint" for leg in LEGS for joint in ("hip","th
 TERM_DIMS=(3,3,3,12,12,12)
 HISTORY,OBS_DIM,SINGLE_DIM=10,450,45
 PRIV_DIM=STATE_DIM+3+12+CONTEXT_DIM+77
-DEFAULT_Q=(.1,.9,-1.8,-.1,.9,-1.8,.1,.9,-1.8,-.1,.9,-1.8)
+DEFAULT_Q=(-.1,.9,-1.8,.1,.9,-1.8,-.1,.9,-1.8,.1,.9,-1.8)
+AUX_DIM=40
+AUX_TORQUE,AUX_ACC,AUX_FEET_VXY,AUX_LOG_FORCE=slice(0,12),slice(12,24),slice(24,32),slice(32,40)
+REWARD_STATE=("applied_torque","joint_acceleration","foot_velocity","log_contact_force")
 
 def quat_normalize(q):return q/torch.linalg.vector_norm(q,dim=-1,keepdim=True).clamp_min(1e-9)
 def quat_conjugate(q):return torch.cat((-q[...,:3],q[...,3:]),-1)
@@ -51,20 +54,20 @@ def apply_pose_delta(p,d):
     return torch.cat((p[:,:3]+d[:,:3],quat_normalize(quat_mul(p[:,3:],rotvec_quat(d[:,3:])))),-1)
 
 def forward_kinematics(q):
-    """Go2 URDF leg chain, joints in FL/FR/RL/RR order; positions in base frame.
+    """AS2 URDF leg chain, joints in FL/FR/RL/RR order; positions in base frame.
 
     Constants are pinned to the training asset and validated against loaded PhysX
     body transforms by the runtime audit before training.
     """
     q=q.reshape(-1,4,3);hip,thigh,calf=q.unbind(-1)
     sides=q.new_tensor([1.,-1.,1.,-1.]);front=q.new_tensor([1.,1.,-1.,-1.])
-    root=torch.stack((front*.1934,sides*.0465,torch.zeros_like(front)),-1).expand(len(q),-1,-1)
-    off=torch.stack((torch.zeros_like(sides),sides*.0955,torch.zeros_like(sides)),-1).expand(len(q),-1,-1)
+    root=torch.stack((front*.2119,sides*.06,torch.zeros_like(front)),-1).expand(len(q),-1,-1)
+    off=torch.stack((torch.zeros_like(sides),sides*.1054,torch.zeros_like(sides)),-1).expand(len(q),-1,-1)
     def rx(v):
         x,y,z=v.unbind(-1);c,s=hip.cos(),hip.sin();return torch.stack((x,c*y-s*z,s*y+c*z),-1)
     h=root+rx(off)
-    def seg(angle):return torch.stack((-.213*angle.sin(),torch.zeros_like(angle),-.213*angle.cos()),-1)
-    knee=h+rx(seg(thigh));foot=knee+rx(seg(thigh+calf))
+    def seg(angle,length):return torch.stack((-length*angle.sin(),torch.zeros_like(angle),-length*angle.cos()),-1)
+    knee=h+rx(seg(thigh,.212));foot=knee+rx(seg(thigh+calf,.21344))
     return h,knee,foot
 
 def reconcile_state(s,pose,field=None,default_q=None):

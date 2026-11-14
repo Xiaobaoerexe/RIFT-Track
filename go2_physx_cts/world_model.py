@@ -1,7 +1,8 @@
-"""Encoded physical dynamics with full pose and supervised contact telemetry.
+"""Full-pose physical model plus held-camera latent dynamics.
 
-No task label enters dynamics. Geometry is sampled at each autoregressively
-predicted pose; terminal transitions remain supervised, reset jumps do not.
+No task ID enters dynamics. The 1024x3 backbone is retained; only its interfaces
+grow. Physical telemetry includes the exact AS2 reward measurements. Visual
+targets are re-encoded real captures; a training-only decoder prevents collapse.
 """
 import torch
 from torch import nn
@@ -10,113 +11,178 @@ from . import state as st
 from .networks import RunningNorm, GeometryEncoder, mlp
 from .terrain import geometry_crop
 from .precision import network_autocast
+from .latent import LATENT_DIM, CAPTURE_CONTEXT_DIM, LatentDecoder, camera_context, camera_refresh, prepare_latent_targets
 
 
-def supervised_loss(model,window,field,default_q):
-    """Compilation boundary for one unchanged autoregressive supervision update.
+def supervised_loss(model,window,field,default_q,*,depth=None,encoder=None,latent_targets=None):
+    """Prepare real images outside compilation; compile the tensor loss if needed."""
+    return model.loss(window,field,default_q,depth=depth,encoder=encoder,latent_targets=latent_targets)
 
-    Keep the module itself unwrapped so parameter ownership, running statistics
-    and checkpoint keys remain identical. Diagnostics may call model.loss with
-    return_terms directly without compiling a second full supervision graph.
-    """
-    return model.loss(window,field,default_q)
+
+def telemetry_vector(telemetry):
+    return torch.cat((telemetry['applied_torque'],telemetry['foot_velocity'].reshape(-1,12),
+                      telemetry['joint_acceleration'],telemetry['log_contact_force']),-1)
+
+
+def telemetry_target(window,step):
+    return torch.cat((window['applied_torque'][:,step],window['foot_velocity'][:,step].reshape(-1,12),
+                      window['joint_acceleration'][:,step],window['log_contact_force'][:,step]),-1)
 
 
 class WorldModel(nn.Module):
     contact_dim=14
-    def __init__(self,hidden=(1024,1024,1024),mixed_precision=True):
-        super().__init__();self.mixed_precision=mixed_precision
+    telemetry_dim=44  # torque12, feet velocityXYZ12, qacc12, limb log1p(force)8
+    latent_dim=LATENT_DIM
+    def __init__(self,hidden=(1024,1024,1024),mixed_precision=True,depth_period=10):
+        super().__init__();self.mixed_precision=mixed_precision;self.depth_period=int(depth_period)
+        if self.depth_period<1:raise ValueError('depth_period must be positive')
         self.physical_norm=RunningNorm(st.STATE_DIM+4)
-        self.action_norm=RunningNorm(25)
-        self.context_norm=RunningNorm(st.CONTEXT_DIM)
+        self.action_norm=RunningNorm(25);self.context_norm=RunningNorm(st.CONTEXT_DIM)
         self.physical_encoder=mlp(st.STATE_DIM+4,(128,),128)
-        self.action_encoder=mlp(25,(64,),64)
-        self.context_encoder=mlp(st.CONTEXT_DIM,(32,),32)
+        self.action_encoder=mlp(25,(64,),64);self.context_encoder=mlp(st.CONTEXT_DIM,(32,),32)
         self.geometry_encoder=GeometryEncoder(128,mixed_precision=mixed_precision)
         self.output_dim=st.STATE_DIM+st.POSE_DELTA_DIM
-        self.net=mlp(352,hidden,self.output_dim+24+self.contact_dim)
-        self.out_norm=RunningNorm(self.output_dim)
-        self.telemetry_norm=RunningNorm(24)
-    def _features(self,s,a,a_prev,xi,local_map,pose):
+        self.net=mlp(352+LATENT_DIM+CAPTURE_CONTEXT_DIM,hidden,
+                     self.output_dim+self.telemetry_dim+self.contact_dim+LATENT_DIM)
+        # Instinct initializes predicted increments at zero. Apply that source
+        # choice only to the newly added latent rows: the first visual forecast
+        # is a hold, rather than an arbitrary delta divided by tiny CNN variance.
+        # Keep the existing AS2/depth physical-output initialization unchanged.
+        latent_start=self.output_dim+self.telemetry_dim+self.contact_dim
+        with torch.no_grad():
+            self.net[-1].weight[latent_start:].zero_()
+            self.net[-1].bias[latent_start:].zero_()
+        self.out_norm=RunningNorm(self.output_dim);self.telemetry_norm=RunningNorm(self.telemetry_dim)
+        self.latent_decoder=LatentDecoder(LATENT_DIM,mixed_precision)
+        self.register_buffer('z_mean',torch.zeros(LATENT_DIM))
+        self.register_buffer('z_std',torch.ones(LATENT_DIM))
+        self.register_buffer('dz_std',torch.ones(LATENT_DIM))
+
+    def _features(self,s,a,a_prev,xi,local_map,pose,latent,frame_index,capture_pose):
         delayed=torch.cat((a,a_prev,xi[:,3:4]),-1)
+        if latent is None:
+            visual=s.new_zeros((len(s),LATENT_DIM+CAPTURE_CONTEXT_DIM))
+        else:
+            if frame_index is None or capture_pose is None:
+                raise ValueError('Latent dynamics requires control frame and last capture pose')
+            visual=torch.cat(((latent-self.z_mean)/self.z_std,
+                              camera_context(pose,frame_index,capture_pose,self.depth_period)),-1)
         return torch.cat((self.physical_encoder(self.physical_norm(torch.cat((s,pose[:,3:]),-1))),
             self.action_encoder(self.action_norm(delayed)),self.context_encoder(self.context_norm(xi)),
-            self.geometry_encoder(local_map)),-1)
-    @torch.no_grad()
-    def update_stats(self,s,a,a_prev,xi,local_map,s_next,pose_delta,telemetry=None,pose=None):
-        self.physical_norm.update(torch.cat((s,pose[:,3:]),-1)); self.action_norm.update(torch.cat((a,a_prev,xi[:,3:4]),-1)); self.context_norm.update(xi)
-        self.out_norm.update(torch.cat((s_next-s,pose_delta),-1))
-        if telemetry is not None:
-            self.telemetry_norm.update(torch.cat((telemetry['applied_torque'],telemetry['foot_velocity'].reshape(-1,12)),-1))
-    def predict(self,s,a,a_prev,xi,local_map,pose):
-        with network_autocast(s,self.mixed_precision):y=self.net(self._features(s,a,a_prev,xi,local_map,pose))
-        # Autoregressive integration, contact probabilities and all supervised
-        # losses operate onFP32 physical quantities, not accumulated BF16 state.
-        y=y.float()
-        physical=self.out_norm.unnormalize(y[:,:self.output_dim])
-        auxiliary=self.telemetry_norm.unnormalize(y[:,self.output_dim:self.output_dim+24])
-        logits=y[:,self.output_dim+24:]
-        telemetry={'applied_torque':auxiliary[:,:12],'foot_velocity':auxiliary[:,12:].reshape(-1,4,3),
-                   'contact_prob':logits.sigmoid(),'contact_logits':logits}
-        return s+physical[:,:st.STATE_DIM],physical[:,st.STATE_DIM:],telemetry
-    def forward(self,s,a,a_prev,xi,local_map,pose):
-        ns,dp,_=self.predict(s,a,a_prev,xi,local_map,pose); return ns,dp
+            self.geometry_encoder(local_map),visual),-1)
 
     @torch.no_grad()
-    def validation_errors(self,w,field,default_q,scales):
-        """Per-window physical errors on immutable labels and fixed metric scales."""
-        s=w['s'][:,0];pose=w['pose'][:,0];valid=w['valid']
+    def update_stats(self,s,a,a_prev,xi,local_map,s_next,pose_delta,telemetry=None,pose=None):
+        if pose is None:raise ValueError('Full current pose is required')
+        self.physical_norm.update(torch.cat((s,pose[:,3:]),-1))
+        self.action_norm.update(torch.cat((a,a_prev,xi[:,3:4]),-1));self.context_norm.update(xi)
+        self.out_norm.update(torch.cat((s_next-s,pose_delta),-1))
+        if telemetry is not None:self.telemetry_norm.update(telemetry_vector(telemetry))
+
+    @torch.no_grad()
+    def update_latent_stats(self,targets,rate=.01):
+        weight=targets.refresh.to(targets.targets.dtype)[...,None]
+        count=weight.sum();total=count+len(targets.initial)
+        mean=(targets.initial.sum(0)+(targets.targets*weight).sum((0,1)))/total
+        second=(targets.initial.square().sum(0)+(targets.targets.square()*weight).sum((0,1)))/total
+        self.z_mean.lerp_(mean,rate)
+        self.z_std.lerp_((second-mean.square()).clamp_min(1e-6).sqrt(),rate)
+        rms=((targets.increments.square()*weight).sum((0,1))/count.clamp_min(1)).sqrt().clamp_min(1e-3)
+        self.dz_std.lerp_(torch.where(count>0,rms,self.dz_std),rate)
+
+    def predict(self,s,a,a_prev,xi,local_map,pose,latent=None,frame_index=None,capture_pose=None):
+        with network_autocast(s,self.mixed_precision):
+            y=self.net(self._features(s,a,a_prev,xi,local_map,pose,latent,frame_index,capture_pose))
+        y=y.float();end=self.output_dim+self.telemetry_dim
+        physical=self.out_norm.unnormalize(y[:,:self.output_dim])
+        auxiliary=self.telemetry_norm.unnormalize(y[:,self.output_dim:end])
+        logits=y[:,end:end+self.contact_dim]
+        telemetry={'applied_torque':auxiliary[:,:12], 'foot_velocity':auxiliary[:,12:24].reshape(-1,4,3),
+                   'joint_acceleration':auxiliary[:,24:36], 'log_contact_force':auxiliary[:,36:44],
+                   'contact_prob':logits.sigmoid(),'contact_logits':logits}
+        telemetry['reward_aux']=torch.cat((auxiliary[:,:12],auxiliary[:,24:36],
+                                          telemetry['foot_velocity'][...,:2].reshape(-1,8),auxiliary[:,36:44]),-1)
+        next_latent=None
+        if latent is not None:
+            candidate=latent+y[:,end+self.contact_dim:]*self.dz_std
+            next_latent=torch.where(camera_refresh(frame_index,self.depth_period)[:,None],candidate,latent)
+        return s+physical[:,:st.STATE_DIM],physical[:,st.STATE_DIM:],telemetry,next_latent
+
+    def forward(self,s,a,a_prev,xi,local_map,pose):
+        ns,dp,_,_=self.predict(s,a,a_prev,xi,local_map,pose);return ns,dp
+
+    def _targets(self,w,depth,encoder,latent_targets):
+        if latent_targets is not None:return latent_targets
+        if (depth is None)!=(encoder is None):raise ValueError('depth and encoder must be supplied together')
+        if depth is not None:return prepare_latent_targets(w,depth,encoder,self.depth_period)
+        return None
+
+    def _rollout_errors(self,w,field,default_q,scales,latent_targets):
+        s=w['s'][:,0];pose=w['pose'][:,0]
         scale,aux_scale=scales
-        sums={k:torch.zeros(len(s),device=s.device) for k in
-              ('state','pose','contact','telemetry','consistency','one_step','velocity_mse','pose_mse')}
+        z=None if latent_targets is None else latent_targets.initial
+        capture=None if z is None else w['depth_pose'][:,0]
+        frame=None if z is None else w['frame_index'][:,0].reshape(-1)
+        rows={name:[] for name in ('state','pose','contact','telemetry','consistency','velocity_mse','pose_mse','latent')}
+        if z is not None:
+            weight=latent_targets.refresh.to(s.dtype)[...,None];count=weight.sum().clamp_min(1)
+            mean=(latent_targets.targets*weight).sum((0,1))/count
+            second=(latent_targets.targets.square()*weight).sum((0,1))/count
+            z_variance=(second-mean.square()).clamp_min(0).mean().clamp_min(1e-6)
         for j in range(w['a'].shape[1]):
             xi=w['xi'][:,j] if w['xi'].ndim==3 else w['xi']
-            raw,dp,telemetry=self.predict(s,w['a'][:,j],w['a_prev'][:,j],xi,
-                geometry_crop(s,pose,field,kind='world_model'),pose)
+            raw,dp,telemetry,next_z=self.predict(s,w['a'][:,j],w['a_prev'][:,j],xi,
+                geometry_crop(s,pose,field,kind='world_model'),pose,z,frame,capture)
             next_pose=st.apply_pose_delta(pose,dp)
             ns=st.reconcile_state(raw,next_pose,field,default_q)
             pe=st.pose_delta(w['pose_next'][:,j],next_pose)
-            aux=torch.cat((telemetry['applied_torque'],telemetry['foot_velocity'].reshape(-1,12)),-1)
-            target_aux=torch.cat((w['applied_torque'][:,j],w['foot_velocity'][:,j].reshape(-1,12)),-1)
+            latent_error=s.new_zeros(len(s))
+            if z is not None:
+                dz=torch.where(latent_targets.refresh[:,j,None],next_z-latent_targets.targets[:,j],torch.zeros_like(next_z))
+                latent_error=dz.square().mean(-1)/z_variance
             terms={'state':((ns-w['s_next'][:,j])/scale[:st.STATE_DIM]).square().mean(-1),
                 'pose':(pe/scale[st.STATE_DIM:]).square().mean(-1),
                 'contact':F.binary_cross_entropy_with_logits(telemetry['contact_logits'],w['contact_prob'][:,j].float(),reduction='none').mean(-1),
-                'telemetry':((aux-target_aux)/aux_scale).square().mean(-1),
+                'telemetry':((telemetry_vector(telemetry)-telemetry_target(w,j))/aux_scale).square().mean(-1),
                 'consistency':((raw-ns)/scale[:st.STATE_DIM]).square().mean(-1),
                 'velocity_mse':(ns[:,4:10]-w['s_next'][:,j,4:10]).square().mean(-1),
-                'pose_mse':pe.square().mean(-1)}
-            for k,v in terms.items():sums[k]+=v*valid[:,j]
-            if j==0:sums['one_step']=terms['state']+terms['pose']
+                'pose_mse':pe.square().mean(-1),
+                'latent':latent_error}
+            for name,value in terms.items():rows[name].append(value)
+            if z is not None:
+                refresh=camera_refresh(frame,self.depth_period)
+                capture=torch.where(refresh[:,None],next_pose,capture)
+                frame=frame+1;z=next_z
             s,pose=ns,next_pose
-        den=valid.sum(-1).clamp_min(1)
-        rows={k:v/den if k!='one_step' else v for k,v in sums.items()}
+        return {name:torch.stack(values,1) for name,values in rows.items()}
+
+    @torch.no_grad()
+    def validation_errors(self,w,field,default_q,scales,*,depth=None,encoder=None,latent_targets=None):
+        """Read-only errors; neither running scales nor encoder weights are updated."""
+        target=self._targets(w,depth,encoder,latent_targets)
+        errors=self._rollout_errors(w,field,default_q,scales,target)
+        valid=w['valid'];den=valid.sum(-1).clamp_min(1)
+        rows={name:(value*valid).sum(-1)/den for name,value in errors.items() if name!='latent'}
+        rows['one_step']=errors['state'][:,0]+errors['pose'][:,0]
+        if target is not None:
+            rows['latent']=(errors['latent']*target.refresh).sum(-1)/target.refresh.sum(-1).clamp_min(1)
         rows['total']=rows['state']+rows['pose']+rows['contact']+rows['telemetry']+.1*rows['consistency']
         return rows
-    def loss(self,w,field=None,default_q=None,return_terms=False):
-        s=w['s'][:,0]; pose=w['pose'][:,0]; total=s.new_zeros(())
-        sums={name:s.new_zeros(()) for name in ('state','pose','contact','telemetry','consistency')}
-        scale=self.out_norm.var.sqrt().clamp_min(1e-4)
-        telemetry_scale=self.telemetry_norm.var.sqrt().clamp_min(1e-3)
-        valid=w['valid']; denom=valid.sum().clamp_min(1)
-        for j in range(w['a'].shape[1]):
-            xi=w['xi'][:,j] if w['xi'].ndim==3 else w['xi']
-            local=geometry_crop(s,pose,field,kind='world_model')
-            raw,dp,telemetry=self.predict(s,w['a'][:,j],w['a_prev'][:,j],xi,local,pose)
-            next_pose=st.apply_pose_delta(pose,dp)
-            ns=st.reconcile_state(raw,next_pose,field,default_q)
-            target_s=w['s_next'][:,j]; target_pose=w['pose_next'][:,j]
-            state_loss=((ns-target_s)/scale[:st.STATE_DIM]).square().mean(-1)
-            # Compare accumulated SE(3) prediction against each measured pose.
-            pose_error=st.pose_delta(target_pose,next_pose)
-            pose_loss=(pose_error/scale[st.STATE_DIM:]).square().mean(-1)
-            consistency=((raw-ns)/scale[:st.STATE_DIM]).square().mean(-1)
-            contact=F.binary_cross_entropy_with_logits(telemetry['contact_logits'],w['contact_prob'][:,j].float(),reduction='none').mean(-1)
-            auxiliary=torch.cat((telemetry['applied_torque'],telemetry['foot_velocity'].reshape(-1,12)),-1)
-            target_aux=torch.cat((w['applied_torque'][:,j],w['foot_velocity'][:,j].reshape(-1,12)),-1)
-            aux_loss=((auxiliary-target_aux)/telemetry_scale).square().mean(-1)
-            losses={'state':state_loss,'pose':pose_loss,'contact':contact,'telemetry':aux_loss,'consistency':consistency}
-            for name,loss in losses.items(): sums[name]=sums[name]+(loss*valid[:,j]).sum()
-            total=total+((state_loss+pose_loss+contact+aux_loss+.1*consistency)*valid[:,j]).sum()
-            s,pose=ns,next_pose
-        result=total/denom
-        return (result,{k:v/denom for k,v in sums.items()}) if return_terms else result
+
+    def loss(self,w,field=None,default_q=None,return_terms=False,*,depth=None,encoder=None,latent_targets=None):
+        target=self._targets(w,depth,encoder,latent_targets)
+        if target is not None:
+            if encoder is None:raise ValueError('Shared depth encoder required for reconstruction')
+            self.update_latent_stats(target)
+        scales=(self.out_norm.var.sqrt().clamp_min(1e-4),self.telemetry_norm.var.sqrt().clamp_min(1e-3))
+        errors=self._rollout_errors(w,field,default_q,scales,target)
+        valid=w['valid'];den=valid.sum().clamp_min(1)
+        terms={name:(errors[name]*valid).sum()/den for name in ('state','pose','contact','telemetry','consistency')}
+        result=terms['state']+terms['pose']+terms['contact']+terms['telemetry']+.1*terms['consistency']
+        if target is not None:
+            # Refresh-only mean avoids counting nine held copies as nine labels.
+            terms['latent']=(errors['latent']*target.refresh).sum()/target.refresh.sum().clamp_min(1)
+            reconstruction=self.latent_decoder(encoder(target.reconstruction_noisy))
+            terms['reconstruction']=F.l1_loss(reconstruction,target.reconstruction_clean)
+            result=result+terms['latent']+terms['reconstruction']
+        return (result,terms) if return_terms else result

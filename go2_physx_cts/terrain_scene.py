@@ -1,10 +1,9 @@
-"""Pinned source ten terrains plus the four approved task geometries.
+"""Pinned source ten terrains plus the three approved event geometries.
 
 The original mesh recipes remain unchanged. Additional collision meshes and
 metadata are built together so physics, depth and dynamics observe one geometry.
 """
 import hashlib
-import math
 import numpy as np
 import torch
 import warp as wp
@@ -15,7 +14,7 @@ from .terrain import HeightField
 from .official_terrain_mesh import MIXED_MESH_TERRAIN_CFG
 from .commands import TERRAIN_NAMES
 
-def runway_length(level,episode_seconds=20.,speed=5.,acceleration=2.):
+def runway_length(level,episode_seconds=20.,speed=8.,acceleration=2.):
     """60% reachability after acceleration; harder levels require faster progress."""
     available=max(.5,episode_seconds-1.);ramp=min(available,speed/acceleration)
     travel=.5*acceleration*ramp*ramp+speed*max(0.,available-ramp)
@@ -25,9 +24,9 @@ def _box(x0,x1,y0,y1,z0,z1):
     return trimesh.creation.box(extents=(x1-x0,y1-y0,z1-z0),transform=trimesh.transformations.translation_matrix(((x0+x1)/2,(y0+y1)/2,(z0+z1)/2)))
 
 def additional_arenas(bounds,seed,episode_seconds=20.,task_episode_seconds=None):
-    rng=np.random.default_rng(seed);meshes=[];arenas=[];base_x=float(bounds[1,0])+4.
-    durations=[20.]*10 if task_episode_seconds is None else task_episode_seconds
-    column_span=12.+2.*max(durations[5],durations[8],durations[9])+7.
+    meshes=[];arenas=[];base_x=float(bounds[1,0])+4.
+    durations=[20.]*5 if task_episode_seconds is None else task_episode_seconds
+    column_span=12.+2.*durations[3]+7.
     def add(kind,level,layout,x,y,length,width,parts,spawn,goal):
         offset=np.array([x,y,0.]);world=[]
         for m in parts:m.apply_translation(offset);world.append(m)
@@ -35,26 +34,14 @@ def additional_arenas(bounds,seed,episode_seconds=20.,task_episode_seconds=None)
         arenas.append(dict(terrain_id=TERRAIN_NAMES.index(kind),level=level,layout=layout,
             bounds=[x,max(m.bounds[1,0] for m in world),y,y+width],origin=(offset+np.array(spawn)).tolist(),
             goal=(offset+np.array(goal)).tolist(),length=length,width=width,boxes=[m.bounds.tolist() for m in world]))
-    # Ten independent pillar arrangements at every difficulty; no phantom walls.
     for level in range(10):
-        for layout in range(10):
-            L,W=12.,12.;floor_length=max(L,3.*durations[7]+10.);parts=[_box(0,floor_length,0,W,-.2,0)];pillars=[]
-            for _ in range(1+level):
-                for attempt in range(1000):
-                    sx,sy=rng.uniform(.4,1.,2);cx,cy=rng.uniform(3.,6. if len(pillars)==0 else L-3.),rng.uniform(3.5,8.5)
-                    rect=(cx-sx/2,cx+sx/2,cy-sy/2,cy+sy/2)
-                    if all(max(p[0]-rect[1],rect[0]-p[1],p[2]-rect[3],rect[2]-p[3])>.6 for p in pillars):break
-                else:raise RuntimeError('Could not construct separated indoor pillars')
-                pillars.append(rect);parts.append(_box(*rect,0.,rng.uniform(1.6,2.2)))
-            add('indoor_obstacles',level,layout,base_x+(floor_length+2)*level,-70+14*layout,L,W,parts,(1.,W/2,0.),(L*.8,W/2,0.))
-    for level in range(10):
-        L,W=12.,12.;tail=2.*durations[5]+3.;width=.20+.07*level;far=L*.5;near=far-width
+        L,W=12.,12.;tail=2.*durations[3]+3.;width=.20+.07*level;far=L*.5;near=far-width
         parts=[_box(0,L,0,W,-1.,-.8),_box(0,near,0,W,-.8,0),_box(far,L+tail,0,W,-.8,0)]
         add('gap',level,0,base_x,90.+14*level,L,W,parts,(near-1.4,W/2,0.),(L*.7,W/2,0.))
-        h=.25+.03*level;edge=3.;W=24.;tail=2.*durations[8]+3.
+        h=.25+.03*level;edge=3.;W=24.;tail=2.*durations[3]+3.
         parts=[_box(0,L+tail,0,W,-.2,0),_box(edge,L+tail,0,W,0,h)]
         add('obstacle_up',level,0,base_x+column_span,90.+28*level,L,W,parts,(edge-1.5,W/2,0.),(edge+1.1,W/2,h))
-        tail=2.*durations[9]+3.
+        tail=2.*durations[3]+3.
         parts=[_box(0,L+tail,0,W,-h-.2,-h),_box(0,edge,0,W,-h,0.)]
         add('obstacle_down',level,0,base_x+2*column_span,90.+28*level,L,W,parts,(edge-1.3,W/2,0.),(edge+1.1,W/2,-h))
         L=runway_length(level,episode_seconds);W=16.
@@ -102,7 +89,7 @@ class CapturedTerrain(TerrainImporter):
 
 def terrain_config(seed=17,runway_episode_seconds=20.,task_episode_seconds=None):
     gen=MIXED_MESH_TERRAIN_CFG.copy();gen.seed=int(seed);gen.runway_episode_seconds=float(runway_episode_seconds);gen.task_episode_seconds=task_episode_seconds
-    return TerrainImporterCfg(class_type=CapturedTerrain,prim_path='/World/Ground',terrain_type='generator',terrain_generator=gen,max_init_terrain_level=0,collision_group=-1,debug_vis=False,
+    return TerrainImporterCfg(class_type=CapturedTerrain,prim_path='/World/Ground',terrain_type='generator',terrain_generator=gen,max_init_terrain_level=5,collision_group=-1,debug_vis=False,
         physics_material=RigidBodyMaterialCfg(friction_combine_mode='average',restitution_combine_mode='average',static_friction=1.,dynamic_friction=1.,restitution=0.))
 
 class TerrainPositionLookup:
@@ -113,23 +100,30 @@ class TerrainPositionLookup:
         self.minimum_xy=-.5*self.size*self.shape;self.arenas=list(arenas)
         self.extra_bounds=torch.tensor([a['bounds'] for a in arenas],device=device,dtype=torch.float32) if arenas else torch.empty(0,4,device=device)
         self.extra_types=torch.tensor([a['terrain_id'] for a in arenas],device=device,dtype=torch.long)
-        self.metadata={'names':list(self.names),'source_names':list(cfg.sub_terrains),'rows':cfg.num_rows,'columns':cfg.num_cols,'tile_size_m':list(cfg.size),'seed':cfg.seed,'max_init_terrain_level':0,'arenas':self.arenas}
+        self.metadata={'names':list(self.names),'source_names':list(cfg.sub_terrains),'rows':cfg.num_rows,'columns':cfg.num_cols,'tile_size_m':list(cfg.size),'seed':cfg.seed,'max_init_terrain_level':5,'arenas':self.arenas}
     def query(self,p):
         shape=p.shape[:-1];xy=p[...,:2].reshape(-1,2);cells=torch.floor((xy-self.minimum_xy)/self.size).long()
         inside=((cells>=0)&(cells<self.shape)).all(-1);cols=cells[:,1].clamp(0,len(self.column_types)-1)
         result=torch.where(inside,self.column_types[cols],7)
-        # Indexed rectangles are small (140), unlike per-point triangle queries.
+        # Forty indexed rectangles, with no obstacle-avoidance arenas.
         if len(self.arenas):
             b=self.extra_bounds;hit=(xy[:,None,0]>=b[None,:,0])&(xy[:,None,0]<b[None,:,1])&(xy[:,None,1]>=b[None,:,2])&(xy[:,None,1]<b[None,:,3])
             idx=hit.long().argmax(-1);result=torch.where(hit.any(-1),self.extra_types[idx],result)
         return result.reshape(shape)
     __call__=query
 
-def terrain_level_decisions(progress,success=None,task_ids=None):
-    up=progress>=.6;down=progress<.5
+def terrain_level_decisions(maximum_distance,accumulated_commands,resampling_time,
+                            zero_command_probability,tile_length=9.,sub_terrain_border_width=.5,
+                            *,success=None,task_ids=None):
+    """Pinned AS2 progress rules; special tasks use success, recovery stays fixed."""
+    length=torch.as_tensor(tile_length,device=maximum_distance.device,dtype=maximum_distance.dtype)-2.*sub_terrain_border_width
+    up=maximum_distance>length.clamp_min(0.)/2.
+    target=accumulated_commands.norm(dim=1)*resampling_time*(1.-zero_command_probability)
+    down=(maximum_distance<target*.5)&~up
     if task_ids is not None:
-        if success is not None:up=torch.where(task_ids==5,success.bool(),up);down=torch.where(task_ids==5,~success.bool(),down)
-        up&=task_ids!=6;down&=task_ids!=6
+        if success is not None:
+            up=torch.where(task_ids==3,success.bool(),up);down=torch.where(task_ids==3,~success.bool(),down)
+        up&=task_ids!=4;down&=task_ids!=4
     return up,down
 
 @wp.kernel
@@ -147,9 +141,14 @@ class CollisionHeightRaycaster:
         wp.launch(cast_height,dim=len(flat),inputs=[self.mesh.id,wp.from_torch(flat,dtype=wp.vec3),wp.from_torch(height),wp.from_torch(valid)],device=self.device)
         return height.reshape(shape),valid.reshape(shape).bool()
     def height_crop(self,positions,yaw):
-        x,y=torch.meshgrid(torch.arange(-2,3,device=positions.device)*.1,torch.arange(-1,2,device=positions.device)*.1,indexing='ij');x,y=x.flatten(),y.flatten();c,s=yaw[:,None].cos(),yaw[:,None].sin()
+        x,y=torch.meshgrid(torch.arange(-8,9,device=positions.device)*.1,torch.arange(-5,6,device=positions.device)*.1,indexing='ij')
+        x,y=x.flatten(),y.flatten();c,s=yaw[:,None].cos(),yaw[:,None].sin()
         starts=torch.stack((positions[:,0:1]+c*x-s*y,positions[:,1:2]+s*x+c*y,(positions[:,2:3]+20.).expand(-1,len(x))),-1)
-        height,valid=self.cast(starts);return positions[:,2]-height.mean(-1),valid.all(-1)
+        heights,valid=self.cast(starts)
+        fallback=torch.where(valid,heights,torch.full_like(heights,torch.inf)).amin(-1)
+        fallback=torch.where(torch.isfinite(fallback),fallback,positions[:,2]+19.)
+        heights=torch.where(valid,heights,fallback[:,None]);crop=(x.abs()<=.200001)&(y.abs()<=.150001)
+        return positions[:,2]-heights[:,crop].mean(-1),valid[:,crop].all(-1)
 
 def height_grid_axis(lower,upper,res):return (float(lower)+np.arange(int(np.ceil((upper-lower)/res))+1,dtype=np.float64)*res).astype(np.float32)
 def field_from_mesh(terrain,device,res=.05):

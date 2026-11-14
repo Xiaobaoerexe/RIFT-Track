@@ -1,0 +1,107 @@
+{
+  "source": "https://github.com/unitreerobotics/unitree_ros/tree/master/robots/as2_description",
+  "files": [
+    {
+      "path": "meshes/FL_calf.STL",
+      "url": "https://raw.githubusercontent.com/unitreerobotics/unitree_ros/master/robots/as2_description/meshes/FL_calf.STL",
+      "sha256": "d6bba46f70ec606a6a6dd94365e594f7f449b31a2fdc064f11c4dc6594d9c23e",
+      "bytes": 721684
+    },
+    {
+      "path": "meshes/FL_foot.STL",
+      "url": "https://raw.githubusercontent.com/unitreerobotics/unitree_ros/master/robots/as2_description/meshes/FL_foot.STL",
+      "sha256": "ddf21582becb4df4ff7bd784c2ec0cb4b569c5c6f8ac96ae53e58f2b52f4950f",
+      "bytes": 3465284
+    },
+    {
+      "path": "meshes/FL_hip.STL",
+      "url": "https://raw.githubusercontent.com/unitreerobotics/unitree_ros/master/robots/as2_description/meshes/FL_hip.STL",
+      "sha256": "7566753929d4b4a34dfe7aa57a2601f7edbc9ecd3b3a6786a2045d8e8d7e3849",
+      "bytes": 1383684
+    },
+    {
+      "path": "meshes/FL_thigh.STL",
+      "url": "https://raw.githubusercontent.com/unitreerobotics/unitree_ros/master/robots/as2_description/meshes/FL_thigh.STL",
+      "sha256": "ad006344e8cb2ee51791f0b50cf7cb125ad1ae9c53b169a28c2ecddf3cfb3480",
+      "bytes": 634284
+    },
+    {
+      "path": "meshes/FR_calf.STL",
+      "url": "https://raw.githubusercontent.com/unitreerobotics/unitree_ros/master/robots/as2_description/meshes/FR_calf.STL",
+      "sha256": "5abf4370f3a837b27407f156cc2fc1b46b3c450b845b1231bfe32256f9376b45",
+      "bytes": 714184
+    },
+    {
+      "path": "meshes/FR_foot.STL",
+      "url": "https://raw.githubusercontent.com/unitreerobotics/unitree_ros/master/robots/as2_description/meshes/FR_foot.STL",
+      "sha256": "1f3ae7b8df8ec8a8233761d32fe9ad4c801cff7403f07f495492a2e4c995481f",
+      "bytes": 3468484
+    },
+    {
+      "path": "meshes/FR_hip.STL",
+      "url": "https://raw.githubusercontent.com/unitreerobotics/unitree_ros/master/robots/as2_description/meshes/FR_hip.STL",
+      "sha256": "ab51c738698ae72c95d4aff893a8f42c59ff1c395e12ff88d5cf94413ff9f1da",
+      "bytes": 1383384
+    },
+    {
+      "path": "meshes/FR_thigh.STL",
+      "url": "https://raw.githubusercontent.com/unitreerobotics/unitree_ros/master/robots/as2_description/meshes/FR_thigh.STL",
+      "sha256": "71d25281826c92fb207e32ea10b53af0cfc5a2583c9766a13ab2bf5159463612",
+      "bytes": 640384
+    },
+    {
+      "path": "meshes/RL_calf.STL",
+      "url": "https://raw.githubusercontent.com/unitreerobotics/unitree_ros/master/robots/as2_description/meshes/RL_calf.STL",
+      "sha256": "f7927f861191efc5cbb0e350bb320d05b7af1599456d301b9eefcf8950bf8f14",
+      "bytes": 722784
+    },
+    {
+      "path": "meshes/RL_foot.STL",
+      "url": "https://raw.githubusercontent.com/unitreerobotics/unitree_ros/master/robots/as2_description/meshes/RL_foot.STL",
+      "sha256": "5838f87163721303000799d7df5a5fce1eec4447d1db964466a9c009b59cdd86",
+      "bytes": 3465284
+    },
+    {
+      "path": "meshes/RL_hip.STL",
+      "url": "https://raw.githubusercontent.com/unitreerobotics/unitree_ros/master/robots/as2_description/meshes/RL_hip.STL",
+      "sha256": "ae47b3c00b93782747d8d2d90a2e7c0fba508e521743e603c2eb3f261199f7a6",
+      "bytes": 1380684
+    },
+    {
+      "path": "meshes/RL_thigh.STL",
+      "url": "https://raw.githubusercontent.com/unitreerobotics/unitree_ros/master/robots/as2_description/meshes/RL_thigh.STL",
+      "sha256": "33355396397dc35723c70384f08f50eaabe58d6f04490d77fa688cd6a70aa627",
+      "bytes": 479784
+    },
+    {
+      "path": "meshes/RR_calf.STL",
+      "url": "https://raw.githubusercontent.com/unitreerobotics/unitree_ros/master/robots/as2_description/meshes/RR_calf.STL",
+      "sha256": "b085a9b0d5086ff39993ededdf2bcb39642b130ea5351532026ff34507f97aa2",
+      "bytes": 715784
+    },
+    {
+      "path": "meshes/RR_foot.STL",
+      "url": "https://raw.githubusercontent.com/unitreerobotics/unitree_ros/master/robots/as2_description/meshes/RR_foot.STL",
+      "sha256": "30795035d326e22c9469efabb60d0cd764c6ba3f76fcfd452e11c1f797882caf",
+      "bytes": 3468484
+    },
+    {
+      "path": "meshes/RR_hip.STL",
+      "url": "https://raw.githubusercontent.com/unitreerobotics/unitree_ros/master/robots/as2_description/meshes/RR_hip.STL",
+      "sha256": "3f99ca33686c23e0c5905606a4fc0291c16935dc3ab6362344b6266b5e06e672",
+      "bytes": 1382984
+    },
+    {
+      "path": "meshes/RR_thigh.STL",
+      "url": "https://raw.githubusercontent.com/unitreerobotics/unitree_ros/master/robots/as2_description/meshes/RR_thigh.STL",
+      "sha256": "1bcc5881b8b981cfca73f8718c1db6c2398b66fe7bb2fa6fb978cea7c8c7ec7d",
+      "bytes": 479284
+    },
+    {
+      "path": "meshes/base_link.STL",
+      "url": "https://raw.githubusercontent.com/unitreerobotics/unitree_ros/master/robots/as2_description/meshes/base_link.STL",
+      "sha256": "4ace66bb12a972a67e1dbd823b55162e6d3931d23ccf56c707370c932f297f92",
+      "bytes": 6311184
+    }
+  ]
+}

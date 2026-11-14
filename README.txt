@@ -1,129 +1,42 @@
-Go2 Depth Multitask CTS / SuperMimic-style BPTT
-最新要求（2026-11-02显存优化）：只完成实现、完整更新验收及测试文件清理，不启动或恢复正式训练。
-Critic已detach的270336个地图记录使用132个BF16分块和精确位压缩有效性；总缓存4.3828125GiB。
-任意minibatch通过GPU地址表批量读取，成员/排列/损失分母/梯度累积/5次Adam更新不变。
-Actor状态梯度路径仍实时查询地形，禁止使用上述detach缓存。完成Actor反传后释放图引用与已消费梯度。
-历史已知深度图FP16缓存放CPU，最多48MiB锁页缓冲区、独立传输流和事件保护复用；未来想象深度不变。
-CUDA初始化前默认expandable_segments:True；不把reserved-allocated视为保证可分配空间，不逐轮empty_cache。
-Replay/长期事件仍在GPU。内存与同负载速度证据：research/runs/DEPTH_MEMORY_20261102。
-以下V3启动授权及计时为历史记录，不覆盖上述最新暂停要求。
-V3工程实测：完整4096环境单轮5.561584秒（6轮均值），相对V2的6.213263秒缩短约10.5%。正式冷启动授权与测试能力证据分开记录。
+AS2 Depth CTS / SuperMimic-style learned physical and visual-latent imagination
 
-最新V3授权：共享Actor改为3个稠密专家；启用经独立精度与可微性验收的compact surface depth。两项通过验证并清理临时文件后直接冷启动120000轮；此前10倍提速门槛已经取消。
-保留BF16、5Hz深度、过去图像缓存、轻量地图/Critic编码、8192融合想象、Critic一遍5批、CTS2×128×64及16步burn-in。学生想象仍2048条且每轮执行。
-可训练特征不跨学生优化器更新缓存；burn-in进入损失段重新建立CNN梯度；GRU原位门投影保留重算。轻量深度模型必须单独训练验收后才能替换。
-原深度BF16未过验收，观测模块保留FP32；策略/WM/Critic/学生网络BF16保持。V2全局场景压缩候选失败，代码保存在Git历史。V3保留原几何投影和加噪，仅缩小并重训图像修正CNN，不宣称与旧网络VJP逐点等价。新的误差、解析几何、数值求导与完整计时见research/runs/DEPTH_LIGHT_V3_20261102；V2历史证据仍保留。
+Three controlled experiments share one implementation, selected by cfg.variant:
+137, ~/Documents, 48GB: simple — plain Actor, one motion reward/value, no velocity grid or success reward.
+125, ~/motion_control, 24GB: events — same Actor, five task rewards, velocity grids and hard-event value learning.
+175, ~/Admin, 48GB: moe — events configuration plus three dense action experts.
 
-独立项目副本：/home/abc/Documents/go2_supermimic_lab_depth
-本地源：F:/learning/motion_control/physx_depth
-数据和权重：/home/abc/data2/go2_supermimic_lab_depth
-父训练提交：fa3c776af150986776b5c513130c0e7a8b38b4c6
-旧项目与历史实验不修改；本版全部网络冷初始化，深度/加噪包冻结。
-完整实施契约见 BUILD_CONTRACT.txt，源码依据见 CURRICULUM_SOURCE.json。
+The engineering baseline is the actual137 AS2 blind source2061be6b0d592afe9e81223206cf5f864e45b9f4.
+UPSTREAM.json records pinned external references and what is adapted. Original blind/depth projects and historical evidence are outside this isolated tree and are not deleted.
 
-正式入口（仅干净已提交的版本可启动）：
-python -m go2_physx_cts.supervise --output NEW_RUN_DIRECTORY --usd GO2_USD
-  --driver OFFICIAL_MOE_TORCHSCRIPT --reward-calibration REWARD_CALIBRATION_JSON
-  --evaluation-python ROBOGAUGE_PYTHON --fast-depth-checkpoint ACCEPTED_COMPACT_DEPTH
+Common training contract
+Isaac Sim/PhysX; AS2 USD and IdealPD; raw12-joint actions with scale.3125 and no tanh.
+4096 real environments, one real step per iteration, Replay1000 steps/environment.
+8192 imagined trajectories=6144 teacher+2048 student, horizon32, exact teacher mean+student mean Actor objective.
+WM1024x3, batch2048, autoregressive8 steps; two updates before2500, four afterwards.
+AS2 Critic fitting: five passes/four minibatches; execution microbatches do not change sample membership or optimizer steps.
+Visual CTS:2x160 sequences,64 loss steps+16 burn-in, equivalent20480 supervised frames/iteration; adaptation from blind20x1024 independent histories, not a claim of identical temporal learning.
+120000 iterations, no6/8-hour cap. Actual GPU memory/throughput must be measured separately on each host before starting.
 
-Isaac Sim/PhysX，4096环境，每轮真实采集1步，Actor更新1次；120000轮，无小时硬上限。
-8192条32步想象：6144教师+2048学生；损失严格为teacher.mean()+student.mean()。
-想象采用一次8192融合执行，不改变分支分母、轨迹总数或Actor优化器更新数量。
-Replay每环境1000步，保存真实终止前状态；事件前2秒参与稀有窗口保留。
-WM监督8步/2048窗口，平地2次，地形4次。Critic全部有效状态训练一遍，分成5个minibatch。
-学生独立Adam，每轮2次，128序列，每条16步burn-in+64步蒸馏。
+Perception and ownership
+Teacher sees proprioceptive privileged input and a forward height map; no taskID input.
+Student keeps8-expert proprioception MoE450->32, depth CNN128, GRU256, Linear+LayerNorm fusion32.
+Depth CNN has one optimizer owner: world-model reconstruction. Student MoE/GRU/fusion receive latent+action distillation only.
+Teacher+shared Actor share one Adam; world model+depth CNN share one Adam; student remainder and Critic each have their own Adam.
+Frozen depth/noise models generate held5Hz captures. Imagination starts from an encoded actual capture, then WM predicts128-D latent changes at capture refresh steps. It does not render future depth or reuse future real images.
+WM predicts physical state/complete pose, contacts and actual AS2 reward telemetry; it never consumes a hidden taskID.
 
-网络及梯度：
-教师：167维特权MLP32 + 前方2×64×128地图CNN128 + 任务onehot10 -> Linear32+LN。
-学生：450维本体历史8专家MoE32；48×64深度CNN128+当前45维观测 -> GRU256；
-288维融合 -> Linear32+LN。学生参数只接受教师latent MSE蒸馏，不接收回报更新。
-共享Actor：3个稠密动作专家，latent路由，输出12个原始线性动作，无tanh。
-教师编码器与共享Actor接受想象回报梯度；学生冻结时对输入和GRU记忆仍保留导数。
-10个独立任务Critic各含教师/学生两值头，任务内PopArt、归一化Huber。
-Critic输入为物理状态、地图和任务记忆，不使用Actor持有latent，避免价值梯度捷径。
-WM：1024×3主干，物理/动作/上下文MLP，局部2×41×49地图CNN；完整xyz+xyzw位姿，
-预测位姿变化、状态、接触/力矩/足速；FK一致性。没有额外Transformer或视觉预测头。
+Reward/value split
+simple uses exactly the fifteen AS2 motion terms, including its high-speed tracking-width blend and3k coefficient ramp. No success bonus is inserted.
+events/moe preserve continuous long-term value and add a task-conditioned hard-event channel in the same Critic trunk. Actor combines continuous32-step BPTT+tail value with one root afterstate event value; it does not sum repeated success values along all32 steps.
+Special approach commands start at0.6–1.0m/s for the8s deadline; the lowerbound is derived from the longestgap approach plus stability/startup time. Grid downgrades cannot make successful completion kinematically impossible.
+Hard success/failure labels come from pre-reset PhysX transitions. No sigmoid-product completion, soft stable timer or soft cumulative success remains.
+New event bonuses require complete-episode mature-AS2 policy calibration. Existing Go2 calibration numbers are invalid.
 
-深度基准接口：固定go2_depth_input0.1.0，25.6m/512×512图集缓存，5Hz，重算反传；BF16及轻量替代模型须验收。神经网络使用BF16混合精度，物理积分/奖励/统计保持FP32。
-图集中心间距12m，按完整相机视锥的世界XY包围盒中心选图；实际图集/场地越界显式报错。
-完整机身旋转×固定相机安装变换；输出光轴米制深度0.1..6m，无效0。
-噪声key与episode/相机帧/轨迹绑定。想象不复制真实轨迹后续图像，不detach预测位姿。
-二值有效性/孔洞沿用包中的平滑直通替代梯度，不宣称硬事件精确可微。
-几何/噪声模型均冻结。深度包自身证据不等于新多任务控制能力实测。
+Run interface
+python -m go2_physx_cts.train --config <resolved-json> --output <run-directory> --usd <assets/as2/as2.usd>
+Use the runtime/version validation and complete-update GPU test implemented by tools/validate_training.py before formal runs. Host launch paths, checkpoint/depth hashes and measured throughput belong in each run manifest.
+No valid new-model MuJoCo/real-robot claim is made here. Obsolete Go2 RoboGauge adapters were removed; native fixed-condition PhysX diagnosis remains separate from curriculum statistics.
 
-任务（编号从1开始；代码ID从0开始）：
-1 flat/slope_up/slope_down/rough_slope速度；2 flat高速；
-3 wave/obstacles/wheels/small_squares速度；4上楼梯；5下楼梯；6跨沟；
-7恢复；8室内避障；9跳上障碍；10跳下障碍。
-0..2500仅任务1平地，2500..5000任务1平地40%/三坡各20%，
-5000..8000任务1..5，8000后环境数[820,365,365,365,365,365,356,365,365,365]。
-WM预热1000，Critic1000..1500，Actor1500..2500渐入；新任务Critic再适配500轮。
-任务1速度上限：.5@1500，1@5000，1.5@10000，2@20000，2.5@30000，3@35000。
-任务2上限：1.5@5000，2.5@10000，4@20000，5@30000；其余普通任务最高3。
-跨沟/跳上/跳下使用可行的前进命令1..1.5，20000后最高2，横向/转向限制为.15/.1。
-恢复命令.5m/s，无速度网格，固定level5，50%平地+50%九类原非平地。
-每任务独立Rapid来源速度网格，每1000轮仅使用本项目教师/学生转移，按地形分别统计。
-进度=沿指令方向实际位移/同期指令要求位移；特殊任务使用成功率。
-<=50%回退，>75%扩展，增量vx.5/vy.2/wz.1；保留低速且至少30%纯vx。
-普通地形进度<50%降级、>=60%升级；gap按成功；恢复不升降。
-负重0..1.2kg，原质心刚性点质量，episode内不变。
-
-奖励：以用户交接文件及后续覆盖意见为准，十任务独立目标，共用约束系数不整体缩小。
-官方策略在完整20秒平地episode含起步实测标定，标定文件为正式启动必填资产。
-成功只记一次，完成后继续速度跟踪且停止未完成时间扣分；正奖励预算独立于负惩罚。
-真实PhysX用硬碰撞/硬成功；想象使用连续接触/累计完成概率，保留可用一阶梯度。
-高度/垂直速度两系数于3000轮结束渐变。
-episode elapsed按50Hz控制步重建，避免FP32累加漂移；真实/想象的恢复deadline和episode超时使用同一判定。8秒未恢复在第400步失败，失败优先于timeout bootstrap；已恢复成功仍可正常超时。
-
-学习率：四个Adam优化器，教师编码器与Actor同组且同率；WM/Actor/Critic起点2e-4，学生3e-4。
-任务1 Critic在1000–1499预热；教师/Actor与学生1500开始，教师/Actor在1500–2499渐入；其他任务Critic随解锁预热500轮。
-2500后每200轮观测实际更新，每1000轮汇总；不再试更新候选模型，不使用PPO KL或3秒仿真评分。
-WM用固定及近期留出episode的配对误差；Critic用独立起点、固定目标的真实拟合前后误差；Actor用实际PD目标变化。
-连续2个恶化窗口÷1.3，连续3个良好窗口×1.3恢复，最高初始2e-4；WM普通下限2e-5，Actor/Critic4e-6。
-证据不足/冲突保持；两次降速无效后阻止继续降速。Actor恢复还要求WM、Critic、蒸馏跟踪稳定且无已确认原生退化。
-80000后WM/Actor/Critic以当前基准余弦衰减，120000到1e-6。严重回退保持原三窗口规则及Adam矩，不重启余弦时钟。
-学生3e-4保持至30000，每1000轮检查已有原生与RoboGauge固定队列报告；每端3份不同轮次报告，成功率>=80%、回报波动<=5%。
-稳定时间S<80000则余弦到80000的3e-6；S>=80000则到120000；未稳定保持3e-4，已触发的衰减不重启。
-诊断episode按确定性哈希留出约1/32，不参与训练采样或归一化；普通训练批量、更新次数不变。诊断不推进仿真或优化器。
-新调度状态版本3，不静默恢复旧候选调度checkpoint；旧实验/权重保留用于对照。
-官方采集仅任务1..5有可用专家，各10%；缺少高速>4、跨沟/恢复/避障/跳跃专家。
-自身能力与WM验证连续稳定后，各任务官方比例在5000轮渐退；不论能力判据是否满足，8000轮及以后官方采集比例均为0，并停止官方策略推理。
-课程阶段或实际任务分配变化时同步刷新采集来源，支持跳过轮次边界的诊断；episode变化时同步清空官方策略历史，避免课程重置遗漏done通知。
-所有实际执行转移共享Replay和想象起点，不直接模仿专家动作。
-
-诊断：每5000轮原生PhysX、世界模型和RoboGauge分别记录。官方迁移失败不自动等同原生停滞。
-RoboGauge add2c7ee0185ea8fd93d242f86e1c8cac6e9913b：Python3.11、MuJoCo3.2.3、
-dm-control1.0.23、Torch2.4.1+cu124。启动校验156个源文件哈希与导出golden序列。
-官方BasePipeline及MujocoSimulator保持原样；适配器扩展深度/GRU/教师地图与任务观测。
-PD/默认姿态/动作缩放读取checkpoint，保留官方XML被动参数，不静默改物理参数。
-旧USD和官方XML仍有质量、扭矩速度曲线、接触求解器等差异，不宣称物理完全一致。
-新任务几何使用训练同一组box转换MJCF。环境数调度评测覆盖全部14种地形：普通任务固定level0，恢复任务固定level5并保留六种实际PhysX初始化姿态。
-原地形由实际加载的碰撞网格转换：上表面凸分块用于碰撞，原连续网格仅用于视觉/射线，不把凹地形整体凸包化。
-使用MuJoCo原生mesh射线查询；明确命名几何，避免dm-control处理大量匿名几何的开销。不修改官方物理/PD/重置循环。
-恢复fixtures是版本化正式评测协议，不引用临时文件。学生实际深度由MuJoCo射线+冻结噪声产生。
-
-任务环境数：总数4096；25000轮起每5000轮决策，20000轮可作为首份基准报告。
-按固定地形权重汇总，各任务取教师/学生达标率较低者；每地形每分支5种子×0/1.2kg，完整分配队列500案例，与学生学习率稳定性队列分开。
-连续两份可比报告均<50%可申请当前环境数的10%；连续两份均>=80%且未下降>=10个百分点可提供资源。
-提供方均摊绝对数量，各自至多提供当前数量的10%；供给不足时按需求比例分配，最大余数取整，总数严格守恒。
-所有任务下限200，上限为初始数量的2倍。缺失/错误/不可比评测保持；已排队转移未完成时不再次分配。
-任务只在自然episode重置时切换，使用接收任务的地形/难度分布；Replay旧标签不改、不清空。
-调度历史、目标数量、待转移环境随checkpoint保存；实际数量、目标及想象样本任务数写入日志。
-
-保存：网络/优化器/归一化/任务网格/奖励标定/学习率/课程/随机状态及来源。
-恢复运行重新开始物理episode及Replay，与上游一致，不声称仿真逐位续接。
-训练产物在data2。临时测试脚本、旧测试接口、冒烟权重/视频/导出在正式启动前删除。
-源码事实、论文/作者训练记录、本项目验证、实际控制能力必须分别陈述。
-2026-11-03 checkpoint continuation / Critic compiler cache
-Critic task heads, geometry encoder and geometry query retain dynamic compilation,
-with fullgraph=False so legitimate gradient-mode/task-tail variants can fall back
-to eager execution at PyTorch's bounded recompile limit. This changes execution
-only: task ownership, input derivatives, losses, minibatches and optimizer steps
-are unchanged. No global cache-limit increase or exception suppression is used.
-Checkpoint continuation restores models, four optimizers, normalization and
-curriculum/schedule state. Replay is not serialized. Before resumed optimization,
-collect max(WM window, student burn-in + loss sequence) = 80 vector steps at the
-saved iteration, without advancing course/LR clocks. Resume provenance and this
-fresh-Replay contract are recorded in run_identity.json. Failed-run evidence is
-kept in its original run directory; continuation uses a new output directory.
-
+Verification
+python -m unittest discover -s tests
+CPU invariants establish execution/algebra only. Loaded USD/PhysX parameter readback, full Actor backward, complete sustained updates and GPU memory/time acceptance remain required before launch.
