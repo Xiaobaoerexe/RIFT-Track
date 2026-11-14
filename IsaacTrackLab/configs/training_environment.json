@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "environment_id": "isaac_track_lab_long_horizon_v1",
+  "current_stage": "stage_6d_representative_dynamics_and_live_target_verified",
+  "baseline_manifest": "configs/baseline_305m_v1.json",
+  "scene_change_authorization": {
+    "requires_explicit_user_instruction": true,
+    "automatic_scene_expansion": false,
+    "automatic_event_injection": false,
+    "event_addition_policy": "one user-specified event at a time"
+  },
+  "control_modes": {
+    "pure_e2e": {
+      "purpose": "trainable_and_deployable_actor_path",
+      "actor_inputs": [
+        "rgb",
+        "target_template_rgb",
+        "joint_position",
+        "joint_velocity",
+        "base_angular_velocity",
+        "projected_gravity",
+        "foot_contacts"
+      ],
+      "optional_actor_inputs": ["aligned_depth"],
+      "forbidden_actor_inputs": [
+        "target_world_pose",
+        "robot_world_pose",
+        "scheduled_target_bearing",
+        "route_progress",
+        "ground_truth_bbox",
+        "appearance_recovery_bbox",
+        "semantic_segmentation",
+        "simulator_object_id"
+      ],
+      "truth_usage": ["reward", "termination", "metrics", "teacher_labels"]
+    },
+    "showcase_hybrid": {
+      "purpose": "frozen_305m_regression_reproduction",
+      "privileged_actor_inputs": [
+        "scheduled_target_bearing",
+        "purple_vest_recovery_bbox"
+      ],
+      "may_be_reported_as_pure_e2e": false
+    }
+  },
+  "interfaces": {
+    "visual_encoder": {
+      "input": ["rgb", "target_template_rgb"],
+      "output": "last_hidden_tokens"
+    },
+    "algorithm_constrained_navigation": {
+      "input": ["last_hidden_tokens", "proprioception"],
+      "output": ["vx_mps", "vy_mps", "yaw_rate_rps"]
+    },
+    "locomotion": {
+      "input": ["vx_mps", "vy_mps", "yaw_rate_rps", "proprioception"],
+      "output": "joint_action"
+    }
+  },
+  "stage_gates": [
+    {
+      "stage": 1,
+      "name": "baseline_and_interface_isolation",
+      "status": "verified",
+      "gate": "frozen artifacts validate and pure_e2e command path has no privileged inputs"
+    },
+    {
+      "stage": 2,
+      "name": "standard_episode_environment",
+      "status": "verified",
+      "gate": "reset-step observation-action contracts and deterministic scenario replay pass"
+    },
+    {
+      "stage": 3,
+      "name": "physical_occlusion_and_truth_free_recovery",
+      "status": "diagnostic_verified_then_removed_from_active_scene",
+      "gate": "archived diagnostic proves truth-free recovery; active default scene contains no injected occlusion event"
+    },
+    {
+      "stage": 4,
+      "name": "modular_training_interface",
+      "status": "verified",
+      "gate": "visual, algorithm-constrained navigation and locomotion modules can be frozen independently or trained jointly"
+    },
+    {
+      "stage": 5,
+      "name": "current_scene_ten_minute_acceptance",
+      "status": "verified",
+      "gate": "pure_e2e passes the maximum useful continuous duration of the existing scene",
+      "evidence": "outputs/baseline_305m/ten_minute/stage5_10min_no_event_v3.json"
+    },
+    {
+      "stage": 6,
+      "name": "scene_expansion_and_one_hour_acceptance",
+      "status": "in_progress_representative_dynamics_and_live_target_verified",
+      "gate": "60 static realistic all-terrain maps and 1200 reachable routes are structurally verified; tiled terrain collision and real Go2 dynamics pass on one representative city, park, and forest map; an animated, terrain-grounded, collidable target is live in Isaac Sim; all-map dynamics, character foot IK, and continuous one-hour acceptance remain unverified",
+      "evidence": [
+        "outputs/terrain_dataset_v3_realistic/static_baseline_report.json",
+        "outputs/terrain_dataset_v3_realistic/dynamics/representative_dynamics_report.json",
+        "outputs/terrain_dataset_v3_realistic/live_target/park_01_route_01_live_target.json"
+      ],
+      "authorized_scope_completed": "60 static maps and 1200 logical routes with terrain, obstacles, friction, tiled collision, target speed/yaw limits, zero injected events, representative Go2 dynamics on city_01, park_01, and forest_trail_01, plus live animated target motion on park_01",
+      "not_authorized_or_not_completed": [
+        "dynamic occlusion or distractor events",
+        "automatic one-hour route expansion",
+        "character-rig-specific skeletal foot IK acceptance",
+        "Go2 all-map dynamics acceptance beyond the three representative maps",
+        "one-hour pure_e2e acceptance"
+      ]
+    }
+  ]
+}

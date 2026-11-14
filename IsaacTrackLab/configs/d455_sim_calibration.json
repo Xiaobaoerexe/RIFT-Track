@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "status": "MEASURED_AND_FROZEN_BASELINE",
+  "physical_device_note": "The referenced hardware is D457 but the runtime retains D455 naming in USB mode.",
+  "image_size": [640, 480],
+  "nominal_frequency_hz": {"rgb": 30.0, "depth": 30.0},
+  "color_aligned_intrinsics": {
+    "fx": 391.18,
+    "fy": 391.18,
+    "cx": 321.78,
+    "cy": 239.94,
+    "distortion_model": "not_available",
+    "distortion_coefficients": [],
+    "source": "/media/abc/KINGSTON/vln_go2_system_jetson_tricam/training/safe_flow/safe_flow/config.py"
+  },
+  "mount": {
+    "optical_center_height_m": 0.66,
+    "pitch_down_deg": 10.0,
+    "body_relative_translation_m": [0.32, 0.0, 0.32],
+    "body_relative_quaternion_xyzw_ros": [0.54167522, -0.54167522, 0.45451948, -0.45451948],
+    "nominal_go2_base_height_m": 0.34,
+    "translation_note": "The complete body-relative translation and ROS xyzw quaternion are measured project values and are frozen. Training perturbations are applied only as explicit observation/mount randomization around this nominal baseline.",
+    "calibration_state": "measured_and_frozen_do_not_reestimate_or_randomize_nominal",
+    "source": "/media/abc/KINGSTON/vln_go2_system_jetson_tricam/docs/JETSON_DEPLOYMENT.md"
+  },
+  "rejected_source": {
+    "path": "/media/abc/KINGSTON/vln_go2_system_jetson_tricam/configs/d455_intrinsics.json",
+    "reason": "File explicitly says PLACEHOLDER ONLY. Its 386 px focal lengths were not used."
+  }
+}

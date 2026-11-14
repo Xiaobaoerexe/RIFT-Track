@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "purpose": "short_actual_isaac_runtime_acceptance_only",
+  "scenario": {
+    "id": "smoke_sim2real_events",
+    "duration_s": 4.0,
+    "interference": "distractors_occlusion",
+    "distractors": [1, 1],
+    "forced_occlusions": [1, 1],
+    "appearance_changes": [1, 1],
+    "lighting_changes": [1, 1],
+    "sensor_degradations": [1, 1]
+  },
+  "occlusion_event": {
+    "duration_s": [1.0, 1.0],
+    "types": ["crossing_person"],
+    "reappearance": ["opposite_side"]
+  },
+  "explicit_events": [
+    {"kind": "appearance_change", "variant": "outerwear_change", "start_s": 0.08, "duration_s": 0.30},
+    {"kind": "lighting_change", "variant": "sun_shadow_transition", "start_s": 0.10, "duration_s": 0.30},
+    {"kind": "sensor_degradation", "variant": "depth_dropout", "start_s": 0.12, "duration_s": 0.30},
+    {"kind": "occlusion", "variant": "crossing_person", "start_s": 0.14, "duration_s": 0.30, "recovery": "opposite_side"}
+  ],
+  "disturbance_event": {
+    "appearance_change": {
+      "duration_s": [1.0, 1.0],
+      "types": ["outerwear_change"]
+    },
+    "lighting_change": {
+      "duration_s": [1.0, 1.0],
+      "types": ["sun_shadow_transition"]
+    },
+    "sensor_degradation": {
+      "duration_s": [1.0, 1.0],
+      "types": ["depth_dropout"]
+    }
+  }
+}

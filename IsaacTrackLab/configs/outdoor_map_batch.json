@@ -1,0 +1,126 @@
+{
+  "schema_version": 1,
+  "batch_id": "outdoor_all_terrain_v1",
+  "quality_contract": {
+    "texture_resolution": "2k",
+    "material_model": "PBR diffuse + roughness + normal",
+    "lighting": "2k HDRI + directional sun",
+    "meters_per_unit": 1.0,
+    "collision_required_for": ["terrain", "static_obstacles", "challenge_structures"],
+    "dynamic_events": [],
+    "distractor_people": 0
+  },
+  "route_defaults": {
+    "algorithm": "seeded_cost_aware_astar",
+    "grid_resolution_m": 2.0,
+    "resample_spacing_m": 1.0,
+    "robot_clearance_m": 1.2,
+    "maximum_slope_deg": 28.0,
+    "minimum_length_m": 220.0,
+    "maximum_length_m": 430.0,
+    "maximum_attempts": 100
+  },
+  "maps": [
+    {
+      "id": "forest_trail",
+      "label": "森林泥土山径",
+      "seed": 1101,
+      "bounds_m": [-90.0, 90.0, -90.0, 90.0],
+      "terrain": {"profile": "rolling_forest", "texture": "forest_ground_04", "hdri": "forest_grove", "amplitude_m": 2.2, "frequency": 0.035, "static_friction": 0.92, "dynamic_friction": 0.78},
+      "obstacle_templates": [
+        {"asset": "pine_tree_01", "count": 42, "scale": [0.8, 1.25], "proxy": "cylinder", "radius_m": 0.55, "height_m": 7.0, "clearance_m": 1.5},
+        {"asset": "dead_tree_trunk", "count": 10, "scale": [0.8, 1.2], "proxy": "box", "size_m": [4.2, 0.9, 0.9], "clearance_m": 1.2},
+        {"asset": "tree_stump_01", "count": 12, "scale": [0.8, 1.3], "proxy": "cylinder", "radius_m": 0.65, "height_m": 0.8, "clearance_m": 1.3},
+        {"asset": "boulder_01", "count": 14, "scale": [0.6, 1.15], "proxy": "sphere", "radius_m": 1.1, "clearance_m": 1.4}
+      ],
+      "challenge_zones": [
+        {"id": "mud_patch", "kind": "soft_ground", "center_m": [-12, 8], "size_m": [30, 20], "cost": 1.5, "traversable": true, "static_friction": 0.55, "dynamic_friction": 0.38},
+        {"id": "root_field", "kind": "rough_ground", "center_m": [42, -28], "size_m": [28, 24], "cost": 1.8, "traversable": true, "static_friction": 0.86, "dynamic_friction": 0.70}
+      ],
+      "route_gates": [[-68, -54, 18, 18], [-28, 30, 24, 20], [35, -35, 25, 22], [65, 55, 18, 18]]
+    },
+    {
+      "id": "rocky_canyon",
+      "label": "岩石峡谷与碎石坡",
+      "seed": 2202,
+      "bounds_m": [-90.0, 90.0, -90.0, 90.0],
+      "terrain": {"profile": "rocky_canyon", "texture": "rocky_trail", "hdri": "fouriesburg_mountain_midday", "amplitude_m": 4.0, "frequency": 0.028, "static_friction": 0.88, "dynamic_friction": 0.72},
+      "obstacle_templates": [
+        {"asset": "boulder_01", "count": 32, "scale": [0.7, 1.8], "proxy": "sphere", "radius_m": 1.35, "clearance_m": 1.5},
+        {"asset": "rock_09", "count": 28, "scale": [0.6, 1.5], "proxy": "sphere", "radius_m": 1.0, "clearance_m": 1.3}
+      ],
+      "challenge_zones": [
+        {"id": "narrow_pass", "kind": "corridor", "center_m": [0, -12], "size_m": [18, 65], "cost": 1.2, "traversable": true, "static_friction": 0.82, "dynamic_friction": 0.66},
+        {"id": "talus_field", "kind": "rough_ground", "center_m": [42, 36], "size_m": [38, 34], "cost": 2.0, "traversable": true, "static_friction": 0.68, "dynamic_friction": 0.52}
+      ],
+      "route_gates": [[-72, -58, 18, 18], [-30, 36, 22, 22], [28, -36, 22, 22], [62, 58, 20, 20]]
+    },
+    {
+      "id": "alpine_slope",
+      "label": "高山雪坡与横坡台阶",
+      "seed": 3303,
+      "bounds_m": [-90.0, 90.0, -90.0, 90.0],
+      "terrain": {"profile": "alpine_slope", "texture": "snow_02", "hdri": "snowy_hillside", "amplitude_m": 3.0, "frequency": 0.03, "static_friction": 0.70, "dynamic_friction": 0.55},
+      "obstacle_templates": [
+        {"asset": "rock_09", "count": 30, "scale": [0.65, 1.55], "proxy": "sphere", "radius_m": 1.15, "clearance_m": 1.4},
+        {"asset": "boulder_01", "count": 18, "scale": [0.8, 1.7], "proxy": "sphere", "radius_m": 1.4, "clearance_m": 1.6}
+      ],
+      "challenge_zones": [
+        {"id": "cross_slope", "kind": "slope", "center_m": [-20, 15], "size_m": [55, 38], "cost": 1.7, "traversable": true, "static_friction": 0.52, "dynamic_friction": 0.36},
+        {"id": "snow_steps", "kind": "steps", "center_m": [46, -24], "size_m": [32, 22], "cost": 1.9, "traversable": true, "static_friction": 0.64, "dynamic_friction": 0.48}
+      ],
+      "route_gates": [[-72, -58, 18, 18], [-35, 18, 24, 24], [25, 35, 24, 24], [68, -48, 18, 18]]
+    },
+    {
+      "id": "wetland_boardwalk",
+      "label": "湿地泥泞与栈道",
+      "seed": 4404,
+      "bounds_m": [-90.0, 90.0, -90.0, 90.0],
+      "terrain": {"profile": "wetland", "texture": "muddy_tracks", "hdri": "monbachtal_riverbank", "amplitude_m": 1.0, "frequency": 0.04, "static_friction": 0.82, "dynamic_friction": 0.58},
+      "obstacle_templates": [
+        {"asset": "dead_tree_trunk", "count": 18, "scale": [0.75, 1.25], "proxy": "box", "size_m": [4.2, 0.9, 0.9], "clearance_m": 1.2},
+        {"asset": "tree_stump_01", "count": 18, "scale": [0.75, 1.25], "proxy": "cylinder", "radius_m": 0.65, "height_m": 0.8, "clearance_m": 1.3},
+        {"asset": "boulder_01", "count": 12, "scale": [0.55, 1.0], "proxy": "sphere", "radius_m": 0.9, "clearance_m": 1.2}
+      ],
+      "challenge_zones": [
+        {"id": "deep_water_west", "kind": "water", "center_m": [-35, 5], "size_m": [25, 75], "cost": 99.0, "traversable": false},
+        {"id": "boardwalk", "kind": "boardwalk", "center_m": [-8, 5], "size_m": [15, 82], "cost": 0.8, "traversable": true, "static_friction": 0.86, "dynamic_friction": 0.68},
+        {"id": "mud_basin", "kind": "soft_ground", "center_m": [38, -26], "size_m": [42, 32], "cost": 2.2, "traversable": true, "static_friction": 0.48, "dynamic_friction": 0.32}
+      ],
+      "route_gates": [[-70, -62, 18, 18], [-8, -28, 12, 18], [-8, 38, 12, 18], [65, 58, 18, 18]]
+    },
+    {
+      "id": "desert_dunes",
+      "label": "沙漠沙丘与岩石沟壑",
+      "seed": 5505,
+      "bounds_m": [-90.0, 90.0, -90.0, 90.0],
+      "terrain": {"profile": "desert_dunes", "texture": "playground_sand", "hdri": "dry_field", "amplitude_m": 3.2, "frequency": 0.026, "static_friction": 0.72, "dynamic_friction": 0.50},
+      "obstacle_templates": [
+        {"asset": "sand_rocks_small_01", "count": 36, "scale": [0.7, 1.6], "proxy": "sphere", "radius_m": 0.95, "clearance_m": 1.25},
+        {"asset": "boulder_01", "count": 16, "scale": [0.8, 1.65], "proxy": "sphere", "radius_m": 1.35, "clearance_m": 1.5}
+      ],
+      "challenge_zones": [
+        {"id": "soft_dune", "kind": "soft_ground", "center_m": [-20, 20], "size_m": [60, 45], "cost": 1.9, "traversable": true, "static_friction": 0.55, "dynamic_friction": 0.38},
+        {"id": "dry_gully", "kind": "gully", "center_m": [42, -18], "size_m": [22, 70], "cost": 1.6, "traversable": true, "static_friction": 0.66, "dynamic_friction": 0.46}
+      ],
+      "route_gates": [[-72, -62, 18, 18], [-35, 28, 24, 24], [32, -32, 24, 24], [70, 55, 18, 18]]
+    },
+    {
+      "id": "coastal_scrub",
+      "label": "海岸砂石与潮蚀岩场",
+      "seed": 6606,
+      "bounds_m": [-90.0, 90.0, -90.0, 90.0],
+      "terrain": {"profile": "coastal_scrub", "texture": "coast_sand_rocks_02", "hdri": "river_rocks", "amplitude_m": 2.6, "frequency": 0.032, "static_friction": 0.84, "dynamic_friction": 0.66},
+      "obstacle_templates": [
+        {"asset": "coast_rocks_01", "count": 28, "scale": [0.65, 1.5], "proxy": "sphere", "radius_m": 1.25, "clearance_m": 1.45},
+        {"asset": "dead_tree_trunk", "count": 10, "scale": [0.75, 1.2], "proxy": "box", "size_m": [4.2, 0.9, 0.9], "clearance_m": 1.2},
+        {"asset": "rock_09", "count": 18, "scale": [0.6, 1.4], "proxy": "sphere", "radius_m": 1.0, "clearance_m": 1.3}
+      ],
+      "challenge_zones": [
+        {"id": "tidal_channel", "kind": "water", "center_m": [-12, -8], "size_m": [18, 95], "cost": 99.0, "traversable": false},
+        {"id": "rock_shelf", "kind": "rough_ground", "center_m": [42, 28], "size_m": [45, 40], "cost": 1.9, "traversable": true, "static_friction": 0.78, "dynamic_friction": 0.60}
+      ],
+      "route_gates": [[-70, -58, 18, 18], [-30, 28, 24, 22], [18, -38, 24, 22], [68, 58, 18, 18]]
+    }
+  ]
+}

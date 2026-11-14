@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "baseline_id": "realistic_static_training_v1",
+  "dataset_config": "configs/terrain_dataset_v3_realistic.json",
+  "scene_root": "assets/scenes/terrain_dataset_v3_realistic",
+  "representative_maps": ["city_01", "park_01", "forest_trail_01"],
+  "authorized_scope": {
+    "scene_expansion": false,
+    "dynamic_events": [],
+    "distractor_people": 0
+  },
+  "target_motion": {
+    "nominal_speed_mps": 1.25,
+    "minimum_speed_mps": 1.0,
+    "maximum_speed_mps": 1.5,
+    "heading_lookahead_m": 2.5,
+    "maximum_yaw_rate_deg_s": 120.0,
+    "maximum_route_turn_deg": 150.0,
+    "ground_clearance_m": 0.0,
+    "skeletal_foot_ik_status": "not_implemented_requires_character_specific_rig_validation"
+  },
+  "d455_calibration": "configs/d455_sim_calibration.json",
+  "d455_required": {
+    "image_size": [640, 480],
+    "fx": 391.18,
+    "fy": 391.18,
+    "cx": 321.78,
+    "cy": 239.94,
+    "optical_center_height_m": 0.66,
+    "pitch_down_deg": 10.0
+  },
+  "physics": {
+    "collision_required": true,
+    "minimum_static_friction": 0.5,
+    "minimum_dynamic_friction": 0.35,
+    "maximum_restitution": 0.1
+  },
+  "acceptance": {
+    "map_count": 60,
+    "route_count": 1200,
+    "terrain_height_error_max_m": 0.001,
+    "event_count": 0,
+    "distractor_people": 0
+  }
+}

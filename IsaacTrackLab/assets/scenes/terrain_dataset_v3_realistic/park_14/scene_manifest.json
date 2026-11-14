@@ -1,0 +1,1292 @@
+{
+  "schema_version": 1,
+  "batch_id": "city_park_forest_realistic_v3",
+  "map_id": "park_14",
+  "label": "湖泊丘陵公园 14",
+  "usd": "park_14.usdc",
+  "seed": 183414,
+  "bounds_m": [
+    -90.0,
+    90.0,
+    -90.0,
+    90.0
+  ],
+  "terrain": {
+    "profile": "rolling_park",
+    "texture": "leafy_grass",
+    "hdri": "je_gray_park",
+    "seed": 183414,
+    "amplitude_m": 2.9434,
+    "frequency": 0.02908,
+    "roughness_m": 0.2325,
+    "micro_frequency": 0.09811,
+    "tilt_x": 0.00066,
+    "tilt_y": 0.00155,
+    "static_friction": 0.86,
+    "dynamic_friction": 0.68,
+    "features": [
+      {
+        "id": "lake_basin",
+        "kind": "lake_basin",
+        "center_m": [
+          29.595300925095817,
+          22.175591202148183
+        ],
+        "amplitude_m": 1.45,
+        "radius_x_m": 22.72628504507503,
+        "radius_y_m": 15.179762230701794
+      },
+      {
+        "id": "hill_west",
+        "kind": "gaussian",
+        "center_m": [
+          -48,
+          35
+        ],
+        "amplitude_m": 1.761918021413162,
+        "sigma_m": 21.31481064747574
+      },
+      {
+        "id": "hill_south",
+        "kind": "gaussian",
+        "center_m": [
+          28,
+          -48
+        ],
+        "amplitude_m": 1.4743599489967871,
+        "sigma_m": 17.52386985845571
+      },
+      {
+        "id": "path_bump_0",
+        "kind": "step_bump",
+        "center_m": [
+          -64.47809677405161,
+          22.812176782247136
+        ],
+        "amplitude_m": 0.1,
+        "radius_x_m": 1.6,
+        "radius_y_m": 0.9,
+        "angle_deg": -138.3372054255945
+      },
+      {
+        "id": "path_bump_1",
+        "kind": "step_bump",
+        "center_m": [
+          75.21139553984692,
+          18.30527695703779
+        ],
+        "amplitude_m": 0.1,
+        "radius_x_m": 1.6,
+        "radius_y_m": 0.9,
+        "angle_deg": 71.90686250457057
+      },
+      {
+        "id": "path_bump_2",
+        "kind": "step_bump",
+        "center_m": [
+          -8,
+          -5
+        ],
+        "amplitude_m": 0.1,
+        "radius_x_m": 1.6,
+        "radius_y_m": 0.9,
+        "angle_deg": -119.57229264281095
+      }
+    ]
+  },
+  "terrain_footprint_bounds_m": [
+    -120.0,
+    120.0,
+    -120.0,
+    120.0
+  ],
+  "friction": {
+    "static": 0.86,
+    "dynamic": 0.68
+  },
+  "family": "park",
+  "terrain_grid_spacing_m": 1.0,
+  "obstacles": [
+    {
+      "id": "pine_tree_01_001",
+      "asset": "pine_tree_01",
+      "x_m": 81.693,
+      "y_m": 36.667,
+      "z_m": 1.13033,
+      "yaw_deg": 0.0,
+      "scale": 1.0132,
+      "visual_scale": 0.323017,
+      "radius_m": 0.5066,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_001"
+    },
+    {
+      "id": "pine_tree_01_002",
+      "asset": "pine_tree_01",
+      "x_m": -59.087,
+      "y_m": 9.487,
+      "z_m": -0.05333,
+      "yaw_deg": 0.0,
+      "scale": 0.9299,
+      "visual_scale": 0.29646,
+      "radius_m": 0.46495,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_002"
+    },
+    {
+      "id": "pine_tree_01_003",
+      "asset": "pine_tree_01",
+      "x_m": 70.629,
+      "y_m": 70.295,
+      "z_m": 1.71305,
+      "yaw_deg": 0.0,
+      "scale": 0.7473,
+      "visual_scale": 0.238246,
+      "radius_m": 0.37365,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_003"
+    },
+    {
+      "id": "pine_tree_01_004",
+      "asset": "pine_tree_01",
+      "x_m": 57.733,
+      "y_m": 65.489,
+      "z_m": 1.3967,
+      "yaw_deg": 0.0,
+      "scale": 1.0456,
+      "visual_scale": 0.333346,
+      "radius_m": 0.5228,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_004"
+    },
+    {
+      "id": "pine_tree_01_005",
+      "asset": "pine_tree_01",
+      "x_m": 30.886,
+      "y_m": -49.702,
+      "z_m": 0.77466,
+      "yaw_deg": 0.0,
+      "scale": 0.8812,
+      "visual_scale": 0.280934,
+      "radius_m": 0.4406,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_005"
+    },
+    {
+      "id": "pine_tree_01_006",
+      "asset": "pine_tree_01",
+      "x_m": -32.125,
+      "y_m": -55.203,
+      "z_m": -1.13342,
+      "yaw_deg": 0.0,
+      "scale": 0.6845,
+      "visual_scale": 0.218224,
+      "radius_m": 0.34225,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_006"
+    },
+    {
+      "id": "pine_tree_01_007",
+      "asset": "pine_tree_01",
+      "x_m": -5.423,
+      "y_m": -62.827,
+      "z_m": -1.36091,
+      "yaw_deg": 0.0,
+      "scale": 0.8901,
+      "visual_scale": 0.283772,
+      "radius_m": 0.44505,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_007"
+    },
+    {
+      "id": "pine_tree_01_008",
+      "asset": "pine_tree_01",
+      "x_m": 9.426,
+      "y_m": 66.516,
+      "z_m": -0.41385,
+      "yaw_deg": 0.0,
+      "scale": 0.7421,
+      "visual_scale": 0.236588,
+      "radius_m": 0.37105,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_008"
+    },
+    {
+      "id": "pine_tree_01_009",
+      "asset": "pine_tree_01",
+      "x_m": 78.167,
+      "y_m": 48.192,
+      "z_m": 1.70885,
+      "yaw_deg": 0.0,
+      "scale": 0.7576,
+      "visual_scale": 0.241529,
+      "radius_m": 0.3788,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_009"
+    },
+    {
+      "id": "pine_tree_01_010",
+      "asset": "pine_tree_01",
+      "x_m": 13.548,
+      "y_m": -34.344,
+      "z_m": -0.4234,
+      "yaw_deg": 0.0,
+      "scale": 0.809,
+      "visual_scale": 0.257916,
+      "radius_m": 0.4045,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_010"
+    },
+    {
+      "id": "pine_tree_01_011",
+      "asset": "pine_tree_01",
+      "x_m": 41.642,
+      "y_m": 52.366,
+      "z_m": 1.29366,
+      "yaw_deg": 0.0,
+      "scale": 0.7605,
+      "visual_scale": 0.242454,
+      "radius_m": 0.38025,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_011"
+    },
+    {
+      "id": "pine_tree_01_012",
+      "asset": "pine_tree_01",
+      "x_m": 24.436,
+      "y_m": -78.735,
+      "z_m": 0.48996,
+      "yaw_deg": 0.0,
+      "scale": 0.859,
+      "visual_scale": 0.273857,
+      "radius_m": 0.4295,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_012"
+    },
+    {
+      "id": "pine_tree_01_013",
+      "asset": "pine_tree_01",
+      "x_m": 51.589,
+      "y_m": -10.686,
+      "z_m": -0.27074,
+      "yaw_deg": 0.0,
+      "scale": 0.8963,
+      "visual_scale": 0.285748,
+      "radius_m": 0.44815,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_013"
+    },
+    {
+      "id": "pine_tree_01_014",
+      "asset": "pine_tree_01",
+      "x_m": -2.107,
+      "y_m": 33.578,
+      "z_m": -0.42079,
+      "yaw_deg": 0.0,
+      "scale": 0.9184,
+      "visual_scale": 0.292794,
+      "radius_m": 0.4592,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_014"
+    },
+    {
+      "id": "pine_tree_01_015",
+      "asset": "pine_tree_01",
+      "x_m": 49.881,
+      "y_m": -40.719,
+      "z_m": 0.68032,
+      "yaw_deg": 0.0,
+      "scale": 0.8023,
+      "visual_scale": 0.25578,
+      "radius_m": 0.40115,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_015"
+    },
+    {
+      "id": "pine_tree_01_016",
+      "asset": "pine_tree_01",
+      "x_m": 55.944,
+      "y_m": -14.32,
+      "z_m": -0.25765,
+      "yaw_deg": 0.0,
+      "scale": 0.8441,
+      "visual_scale": 0.269106,
+      "radius_m": 0.42205,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_016"
+    },
+    {
+      "id": "pine_tree_01_017",
+      "asset": "pine_tree_01",
+      "x_m": 65.288,
+      "y_m": -61.557,
+      "z_m": 1.85094,
+      "yaw_deg": 0.0,
+      "scale": 0.9227,
+      "visual_scale": 0.294165,
+      "radius_m": 0.46135,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_017"
+    },
+    {
+      "id": "pine_tree_01_018",
+      "asset": "pine_tree_01",
+      "x_m": -31.127,
+      "y_m": 15.336,
+      "z_m": -0.46623,
+      "yaw_deg": 0.0,
+      "scale": 0.9446,
+      "visual_scale": 0.301147,
+      "radius_m": 0.4723,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_018"
+    },
+    {
+      "id": "pine_tree_01_019",
+      "asset": "pine_tree_01",
+      "x_m": 3.491,
+      "y_m": 52.793,
+      "z_m": -0.26892,
+      "yaw_deg": 0.0,
+      "scale": 1.0271,
+      "visual_scale": 0.327448,
+      "radius_m": 0.51355,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_019"
+    },
+    {
+      "id": "pine_tree_01_020",
+      "asset": "pine_tree_01",
+      "x_m": -36.193,
+      "y_m": -46.391,
+      "z_m": -1.15546,
+      "yaw_deg": 0.0,
+      "scale": 0.6812,
+      "visual_scale": 0.217172,
+      "radius_m": 0.3406,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_020"
+    },
+    {
+      "id": "pine_tree_01_021",
+      "asset": "pine_tree_01",
+      "x_m": 65.651,
+      "y_m": 59.094,
+      "z_m": 1.72322,
+      "yaw_deg": 0.0,
+      "scale": 0.7442,
+      "visual_scale": 0.237257,
+      "radius_m": 0.3721,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_021"
+    },
+    {
+      "id": "pine_tree_01_022",
+      "asset": "pine_tree_01",
+      "x_m": -61.976,
+      "y_m": -32.698,
+      "z_m": -1.57232,
+      "yaw_deg": 0.0,
+      "scale": 0.8771,
+      "visual_scale": 0.279627,
+      "radius_m": 0.43855,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_022"
+    },
+    {
+      "id": "pine_tree_01_023",
+      "asset": "pine_tree_01",
+      "x_m": 52.867,
+      "y_m": -6.636,
+      "z_m": -0.17384,
+      "yaw_deg": 0.0,
+      "scale": 1.0383,
+      "visual_scale": 0.331019,
+      "radius_m": 0.51915,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_023"
+    },
+    {
+      "id": "pine_tree_01_024",
+      "asset": "pine_tree_01",
+      "x_m": -25.033,
+      "y_m": 1.256,
+      "z_m": -1.12926,
+      "yaw_deg": 0.0,
+      "scale": 0.9614,
+      "visual_scale": 0.306503,
+      "radius_m": 0.4807,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_024"
+    },
+    {
+      "id": "pine_tree_01_025",
+      "asset": "pine_tree_01",
+      "x_m": -25.163,
+      "y_m": 77.444,
+      "z_m": 0.74864,
+      "yaw_deg": 0.0,
+      "scale": 0.7415,
+      "visual_scale": 0.236397,
+      "radius_m": 0.37075,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_025"
+    },
+    {
+      "id": "pine_tree_01_026",
+      "asset": "pine_tree_01",
+      "x_m": -3.46,
+      "y_m": 55.605,
+      "z_m": -0.15699,
+      "yaw_deg": 0.0,
+      "scale": 0.9565,
+      "visual_scale": 0.30494,
+      "radius_m": 0.47825,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_026"
+    },
+    {
+      "id": "pine_tree_01_027",
+      "asset": "pine_tree_01",
+      "x_m": 25.102,
+      "y_m": 50.007,
+      "z_m": 0.28101,
+      "yaw_deg": 0.0,
+      "scale": 0.9633,
+      "visual_scale": 0.307108,
+      "radius_m": 0.48165,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_027"
+    },
+    {
+      "id": "pine_tree_01_028",
+      "asset": "pine_tree_01",
+      "x_m": -64.68,
+      "y_m": -68.399,
+      "z_m": 0.08864,
+      "yaw_deg": 0.0,
+      "scale": 0.701,
+      "visual_scale": 0.223485,
+      "radius_m": 0.3505,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_028"
+    },
+    {
+      "id": "pine_tree_01_029",
+      "asset": "pine_tree_01",
+      "x_m": -45.005,
+      "y_m": 3.556,
+      "z_m": -1.12301,
+      "yaw_deg": 0.0,
+      "scale": 0.9313,
+      "visual_scale": 0.296906,
+      "radius_m": 0.46565,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_029"
+    },
+    {
+      "id": "pine_tree_01_030",
+      "asset": "pine_tree_01",
+      "x_m": 44.289,
+      "y_m": -35.312,
+      "z_m": 0.34339,
+      "yaw_deg": 0.0,
+      "scale": 1.0393,
+      "visual_scale": 0.331338,
+      "radius_m": 0.51965,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_030"
+    },
+    {
+      "id": "pine_tree_01_031",
+      "asset": "pine_tree_01",
+      "x_m": -67.91,
+      "y_m": 70.797,
+      "z_m": 1.12285,
+      "yaw_deg": 0.0,
+      "scale": 0.9477,
+      "visual_scale": 0.302135,
+      "radius_m": 0.47385,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_031"
+    },
+    {
+      "id": "pine_tree_01_032",
+      "asset": "pine_tree_01",
+      "x_m": 8.351,
+      "y_m": -41.813,
+      "z_m": -0.60445,
+      "yaw_deg": 0.0,
+      "scale": 0.953,
+      "visual_scale": 0.303825,
+      "radius_m": 0.4765,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_032"
+    },
+    {
+      "id": "pine_tree_01_033",
+      "asset": "pine_tree_01",
+      "x_m": -74.572,
+      "y_m": -80.307,
+      "z_m": 0.71103,
+      "yaw_deg": 0.0,
+      "scale": 0.9023,
+      "visual_scale": 0.287661,
+      "radius_m": 0.45115,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_033"
+    },
+    {
+      "id": "pine_tree_01_034",
+      "asset": "pine_tree_01",
+      "x_m": -48.45,
+      "y_m": -56.49,
+      "z_m": -0.47187,
+      "yaw_deg": 0.0,
+      "scale": 0.7064,
+      "visual_scale": 0.225206,
+      "radius_m": 0.3532,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_034"
+    },
+    {
+      "id": "pine_tree_01_035",
+      "asset": "pine_tree_01",
+      "x_m": 10.49,
+      "y_m": -22.612,
+      "z_m": -0.78813,
+      "yaw_deg": 0.0,
+      "scale": 0.6811,
+      "visual_scale": 0.217141,
+      "radius_m": 0.34055,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_035"
+    },
+    {
+      "id": "pine_tree_01_036",
+      "asset": "pine_tree_01",
+      "x_m": 64.138,
+      "y_m": 79.655,
+      "z_m": 1.13495,
+      "yaw_deg": 0.0,
+      "scale": 0.7053,
+      "visual_scale": 0.224856,
+      "radius_m": 0.35265,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_036"
+    },
+    {
+      "id": "pine_tree_01_037",
+      "asset": "pine_tree_01",
+      "x_m": 77.642,
+      "y_m": 73.818,
+      "z_m": 1.76955,
+      "yaw_deg": 0.0,
+      "scale": 1.0229,
+      "visual_scale": 0.326109,
+      "radius_m": 0.51145,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_037"
+    },
+    {
+      "id": "pine_tree_01_038",
+      "asset": "pine_tree_01",
+      "x_m": -23.709,
+      "y_m": -62.887,
+      "z_m": -1.39727,
+      "yaw_deg": 0.0,
+      "scale": 0.718,
+      "visual_scale": 0.228905,
+      "radius_m": 0.359,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_038"
+    },
+    {
+      "id": "pine_tree_01_039",
+      "asset": "pine_tree_01",
+      "x_m": -50.576,
+      "y_m": 69.92,
+      "z_m": 1.35469,
+      "yaw_deg": 0.0,
+      "scale": 0.9752,
+      "visual_scale": 0.310902,
+      "radius_m": 0.4876,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_039"
+    },
+    {
+      "id": "pine_tree_01_040",
+      "asset": "pine_tree_01",
+      "x_m": 36.83,
+      "y_m": -14.374,
+      "z_m": -0.34246,
+      "yaw_deg": 0.0,
+      "scale": 0.9979,
+      "visual_scale": 0.318139,
+      "radius_m": 0.49895,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_040"
+    },
+    {
+      "id": "pine_tree_01_041",
+      "asset": "pine_tree_01",
+      "x_m": 80.011,
+      "y_m": 65.436,
+      "z_m": 2.00094,
+      "yaw_deg": 0.0,
+      "scale": 0.8447,
+      "visual_scale": 0.269298,
+      "radius_m": 0.42235,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_041"
+    },
+    {
+      "id": "pine_tree_01_042",
+      "asset": "pine_tree_01",
+      "x_m": 9.662,
+      "y_m": -61.096,
+      "z_m": -0.63487,
+      "yaw_deg": 0.0,
+      "scale": 0.9985,
+      "visual_scale": 0.31833,
+      "radius_m": 0.49925,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_042"
+    },
+    {
+      "id": "pine_tree_01_043",
+      "asset": "pine_tree_01",
+      "x_m": 57.167,
+      "y_m": -55.788,
+      "z_m": 1.49023,
+      "yaw_deg": 0.0,
+      "scale": 0.9807,
+      "visual_scale": 0.312656,
+      "radius_m": 0.49035,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_043"
+    },
+    {
+      "id": "pine_tree_01_044",
+      "asset": "pine_tree_01",
+      "x_m": 67.85,
+      "y_m": -79.174,
+      "z_m": 1.59842,
+      "yaw_deg": 0.0,
+      "scale": 0.9456,
+      "visual_scale": 0.301465,
+      "radius_m": 0.4728,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_044"
+    },
+    {
+      "id": "pine_tree_01_045",
+      "asset": "pine_tree_01",
+      "x_m": 24.78,
+      "y_m": -18.62,
+      "z_m": -0.51433,
+      "yaw_deg": 0.0,
+      "scale": 0.8159,
+      "visual_scale": 0.260116,
+      "radius_m": 0.40795,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_045"
+    },
+    {
+      "id": "pine_tree_01_046",
+      "asset": "pine_tree_01",
+      "x_m": 51.505,
+      "y_m": -71.056,
+      "z_m": 1.72027,
+      "yaw_deg": 0.0,
+      "scale": 0.8018,
+      "visual_scale": 0.255621,
+      "radius_m": 0.4009,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_046"
+    },
+    {
+      "id": "pine_tree_01_047",
+      "asset": "pine_tree_01",
+      "x_m": 54.232,
+      "y_m": -39.056,
+      "z_m": 0.72002,
+      "yaw_deg": 0.0,
+      "scale": 0.9846,
+      "visual_scale": 0.313899,
+      "radius_m": 0.4923,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_047"
+    },
+    {
+      "id": "pine_tree_01_048",
+      "asset": "pine_tree_01",
+      "x_m": -57.99,
+      "y_m": -33.381,
+      "z_m": -1.54449,
+      "yaw_deg": 0.0,
+      "scale": 0.7415,
+      "visual_scale": 0.236397,
+      "radius_m": 0.37075,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_048"
+    },
+    {
+      "id": "pine_tree_01_049",
+      "asset": "pine_tree_01",
+      "x_m": -55.659,
+      "y_m": -19.422,
+      "z_m": -1.90455,
+      "yaw_deg": 0.0,
+      "scale": 0.9245,
+      "visual_scale": 0.294739,
+      "radius_m": 0.46225,
+      "proxy": "cylinder",
+      "collision_prim": "/OutdoorMap/Collision/pine_tree_01_049"
+    },
+    {
+      "id": "boulder_01_001",
+      "asset": "boulder_01",
+      "x_m": 67.437,
+      "y_m": 54.548,
+      "z_m": 1.7899,
+      "yaw_deg": 0.0,
+      "scale": 0.4298,
+      "visual_scale": 0.422677,
+      "radius_m": 0.38682,
+      "proxy": "sphere",
+      "collision_prim": "/OutdoorMap/Collision/boulder_01_001"
+    },
+    {
+      "id": "boulder_01_002",
+      "asset": "boulder_01",
+      "x_m": -43.054,
+      "y_m": 68.617,
+      "z_m": 1.46681,
+      "yaw_deg": 0.0,
+      "scale": 0.707,
+      "visual_scale": 0.695283,
+      "radius_m": 0.6363,
+      "proxy": "sphere",
+      "collision_prim": "/OutdoorMap/Collision/boulder_01_002"
+    },
+    {
+      "id": "boulder_01_003",
+      "asset": "boulder_01",
+      "x_m": -37.111,
+      "y_m": 20.574,
+      "z_m": 0.22202,
+      "yaw_deg": 0.0,
+      "scale": 0.5413,
+      "visual_scale": 0.532329,
+      "radius_m": 0.48717,
+      "proxy": "sphere",
+      "collision_prim": "/OutdoorMap/Collision/boulder_01_003"
+    },
+    {
+      "id": "boulder_01_004",
+      "asset": "boulder_01",
+      "x_m": -1.365,
+      "y_m": 24.395,
+      "z_m": -0.33095,
+      "yaw_deg": 0.0,
+      "scale": 0.5188,
+      "visual_scale": 0.510202,
+      "radius_m": 0.46692,
+      "proxy": "sphere",
+      "collision_prim": "/OutdoorMap/Collision/boulder_01_004"
+    },
+    {
+      "id": "boulder_01_005",
+      "asset": "boulder_01",
+      "x_m": -30.557,
+      "y_m": 44.422,
+      "z_m": 1.23732,
+      "yaw_deg": 0.0,
+      "scale": 0.5492,
+      "visual_scale": 0.540098,
+      "radius_m": 0.49428,
+      "proxy": "sphere",
+      "collision_prim": "/OutdoorMap/Collision/boulder_01_005"
+    },
+    {
+      "id": "boulder_01_006",
+      "asset": "boulder_01",
+      "x_m": -15.675,
+      "y_m": 8.151,
+      "z_m": -1.06308,
+      "yaw_deg": 0.0,
+      "scale": 0.7219,
+      "visual_scale": 0.709936,
+      "radius_m": 0.64971,
+      "proxy": "sphere",
+      "collision_prim": "/OutdoorMap/Collision/boulder_01_006"
+    },
+    {
+      "id": "boulder_01_007",
+      "asset": "boulder_01",
+      "x_m": 2.09,
+      "y_m": -16.79,
+      "z_m": -0.89165,
+      "yaw_deg": 0.0,
+      "scale": 0.7078,
+      "visual_scale": 0.69607,
+      "radius_m": 0.63702,
+      "proxy": "sphere",
+      "collision_prim": "/OutdoorMap/Collision/boulder_01_007"
+    },
+    {
+      "id": "boulder_01_008",
+      "asset": "boulder_01",
+      "x_m": 55.864,
+      "y_m": -71.022,
+      "z_m": 1.79618,
+      "yaw_deg": 0.0,
+      "scale": 0.644,
+      "visual_scale": 0.633327,
+      "radius_m": 0.5796,
+      "proxy": "sphere",
+      "collision_prim": "/OutdoorMap/Collision/boulder_01_008"
+    },
+    {
+      "id": "boulder_01_009",
+      "asset": "boulder_01",
+      "x_m": 35.728,
+      "y_m": 77.726,
+      "z_m": -0.05909,
+      "yaw_deg": 0.0,
+      "scale": 0.5787,
+      "visual_scale": 0.569109,
+      "radius_m": 0.52083,
+      "proxy": "sphere",
+      "collision_prim": "/OutdoorMap/Collision/boulder_01_009"
+    },
+    {
+      "id": "boulder_01_010",
+      "asset": "boulder_01",
+      "x_m": 61.494,
+      "y_m": -65.68,
+      "z_m": 1.79096,
+      "yaw_deg": 0.0,
+      "scale": 0.6866,
+      "visual_scale": 0.675221,
+      "radius_m": 0.61794,
+      "proxy": "sphere",
+      "collision_prim": "/OutdoorMap/Collision/boulder_01_010"
+    },
+    {
+      "id": "boulder_01_011",
+      "asset": "boulder_01",
+      "x_m": -51.184,
+      "y_m": 32.684,
+      "z_m": 2.22905,
+      "yaw_deg": 0.0,
+      "scale": 0.5676,
+      "visual_scale": 0.558193,
+      "radius_m": 0.51084,
+      "proxy": "sphere",
+      "collision_prim": "/OutdoorMap/Collision/boulder_01_011"
+    },
+    {
+      "id": "boulder_01_012",
+      "asset": "boulder_01",
+      "x_m": 5.658,
+      "y_m": -64.071,
+      "z_m": -0.84224,
+      "yaw_deg": 0.0,
+      "scale": 0.6849,
+      "visual_scale": 0.673549,
+      "radius_m": 0.61641,
+      "proxy": "sphere",
+      "collision_prim": "/OutdoorMap/Collision/boulder_01_012"
+    },
+    {
+      "id": "boulder_01_013",
+      "asset": "boulder_01",
+      "x_m": 57.791,
+      "y_m": 58.228,
+      "z_m": 1.58609,
+      "yaw_deg": 0.0,
+      "scale": 0.6507,
+      "visual_scale": 0.639916,
+      "radius_m": 0.58563,
+      "proxy": "sphere",
+      "collision_prim": "/OutdoorMap/Collision/boulder_01_013"
+    },
+    {
+      "id": "boulder_01_014",
+      "asset": "boulder_01",
+      "x_m": -24.883,
+      "y_m": 34.487,
+      "z_m": 0.35287,
+      "yaw_deg": 0.0,
+      "scale": 0.4425,
+      "visual_scale": 0.435166,
+      "radius_m": 0.39825,
+      "proxy": "sphere",
+      "collision_prim": "/OutdoorMap/Collision/boulder_01_014"
+    },
+    {
+      "id": "painted_wooden_bench_001",
+      "asset": "painted_wooden_bench",
+      "x_m": -60.678,
+      "y_m": 25.812,
+      "z_m": 1.77293,
+      "yaw_deg": 56.96,
+      "scale": 0.9845,
+      "visual_scale": 1.6057,
+      "radius_m": 1.0055,
+      "proxy": "box",
+      "collision_prim": "/OutdoorMap/Collision/painted_wooden_bench_001",
+      "size_m": [
+        1.87055,
+        0.738375,
+        1.1814
+      ]
+    },
+    {
+      "id": "painted_wooden_bench_002",
+      "asset": "painted_wooden_bench",
+      "x_m": 14.493,
+      "y_m": 78.553,
+      "z_m": -0.27346,
+      "yaw_deg": -23.63,
+      "scale": 0.9091,
+      "visual_scale": 1.482724,
+      "radius_m": 0.9285,
+      "proxy": "box",
+      "collision_prim": "/OutdoorMap/Collision/painted_wooden_bench_002",
+      "size_m": [
+        1.72729,
+        0.681825,
+        1.09092
+      ]
+    },
+    {
+      "id": "painted_wooden_bench_003",
+      "asset": "painted_wooden_bench",
+      "x_m": 79.011,
+      "y_m": 21.305,
+      "z_m": 0.72981,
+      "yaw_deg": -99.97,
+      "scale": 0.9748,
+      "visual_scale": 1.58988,
+      "radius_m": 0.9956,
+      "proxy": "box",
+      "collision_prim": "/OutdoorMap/Collision/painted_wooden_bench_003",
+      "size_m": [
+        1.85212,
+        0.7311,
+        1.16976
+      ]
+    },
+    {
+      "id": "painted_wooden_bench_004",
+      "asset": "painted_wooden_bench",
+      "x_m": 40.252,
+      "y_m": -67.788,
+      "z_m": 1.35882,
+      "yaw_deg": -173.86,
+      "scale": 0.9618,
+      "visual_scale": 1.568677,
+      "radius_m": 0.98232,
+      "proxy": "box",
+      "collision_prim": "/OutdoorMap/Collision/painted_wooden_bench_004",
+      "size_m": [
+        1.8274199999999998,
+        0.7213499999999999,
+        1.1541599999999999
+      ]
+    }
+  ],
+  "obstacle_count": 67,
+  "structure_count": 0,
+  "prop_count": 67,
+  "surface_corridor_count": 3,
+  "curb_count": 0,
+  "traversable_features": [
+    {
+      "id": "path_stones_0_stone_0",
+      "asset": "rock_09",
+      "x_m": -64.06925,
+      "y_m": 23.09997,
+      "z_m": 1.52873,
+      "yaw_deg": -144.835,
+      "scale": 0.85,
+      "visual_scale": 1.998278,
+      "radius_m": 0.1445,
+      "proxy": "sphere",
+      "collision_prim": "/OutdoorMap/Collision/path_stones_0_stone_0"
+    },
+    {
+      "id": "path_stones_0_stone_1",
+      "asset": "rock_09",
+      "x_m": -64.478,
+      "y_m": 22.812,
+      "z_m": 1.51366,
+      "yaw_deg": -107.835,
+      "scale": 0.93,
+      "visual_scale": 2.186351,
+      "radius_m": 0.1581,
+      "proxy": "sphere",
+      "collision_prim": "/OutdoorMap/Collision/path_stones_0_stone_1"
+    },
+    {
+      "id": "path_stones_0_stone_2",
+      "asset": "rock_09",
+      "x_m": -64.88675,
+      "y_m": 22.52403,
+      "z_m": 1.46108,
+      "yaw_deg": -70.835,
+      "scale": 1.01,
+      "visual_scale": 2.374425,
+      "radius_m": 0.1717,
+      "proxy": "sphere",
+      "collision_prim": "/OutdoorMap/Collision/path_stones_0_stone_2"
+    },
+    {
+      "id": "path_stones_1_stone_0",
+      "asset": "rock_09",
+      "x_m": 75.26924,
+      "y_m": 18.8016,
+      "z_m": 0.75112,
+      "yaw_deg": -96.6888,
+      "scale": 0.85,
+      "visual_scale": 1.998278,
+      "radius_m": 0.1445,
+      "proxy": "sphere",
+      "collision_prim": "/OutdoorMap/Collision/path_stones_1_stone_0"
+    },
+    {
+      "id": "path_stones_1_stone_1",
+      "asset": "rock_09",
+      "x_m": 75.211,
+      "y_m": 18.305,
+      "z_m": 0.74602,
+      "yaw_deg": -59.6888,
+      "scale": 0.93,
+      "visual_scale": 2.186351,
+      "radius_m": 0.1581,
+      "proxy": "sphere",
+      "collision_prim": "/OutdoorMap/Collision/path_stones_1_stone_1"
+    },
+    {
+      "id": "path_stones_1_stone_2",
+      "asset": "rock_09",
+      "x_m": 75.15276,
+      "y_m": 17.8084,
+      "z_m": 0.70061,
+      "yaw_deg": -22.6888,
+      "scale": 1.01,
+      "visual_scale": 2.374425,
+      "radius_m": 0.1717,
+      "proxy": "sphere",
+      "collision_prim": "/OutdoorMap/Collision/path_stones_1_stone_2"
+    },
+    {
+      "id": "path_stones_2_stone_0",
+      "asset": "rock_09",
+      "x_m": -7.53116,
+      "y_m": -4.82626,
+      "z_m": -0.76074,
+      "yaw_deg": -159.6663,
+      "scale": 0.85,
+      "visual_scale": 1.998278,
+      "radius_m": 0.1445,
+      "proxy": "sphere",
+      "collision_prim": "/OutdoorMap/Collision/path_stones_2_stone_0"
+    },
+    {
+      "id": "path_stones_2_stone_1",
+      "asset": "rock_09",
+      "x_m": -8.0,
+      "y_m": -5.0,
+      "z_m": -0.73148,
+      "yaw_deg": -122.6663,
+      "scale": 0.93,
+      "visual_scale": 2.186351,
+      "radius_m": 0.1581,
+      "proxy": "sphere",
+      "collision_prim": "/OutdoorMap/Collision/path_stones_2_stone_1"
+    },
+    {
+      "id": "path_stones_2_stone_2",
+      "asset": "rock_09",
+      "x_m": -8.46884,
+      "y_m": -5.17374,
+      "z_m": -0.76962,
+      "yaw_deg": -85.6663,
+      "scale": 1.01,
+      "visual_scale": 2.374425,
+      "radius_m": 0.1717,
+      "proxy": "sphere",
+      "collision_prim": "/OutdoorMap/Collision/path_stones_2_stone_2"
+    }
+  ],
+  "traversable_feature_count": 9,
+  "planning_contract": {
+    "semantic_layout_required": true,
+    "routes_must_follow_navigation_corridors": true,
+    "city_requires": [
+      "road_network",
+      "sidewalks",
+      "curb_breaks_at_intersections",
+      "roadside_props",
+      "zoned_buildings"
+    ],
+    "park_requires": [
+      "terrain_bowl_lake",
+      "elliptical_water_surface",
+      "hills",
+      "connected_paths",
+      "shore_and_path_stones"
+    ],
+    "forest_requires": [
+      "dense_off-trail_trees",
+      "rugged_ridges",
+      "mud_trails",
+      "rocks",
+      "deadwood",
+      "traversable_step_features"
+    ]
+  },
+  "navigation_corridors": [
+    {
+      "id": "park_loop",
+      "points_m": [
+        [
+          -70.73633967468655,
+          -37.94127213569354
+        ],
+        [
+          -64.47809677405161,
+          22.812176782247136
+        ],
+        [
+          -37.494591420755306,
+          64.30196939542688
+        ],
+        [
+          10.692645946077825,
+          75.55254131265654
+        ],
+        [
+          52.958199230120194,
+          57.058712400051434
+        ],
+        [
+          75.21139553984692,
+          18.30527695703779
+        ],
+        [
+          65.09922599673932,
+          -39.22599534738765
+        ],
+        [
+          36.45240368113982,
+          -70.7881236810907
+        ],
+        [
+          -18.764685536435124,
+          -76.7251891845554
+        ],
+        [
+          -59.29644828576575,
+          -64.32441462283457
+        ],
+        [
+          -74.96232033679881,
+          -35.56155461810417
+        ]
+      ],
+      "width_m": 6.0
+    },
+    {
+      "id": "park_cross_e",
+      "points_m": [
+        [
+          -75,
+          -4
+        ],
+        [
+          -42,
+          -12
+        ],
+        [
+          -8,
+          -5
+        ],
+        [
+          28,
+          5
+        ],
+        [
+          72,
+          4
+        ]
+      ],
+      "width_m": 5.5
+    },
+    {
+      "id": "park_cross_n",
+      "points_m": [
+        [
+          -12,
+          -76
+        ],
+        [
+          -18,
+          -38
+        ],
+        [
+          -8,
+          0
+        ],
+        [
+          -15,
+          38
+        ],
+        [
+          -8,
+          74
+        ]
+      ],
+      "width_m": 5.5
+    }
+  ],
+  "challenge_zones": [
+    {
+      "id": "lake",
+      "kind": "water",
+      "shape": "ellipse",
+      "center_m": [
+        29.595,
+        22.176
+      ],
+      "size_m": [
+        25.453,
+        17.001
+      ],
+      "cost": 99.0,
+      "traversable": false,
+      "water_raise_m": 0.76
+    }
+  ],
+  "terrain_collision_tile_count": 36,
+  "collision_prims_expected": 140,
+  "route_generator": "isaac_track_lab.task.terrain_routes.TerrainRouteGenerator",
+  "route_defaults": {
+    "algorithm": "semantic_corridor_cost_aware_astar",
+    "grid_resolution_m": 1.0,
+    "resample_spacing_m": 1.0,
+    "robot_clearance_m": 1.2,
+    "maximum_slope_deg": 28.0,
+    "target_maximum_slope_deg": 18.0,
+    "maximum_turn_deg": 150.0,
+    "minimum_length_m": 280.0,
+    "maximum_length_m": 360.0,
+    "maximum_attempts": 120
+  },
+  "dynamic_events": [],
+  "distractor_people": 0
+}

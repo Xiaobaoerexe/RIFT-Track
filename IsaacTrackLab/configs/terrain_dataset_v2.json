@@ -1,0 +1,67 @@
+{
+  "schema_version": 2,
+  "dataset_id": "city_park_forest_rugged_v2",
+  "maps_per_family": 20,
+  "routes_per_map": 20,
+  "scene_output_root": "assets/scenes/terrain_dataset_v2",
+  "catalog_output": "configs/terrain_dataset_v2_catalog.json",
+  "quality_contract": {
+    "texture_resolution": "2k",
+    "terrain_grid_spacing_m": 1.0,
+    "terrain_buffer_m": 30.0,
+    "usd_extension": "usdc",
+    "collision_required": true,
+    "target_routes_must_be_reachable": true,
+    "dynamic_events": [],
+    "distractor_people": 0
+  },
+  "route_defaults": {
+    "algorithm": "seeded_multi_gate_cost_aware_astar",
+    "grid_resolution_m": 2.0,
+    "resample_spacing_m": 1.0,
+    "robot_clearance_m": 1.2,
+    "maximum_slope_deg": 28.0,
+    "target_maximum_slope_deg": 18.0,
+    "minimum_length_m": 220.0,
+    "maximum_length_m": 410.0,
+    "maximum_attempts": 180
+  },
+  "families": {
+    "city": {
+      "label": "起伏城市街区",
+      "profile": "rugged_city",
+      "texture": "asphalt_02",
+      "hdri": "urban_street_01",
+      "target_maximum_slope_deg": 14.0,
+      "static_friction": [0.88, 0.98],
+      "dynamic_friction": [0.72, 0.84],
+      "amplitude_m": [1.1, 1.9],
+      "roughness_m": [0.16, 0.32],
+      "obstacle_density": "medium"
+    },
+    "park": {
+      "label": "起伏公园",
+      "profile": "rolling_park",
+      "texture": "leafy_grass",
+      "hdri": "je_gray_park",
+      "target_maximum_slope_deg": 17.0,
+      "static_friction": [0.76, 0.90],
+      "dynamic_friction": [0.58, 0.72],
+      "amplitude_m": [2.2, 3.5],
+      "roughness_m": [0.25, 0.48],
+      "obstacle_density": "medium"
+    },
+    "forest_trail": {
+      "label": "崎岖森林泥土山径",
+      "profile": "forest_ridge",
+      "texture": "rock_path",
+      "hdri": "forest_grove",
+      "target_maximum_slope_deg": 19.0,
+      "static_friction": [0.80, 0.94],
+      "dynamic_friction": [0.60, 0.76],
+      "amplitude_m": [3.1, 4.8],
+      "roughness_m": [0.38, 0.68],
+      "obstacle_density": "high"
+    }
+  }
+}

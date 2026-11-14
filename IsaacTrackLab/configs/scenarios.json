@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "axes": {
+    "duration_s": [300, 3600],
+    "interference": ["none", "distractors", "distractors_occlusion"]
+  },
+  "scenarios": [
+    {"id": "short_none", "duration_s": 300, "interference": "none", "distractors": [0, 0], "forced_occlusions": [0, 0], "appearance_changes": [0, 0], "lighting_changes": [0, 0], "sensor_degradations": [0, 0]},
+    {"id": "short_distractors", "duration_s": 300, "interference": "distractors", "distractors": [2, 6], "forced_occlusions": [0, 0], "appearance_changes": [0, 0], "lighting_changes": [0, 0], "sensor_degradations": [0, 0]},
+    {"id": "short_distractors_occlusion", "duration_s": 300, "interference": "distractors_occlusion", "distractors": [3, 8], "forced_occlusions": [2, 6], "appearance_changes": [1, 2], "lighting_changes": [1, 2], "sensor_degradations": [1, 2]},
+    {"id": "hour_none", "duration_s": 3600, "interference": "none", "distractors": [0, 0], "forced_occlusions": [0, 0], "appearance_changes": [0, 0], "lighting_changes": [0, 0], "sensor_degradations": [0, 0]},
+    {"id": "hour_distractors", "duration_s": 3600, "interference": "distractors", "distractors": [2, 8], "forced_occlusions": [0, 0], "appearance_changes": [2, 4], "lighting_changes": [3, 6], "sensor_degradations": [1, 3]},
+    {"id": "hour_distractors_occlusion", "duration_s": 3600, "interference": "distractors_occlusion", "distractors": [4, 12], "forced_occlusions": [12, 24], "appearance_changes": [4, 8], "lighting_changes": [6, 12], "sensor_degradations": [3, 8]}
+  ],
+  "occlusion_event": {
+    "duration_s": [1.0, 6.0],
+    "types": ["static_occluder", "crossing_person", "parked_vehicle", "building_corner"],
+    "reappearance": ["same_side", "opposite_side", "changed_distance", "similar_person_nearby"]
+  },
+  "disturbance_event": {
+    "appearance_change": {
+      "duration_s": [10.0, 45.0],
+      "types": ["outerwear_change", "partial_clothing_cover", "scale_change", "pose_profile_change"]
+    },
+    "lighting_change": {
+      "duration_s": [20.0, 90.0],
+      "types": ["sun_shadow_transition", "exposure_shift", "backlight", "cloud_cover"]
+    },
+    "sensor_degradation": {
+      "duration_s": [2.0, 12.0],
+      "types": ["motion_blur", "shot_noise", "temporary_underexposure", "depth_dropout"]
+    }
+  },
+  "long_horizon": {
+    "required_duration_s": 3600,
+    "checkpoint_interval_s": 300,
+    "continuous_episode": true,
+    "reset_between_checkpoints": false
+  },
+  "evaluation": {
+    "fixed_seeds_per_scenario": 20,
+    "train_seed_range": [10000, 999999],
+    "evaluation_seeds_are_never_used_for_training": true
+  }
+}

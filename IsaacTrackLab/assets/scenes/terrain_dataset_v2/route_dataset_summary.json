@@ -1,0 +1,487 @@
+{
+  "schema_version": 1,
+  "batch_id": "city_park_forest_rugged_v2",
+  "total_routes": 1200,
+  "maps": [
+    {
+      "map_id": "city_01",
+      "route_count": 20,
+      "minimum_length_m": 259.71257554700895,
+      "maximum_length_m": 369.08990468301454,
+      "json": "assets/scenes/terrain_dataset_v2/city_01/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/city_01/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "city_02",
+      "route_count": 20,
+      "minimum_length_m": 253.83525566349456,
+      "maximum_length_m": 357.82236038495256,
+      "json": "assets/scenes/terrain_dataset_v2/city_02/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/city_02/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "city_03",
+      "route_count": 20,
+      "minimum_length_m": 260.718492263186,
+      "maximum_length_m": 339.527735663453,
+      "json": "assets/scenes/terrain_dataset_v2/city_03/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/city_03/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "city_04",
+      "route_count": 20,
+      "minimum_length_m": 245.31737565821973,
+      "maximum_length_m": 359.51568350561286,
+      "json": "assets/scenes/terrain_dataset_v2/city_04/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/city_04/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "city_05",
+      "route_count": 20,
+      "minimum_length_m": 247.4686835775366,
+      "maximum_length_m": 379.6543395741267,
+      "json": "assets/scenes/terrain_dataset_v2/city_05/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/city_05/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "city_06",
+      "route_count": 20,
+      "minimum_length_m": 273.15940620415154,
+      "maximum_length_m": 356.85918959473565,
+      "json": "assets/scenes/terrain_dataset_v2/city_06/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/city_06/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "city_07",
+      "route_count": 20,
+      "minimum_length_m": 242.14903864638904,
+      "maximum_length_m": 382.1434789124462,
+      "json": "assets/scenes/terrain_dataset_v2/city_07/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/city_07/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "city_08",
+      "route_count": 20,
+      "minimum_length_m": 263.443081167651,
+      "maximum_length_m": 357.4391753351435,
+      "json": "assets/scenes/terrain_dataset_v2/city_08/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/city_08/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "city_09",
+      "route_count": 20,
+      "minimum_length_m": 250.09537578939472,
+      "maximum_length_m": 362.93370515105255,
+      "json": "assets/scenes/terrain_dataset_v2/city_09/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/city_09/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "city_10",
+      "route_count": 20,
+      "minimum_length_m": 236.18819823653754,
+      "maximum_length_m": 343.0334201373521,
+      "json": "assets/scenes/terrain_dataset_v2/city_10/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/city_10/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "city_11",
+      "route_count": 20,
+      "minimum_length_m": 241.19007818520413,
+      "maximum_length_m": 388.44168178191325,
+      "json": "assets/scenes/terrain_dataset_v2/city_11/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/city_11/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "city_12",
+      "route_count": 20,
+      "minimum_length_m": 274.89914010250874,
+      "maximum_length_m": 363.63139676199245,
+      "json": "assets/scenes/terrain_dataset_v2/city_12/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/city_12/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "city_13",
+      "route_count": 20,
+      "minimum_length_m": 257.2270330921571,
+      "maximum_length_m": 355.07762441529974,
+      "json": "assets/scenes/terrain_dataset_v2/city_13/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/city_13/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "city_14",
+      "route_count": 20,
+      "minimum_length_m": 244.63953413893864,
+      "maximum_length_m": 373.13210150873215,
+      "json": "assets/scenes/terrain_dataset_v2/city_14/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/city_14/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "city_15",
+      "route_count": 20,
+      "minimum_length_m": 254.0335333346962,
+      "maximum_length_m": 360.6860916376581,
+      "json": "assets/scenes/terrain_dataset_v2/city_15/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/city_15/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "city_16",
+      "route_count": 20,
+      "minimum_length_m": 235.0757298733576,
+      "maximum_length_m": 344.395103781226,
+      "json": "assets/scenes/terrain_dataset_v2/city_16/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/city_16/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "city_17",
+      "route_count": 20,
+      "minimum_length_m": 249.58765004120636,
+      "maximum_length_m": 362.5750760554013,
+      "json": "assets/scenes/terrain_dataset_v2/city_17/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/city_17/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "city_18",
+      "route_count": 20,
+      "minimum_length_m": 235.02466797649726,
+      "maximum_length_m": 362.01274144716115,
+      "json": "assets/scenes/terrain_dataset_v2/city_18/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/city_18/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "city_19",
+      "route_count": 20,
+      "minimum_length_m": 247.17572045385816,
+      "maximum_length_m": 357.0193629476788,
+      "json": "assets/scenes/terrain_dataset_v2/city_19/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/city_19/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "city_20",
+      "route_count": 20,
+      "minimum_length_m": 239.66938118614632,
+      "maximum_length_m": 343.32197663510806,
+      "json": "assets/scenes/terrain_dataset_v2/city_20/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/city_20/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "park_01",
+      "route_count": 20,
+      "minimum_length_m": 227.81140627363857,
+      "maximum_length_m": 349.7491379123801,
+      "json": "assets/scenes/terrain_dataset_v2/park_01/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/park_01/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "park_02",
+      "route_count": 20,
+      "minimum_length_m": 236.24767047873632,
+      "maximum_length_m": 362.3828354969376,
+      "json": "assets/scenes/terrain_dataset_v2/park_02/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/park_02/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "park_03",
+      "route_count": 20,
+      "minimum_length_m": 231.01380133837026,
+      "maximum_length_m": 349.4416337067162,
+      "json": "assets/scenes/terrain_dataset_v2/park_03/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/park_03/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "park_04",
+      "route_count": 20,
+      "minimum_length_m": 271.6919061830759,
+      "maximum_length_m": 352.0037040096345,
+      "json": "assets/scenes/terrain_dataset_v2/park_04/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/park_04/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "park_05",
+      "route_count": 20,
+      "minimum_length_m": 248.39632117354617,
+      "maximum_length_m": 356.47823010001036,
+      "json": "assets/scenes/terrain_dataset_v2/park_05/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/park_05/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "park_06",
+      "route_count": 20,
+      "minimum_length_m": 238.3866014816986,
+      "maximum_length_m": 406.9154326519422,
+      "json": "assets/scenes/terrain_dataset_v2/park_06/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/park_06/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "park_07",
+      "route_count": 20,
+      "minimum_length_m": 254.74259254061565,
+      "maximum_length_m": 367.8350090576603,
+      "json": "assets/scenes/terrain_dataset_v2/park_07/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/park_07/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "park_08",
+      "route_count": 20,
+      "minimum_length_m": 265.48489960411814,
+      "maximum_length_m": 360.57236151359757,
+      "json": "assets/scenes/terrain_dataset_v2/park_08/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/park_08/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "park_09",
+      "route_count": 20,
+      "minimum_length_m": 248.57645860453877,
+      "maximum_length_m": 361.104811275015,
+      "json": "assets/scenes/terrain_dataset_v2/park_09/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/park_09/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "park_10",
+      "route_count": 20,
+      "minimum_length_m": 253.1793236947082,
+      "maximum_length_m": 353.5852418620877,
+      "json": "assets/scenes/terrain_dataset_v2/park_10/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/park_10/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "park_11",
+      "route_count": 20,
+      "minimum_length_m": 261.01712706654865,
+      "maximum_length_m": 358.01404558930847,
+      "json": "assets/scenes/terrain_dataset_v2/park_11/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/park_11/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "park_12",
+      "route_count": 20,
+      "minimum_length_m": 262.09781509128146,
+      "maximum_length_m": 349.26834280678383,
+      "json": "assets/scenes/terrain_dataset_v2/park_12/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/park_12/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "park_13",
+      "route_count": 20,
+      "minimum_length_m": 256.4057571304418,
+      "maximum_length_m": 384.490273123908,
+      "json": "assets/scenes/terrain_dataset_v2/park_13/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/park_13/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "park_14",
+      "route_count": 20,
+      "minimum_length_m": 251.20250122082228,
+      "maximum_length_m": 362.4936548350367,
+      "json": "assets/scenes/terrain_dataset_v2/park_14/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/park_14/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "park_15",
+      "route_count": 20,
+      "minimum_length_m": 250.00715838262505,
+      "maximum_length_m": 365.91055809214464,
+      "json": "assets/scenes/terrain_dataset_v2/park_15/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/park_15/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "park_16",
+      "route_count": 20,
+      "minimum_length_m": 263.366183161834,
+      "maximum_length_m": 359.8665414128739,
+      "json": "assets/scenes/terrain_dataset_v2/park_16/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/park_16/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "park_17",
+      "route_count": 20,
+      "minimum_length_m": 255.1915003204073,
+      "maximum_length_m": 348.10190096293525,
+      "json": "assets/scenes/terrain_dataset_v2/park_17/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/park_17/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "park_18",
+      "route_count": 20,
+      "minimum_length_m": 240.4576502319937,
+      "maximum_length_m": 332.5262312358381,
+      "json": "assets/scenes/terrain_dataset_v2/park_18/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/park_18/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "park_19",
+      "route_count": 20,
+      "minimum_length_m": 257.4286762351585,
+      "maximum_length_m": 360.48033641734474,
+      "json": "assets/scenes/terrain_dataset_v2/park_19/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/park_19/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "park_20",
+      "route_count": 20,
+      "minimum_length_m": 263.1653308649023,
+      "maximum_length_m": 383.44757185278,
+      "json": "assets/scenes/terrain_dataset_v2/park_20/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/park_20/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "forest_trail_01",
+      "route_count": 20,
+      "minimum_length_m": 251.41257347394605,
+      "maximum_length_m": 338.47657722069806,
+      "json": "assets/scenes/terrain_dataset_v2/forest_trail_01/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/forest_trail_01/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "forest_trail_02",
+      "route_count": 20,
+      "minimum_length_m": 247.09810523942704,
+      "maximum_length_m": 360.2341971955582,
+      "json": "assets/scenes/terrain_dataset_v2/forest_trail_02/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/forest_trail_02/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "forest_trail_03",
+      "route_count": 20,
+      "minimum_length_m": 263.7940605384529,
+      "maximum_length_m": 365.9403563122742,
+      "json": "assets/scenes/terrain_dataset_v2/forest_trail_03/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/forest_trail_03/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "forest_trail_04",
+      "route_count": 20,
+      "minimum_length_m": 258.8700237470702,
+      "maximum_length_m": 360.97639303844966,
+      "json": "assets/scenes/terrain_dataset_v2/forest_trail_04/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/forest_trail_04/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "forest_trail_05",
+      "route_count": 20,
+      "minimum_length_m": 253.94489620448164,
+      "maximum_length_m": 355.0707701316917,
+      "json": "assets/scenes/terrain_dataset_v2/forest_trail_05/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/forest_trail_05/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "forest_trail_06",
+      "route_count": 20,
+      "minimum_length_m": 264.9815704949131,
+      "maximum_length_m": 336.6653832175962,
+      "json": "assets/scenes/terrain_dataset_v2/forest_trail_06/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/forest_trail_06/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "forest_trail_07",
+      "route_count": 20,
+      "minimum_length_m": 260.60841793517386,
+      "maximum_length_m": 376.8334912841427,
+      "json": "assets/scenes/terrain_dataset_v2/forest_trail_07/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/forest_trail_07/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "forest_trail_08",
+      "route_count": 20,
+      "minimum_length_m": 260.369224542217,
+      "maximum_length_m": 361.31499242291966,
+      "json": "assets/scenes/terrain_dataset_v2/forest_trail_08/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/forest_trail_08/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "forest_trail_09",
+      "route_count": 20,
+      "minimum_length_m": 233.7769924741857,
+      "maximum_length_m": 350.52958902345875,
+      "json": "assets/scenes/terrain_dataset_v2/forest_trail_09/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/forest_trail_09/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "forest_trail_10",
+      "route_count": 20,
+      "minimum_length_m": 244.9519357511787,
+      "maximum_length_m": 363.9006713685522,
+      "json": "assets/scenes/terrain_dataset_v2/forest_trail_10/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/forest_trail_10/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "forest_trail_11",
+      "route_count": 20,
+      "minimum_length_m": 248.51755207600985,
+      "maximum_length_m": 367.1266177763548,
+      "json": "assets/scenes/terrain_dataset_v2/forest_trail_11/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/forest_trail_11/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "forest_trail_12",
+      "route_count": 20,
+      "minimum_length_m": 251.00825146358744,
+      "maximum_length_m": 338.31600242535274,
+      "json": "assets/scenes/terrain_dataset_v2/forest_trail_12/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/forest_trail_12/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "forest_trail_13",
+      "route_count": 20,
+      "minimum_length_m": 272.16039159271133,
+      "maximum_length_m": 386.3956942133229,
+      "json": "assets/scenes/terrain_dataset_v2/forest_trail_13/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/forest_trail_13/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "forest_trail_14",
+      "route_count": 20,
+      "minimum_length_m": 266.63391767547466,
+      "maximum_length_m": 334.6487887333931,
+      "json": "assets/scenes/terrain_dataset_v2/forest_trail_14/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/forest_trail_14/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "forest_trail_15",
+      "route_count": 20,
+      "minimum_length_m": 264.525376762491,
+      "maximum_length_m": 343.4716819119197,
+      "json": "assets/scenes/terrain_dataset_v2/forest_trail_15/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/forest_trail_15/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "forest_trail_16",
+      "route_count": 20,
+      "minimum_length_m": 251.52141072345978,
+      "maximum_length_m": 342.3615883104404,
+      "json": "assets/scenes/terrain_dataset_v2/forest_trail_16/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/forest_trail_16/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "forest_trail_17",
+      "route_count": 20,
+      "minimum_length_m": 254.30933989965064,
+      "maximum_length_m": 360.3916676619203,
+      "json": "assets/scenes/terrain_dataset_v2/forest_trail_17/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/forest_trail_17/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "forest_trail_18",
+      "route_count": 20,
+      "minimum_length_m": 252.92697757400387,
+      "maximum_length_m": 353.2965056589117,
+      "json": "assets/scenes/terrain_dataset_v2/forest_trail_18/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/forest_trail_18/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "forest_trail_19",
+      "route_count": 20,
+      "minimum_length_m": 255.28584440340572,
+      "maximum_length_m": 366.98637877547907,
+      "json": "assets/scenes/terrain_dataset_v2/forest_trail_19/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/forest_trail_19/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "forest_trail_20",
+      "route_count": 20,
+      "minimum_length_m": 232.26881767020916,
+      "maximum_length_m": 358.2964064349412,
+      "json": "assets/scenes/terrain_dataset_v2/forest_trail_20/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/terrain_dataset_v2/forest_trail_20/routes/generated_routes.usda"
+    }
+  ]
+}

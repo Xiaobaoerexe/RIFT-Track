@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "baseline_id": "baseline_305m_v1",
+  "status": "frozen",
+  "frozen_on": "2026-11-03",
+  "purpose": "regression_and_showcase_reference_only",
+  "control_mode": "showcase_hybrid",
+  "producer_script_sha256_at_run": "94bb824f94cf46b310c9bb8d319bc4eef596d86dc1d1f210152812cc49fe89c6",
+  "task": {
+    "route_length_m": 305.17579245334406,
+    "horizon_s": 244.2,
+    "target_speed_mps": 1.25,
+    "success_condition": "episode_horizon_reached_without_failure"
+  },
+  "artifacts": [
+    {
+      "path": "assets/scenes/hd_route_city/hd_route_city.usda",
+      "sha256": "3cf4757f5210d5ab253886bf74ed6fc2575e37107d8726beaedeb9b84763258d"
+    },
+    {
+      "path": "configs/task.json",
+      "sha256": "0545c38dd7bd1769875a940bf6d1b2597187dd8942b5f19bcc4143cf50a12e73"
+    },
+    {
+      "path": "configs/hd_route_city_route.json",
+      "sha256": "fc7b7390c5181058a5ee42c48ad341a7237e7dad3a7d04a9a0dd336c3d926abf"
+    },
+    {
+      "path": "outputs/baseline_305m/closed_loop/baseline_305m_official.json",
+      "sha256": "0e568ee508904421724800330eecc943c2130e75518a8e69d8fda26b139df30c"
+    },
+    {
+      "path": "outputs/baseline_305m/closed_loop/baseline_305m_official.mp4",
+      "sha256": "776bd5673e1825864af67ea87879e7752f3da9ea971106f00a80833c49640ef8",
+      "large_media": true
+    }
+  ],
+  "measured_result": {
+    "state": "success",
+    "elapsed_s": 244.20000000000002,
+    "route_distance_completed_m": 305.17579245334406,
+    "tracking_coverage": 0.990990990990991,
+    "absence_events": 4,
+    "reacquisitions": 4,
+    "reacquisition_rate": 1.0,
+    "collision_count": 0,
+    "fall_count": 0,
+    "boundary_violation_count": 0,
+    "mean_robot_planar_speed_mps": 1.2302077364834578,
+    "settled_clearance_above_road_m": 0.3773731470108032,
+    "final_distance_m": 3.1501003639930376,
+    "appearance_reinitializations": 27
+  },
+  "acceptance": {
+    "state": "success",
+    "minimum_route_distance_m": 305.0,
+    "minimum_tracking_coverage": 0.98,
+    "minimum_reacquisition_rate": 1.0,
+    "maximum_collision_count": 0,
+    "maximum_fall_count": 0,
+    "maximum_boundary_violation_count": 0
+  },
+  "limitations": [
+    "The actor used scheduled target bearing as route-heading feed-forward.",
+    "A purple-vest foreground detector reinitialized MaST 27 times.",
+    "The episode contained no distractor people.",
+    "This artifact is not evidence of pure RGB-plus-template end-to-end control."
+  ]
+}

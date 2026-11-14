@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "task_name": "outdoor_person_following",
+  "objective": {
+    "desired_distance_m": 3.0
+  },
+  "robot": {
+    "model": "unitree_as2",
+    "planned_platform": "unitree_as2",
+    "active_simulation_override": "unitree_go2",
+    "urdf": "third_party/unitree_ros/robots/as2_description/urdf/as2.urdf",
+    "control": {
+      "policy_action": ["vx_mps", "vy_mps", "yaw_rate_rps"],
+      "low_level": {
+        "real_robot": "official_unitree_a2_sport_client",
+        "simulation_visual_validation": "unitree_go2_physics",
+        "simulation_dynamics_validation": "mastrack_kaiwu2025_v6-2_124004_policy_onnx"
+      },
+      "policy_hz": 10,
+      "physics_hz": 200
+    }
+  },
+  "actor_observations": {
+    "required": ["rgb", "target_template_rgb", "joint_position", "joint_velocity", "base_angular_velocity", "projected_gravity", "foot_contacts"],
+    "optional": ["aligned_depth"],
+    "forbidden": ["language", "target_world_pose", "semantic_segmentation", "simulator_object_id"]
+  },
+  "privileged_training_only": ["target_world_pose", "target_visibility", "semantic_segmentation", "obstacle_distance", "robot_world_pose"],
+  "camera": {
+    "model": "intel_realsense_d455",
+    "mount_frame": "base",
+    "mount_pose": "calibration_required",
+    "rgb": {"width": 640, "height": 480, "fps": 30},
+    "depth": {"enabled": true, "fps": 30, "noise_model": "calibration_required"},
+    "intrinsics": "calibration_required"
+  },
+  "termination": {
+    "target_too_far": {"distance_m": 12.0, "grace_s": 2.0},
+    "target_absent": {"grace_s": 8.0, "minimum_bbox_area_ratio": 0.0005},
+    "strong_collision": {"base_contact_impulse_ns": 120.0, "calibration_required": true},
+    "fallen": {"maximum_tilt_deg": 60.0, "minimum_base_height_m": 0.28, "grace_s": 0.5, "calibration_required": true},
+    "out_of_bounds": {"source": "scene_walkable_polygon", "margin_m": 0.0}
+  },
+  "success": {
+    "condition": "episode_horizon_reached_without_failure",
+    "note": "Short occlusions are permitted only within target_absent.grace_s; all visibility and reacquisition statistics are still recorded."
+  },
+  "metrics": [
+    "success_rate", "tracking_coverage", "time_to_failure_s", "reacquisition_rate",
+    "mean_reacquisition_time_s", "target_distance_error_m", "collision_count",
+    "fall_count", "boundary_violation_count", "control_smoothness"
+  ]
+}

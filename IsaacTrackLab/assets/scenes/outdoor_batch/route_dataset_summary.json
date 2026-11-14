@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "batch_id": "outdoor_all_terrain_v1",
+  "total_routes": 96,
+  "maps": [
+    {
+      "map_id": "forest_trail",
+      "route_count": 16,
+      "minimum_length_m": 261.61546079656796,
+      "maximum_length_m": 304.48572423611455,
+      "json": "assets/scenes/outdoor_batch/forest_trail/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/outdoor_batch/forest_trail/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "rocky_canyon",
+      "route_count": 16,
+      "minimum_length_m": 281.4385032917542,
+      "maximum_length_m": 333.50446623117546,
+      "json": "assets/scenes/outdoor_batch/rocky_canyon/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/outdoor_batch/rocky_canyon/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "alpine_slope",
+      "route_count": 16,
+      "minimum_length_m": 224.02725629927704,
+      "maximum_length_m": 264.24287819666057,
+      "json": "assets/scenes/outdoor_batch/alpine_slope/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/outdoor_batch/alpine_slope/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "wetland_boardwalk",
+      "route_count": 16,
+      "minimum_length_m": 220.01587033053667,
+      "maximum_length_m": 232.74244703809413,
+      "json": "assets/scenes/outdoor_batch/wetland_boardwalk/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/outdoor_batch/wetland_boardwalk/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "desert_dunes",
+      "route_count": 16,
+      "minimum_length_m": 256.0887773224281,
+      "maximum_length_m": 309.14551952079574,
+      "json": "assets/scenes/outdoor_batch/desert_dunes/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/outdoor_batch/desert_dunes/routes/generated_routes.usda"
+    },
+    {
+      "map_id": "coastal_scrub",
+      "route_count": 16,
+      "minimum_length_m": 307.1170755286606,
+      "maximum_length_m": 347.9914631740228,
+      "json": "assets/scenes/outdoor_batch/coastal_scrub/routes/generated_routes.json",
+      "preview_usd": "assets/scenes/outdoor_batch/coastal_scrub/routes/generated_routes.usda"
+    }
+  ]
+}

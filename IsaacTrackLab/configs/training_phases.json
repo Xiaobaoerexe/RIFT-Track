@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "purpose": "freeze/unfreeze orchestration only; architecture, losses and optimizers remain unspecified",
+  "module_order": [
+    "visual_encoder",
+    "algorithm_constrained_navigation",
+    "locomotion"
+  ],
+  "interface_chain": {
+    "visual_encoder": {
+      "input": ["rgb", "target_template_rgb"],
+      "output": "last_hidden_tokens"
+    },
+    "algorithm_constrained_navigation": {
+      "input": ["last_hidden_tokens", "proprioception"],
+      "output": ["vx_mps", "vy_mps", "yaw_rate_rps"]
+    },
+    "locomotion": {
+      "input": ["vx_mps", "vy_mps", "yaw_rate_rps", "proprioception"],
+      "output": "joint_action"
+    }
+  },
+  "phases": {
+    "visual_only": {
+      "trainable_modules": ["visual_encoder"],
+      "frozen_modules": ["algorithm_constrained_navigation", "locomotion"]
+    },
+    "navigation_only": {
+      "trainable_modules": ["algorithm_constrained_navigation"],
+      "frozen_modules": ["visual_encoder", "locomotion"]
+    },
+    "locomotion_only": {
+      "trainable_modules": ["locomotion"],
+      "frozen_modules": ["visual_encoder", "algorithm_constrained_navigation"]
+    },
+    "visual_and_navigation": {
+      "trainable_modules": ["visual_encoder", "algorithm_constrained_navigation"],
+      "frozen_modules": ["locomotion"]
+    },
+    "end_to_end": {
+      "trainable_modules": ["visual_encoder", "algorithm_constrained_navigation", "locomotion"],
+      "frozen_modules": []
+    }
+  }
+}

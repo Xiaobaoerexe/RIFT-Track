@@ -1,0 +1,20 @@
+[project]
+name = "isaac-track-lab"
+version = "0.1.0"
+description = "Outdoor person-following task definitions for Isaac Sim and Isaac Lab"
+requires-python = ">=3.12"
+
+[project.scripts]
+isaac-track-validate = "isaac_track_lab.spec:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["source/isaac_track_lab"]
+
+[tool.pytest.ini_options]
+pythonpath = ["source"]
+testpaths = ["tests"]
+

@@ -1,0 +1,145 @@
+{
+  "state": "success",
+  "elapsed_s": 244.20000000000002,
+  "failure_reason": null,
+  "tracking_coverage": 0.990990990990991,
+  "absence_events": 4,
+  "reacquisitions": 4,
+  "reacquisition_rate": 1.0,
+  "mean_reacquisition_time_s": 0.5500000000000043,
+  "mean_target_distance_error_m": 0.19636811495126796,
+  "collision_count": 0,
+  "fall_count": 0,
+  "boundary_violation_count": 0,
+  "control_smoothness": 0.3881080029108615,
+  "configured_horizon_s": 244.2,
+  "termination_config": "/home/abc/Documents/\u89c6\u89c9\u8ddf\u8e2a/IsaacTrackLab/configs/task.json",
+  "termination_thresholds": {
+    "target_too_far": {
+      "distance_m": 12.0,
+      "grace_s": 2.0
+    },
+    "target_absent": {
+      "grace_s": 8.0,
+      "minimum_bbox_area_ratio": 0.0005
+    },
+    "strong_collision": {
+      "base_contact_impulse_ns": 120.0
+    },
+    "fallen": {
+      "maximum_tilt_deg": 60.0,
+      "minimum_base_height_m": 0.28,
+      "grace_s": 0.5
+    },
+    "out_of_bounds": {
+      "route_corridor_half_width_m": 3.8,
+      "margin_m": 0.0
+    }
+  },
+  "success_condition": "episode_horizon_reached_without_failure",
+  "high_level_control": "MaST bbox distance/centering feedback with scheduled-route target-bearing feed-forward",
+  "human_motion": "single NVIDIA Behavior walk, speed-matched to route motion",
+  "human_motion_status": "continuous_speed_matched_walk_with_route_aligned_heading",
+  "motion_cycle_frames": {
+    "target": 29
+  },
+  "motion_models": [
+    {
+      "role": "target",
+      "gait": "walk",
+      "source_speed_mps": 0.82,
+      "root_speed_mps": 1.25
+    }
+  ],
+  "distractor_people": 0,
+  "physics_colliders": 92,
+  "city_collision_api_prims_original": 91,
+  "collision_strategy": "scene-authored road, sidewalk, building, furniture, obstacle proxies, plus a kinematic target capsule",
+  "surface_z_m": 0.2,
+  "target_speed_mps": 1.25,
+  "route_length_m": 305.17579245334406,
+  "route_waypoint_count": 27,
+  "route_major_turn_count": 4,
+  "route_obstacle_deviation_count": 3,
+  "observer_mode": "robot",
+  "route_start_distance_m": 0.0,
+  "route_distance_completed_m": 305.17579245334406,
+  "target_path": "305 m intersecting-street route with rounded turns and three obstacle deviations",
+  "character_heading": "velocity-aligned with limited turn rate",
+  "road_friction": {
+    "static": 0.95,
+    "dynamic": 0.82,
+    "restitution": 0.02
+  },
+  "rendering": {
+    "observer_resolution": [
+      1920,
+      1080
+    ],
+    "samples_per_pixel": 16,
+    "video_codec": "H.264 CRF 16",
+    "observer_display_filter": "5x5 median plus mild unsharp mask",
+    "d455_tracker_preprocessing": "single 3x3 median"
+  },
+  "d455_intrinsics": {
+    "width": 640,
+    "height": 480,
+    "fx": 391.18,
+    "fy": 391.18,
+    "cx": 321.78,
+    "cy": 239.94
+  },
+  "d455_mount": {
+    "body_relative_translation_m": [
+      0.32,
+      0.0,
+      0.32
+    ],
+    "body_relative_quaternion_xyzw_ros": [
+      0.54167522,
+      -0.54167522,
+      0.45451948,
+      -0.45451948
+    ],
+    "optical_center_height_m": 0.66,
+    "pitch_down_deg": 10.0,
+    "translation_status": "x/y assumed; z derived from measured optical height"
+  },
+  "mean_distance_m": 3.1346593735792134,
+  "final_distance_m": 3.1501003639930376,
+  "mean_tracker_latency_ms": 2.764827336785731,
+  "mean_tracker_confidence": 0.714795494963164,
+  "minimum_tracker_confidence": 0.3583616316318512,
+  "tracker_visible_ratio": 0.990990990990991,
+  "mean_iou": 0.6511654994390043,
+  "appearance_reinitializations": 27,
+  "appearance_recovery": "purple-vest detector only reinitializes MaST after IoU drift; no distractor people",
+  "locomotion_policy_latency_ms_last": 0.2393729519098997,
+  "commanded_forward_speed_mps": {
+    "mean": 1.2149511658269871,
+    "minimum": 0.7707079178395664,
+    "maximum": 1.3656615771186746
+  },
+  "commanded_yaw_rate_rps": {
+    "mean": -0.006951390049888802,
+    "mean_absolute": 0.044625012014442765,
+    "minimum": -0.43722319844059937,
+    "maximum": 0.30537213639207583
+  },
+  "mean_robot_planar_speed_mps": 1.2302077364834578,
+  "settled_base_height_m": 0.5773731470108032,
+  "settled_clearance_above_road_m": 0.3773731470108032,
+  "robot_forward_progress_m": 93.853515625,
+  "mean_robot_forward_progress_speed_mps": 0.38433054089546204,
+  "final_robot_position_m": [
+    38.84990692138672,
+    12.00677490234375,
+    0.574487030506134
+  ],
+  "video": "/home/abc/Documents/\u89c6\u89c9\u8ddf\u8e2a/IsaacTrackLab/outputs/baseline_305m/closed_loop/baseline_305m_official.mp4",
+  "final_frame": "/home/abc/Documents/\u89c6\u89c9\u8ddf\u8e2a/IsaacTrackLab/outputs/baseline_305m/closed_loop/baseline_305m_official_final.png",
+  "city_asset": "/home/abc/Documents/\u89c6\u89c9\u8ddf\u8e2a/IsaacTrackLab/assets/scenes/hd_route_city/hd_route_city.usda",
+  "character_assets": [
+    "/home/abc/Documents/\u89c6\u89c9\u8ddf\u8e2a/IsaacTrackLab/assets/external/nvidia/people/F_Business_02.usd"
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "result": "outputs/baseline_305m/ten_minute/stage5_10min_no_event_v3.json",
+  "required": {
+    "duration_s": 600.0,
+    "control_mode": "pure_e2e",
+    "scripted_scene_events": [],
+    "distractor_people": 0,
+    "physics_colliders": 92,
+    "minimum_tracking_coverage": 0.95,
+    "minimum_tracker_visible_ratio": 0.95,
+    "maximum_collision_count": 0,
+    "maximum_fall_count": 0,
+    "maximum_boundary_violation_count": 0,
+    "road_friction": {
+      "static": 0.95,
+      "dynamic": 0.82,
+      "restitution": 0.02
+    },
+    "d455_intrinsics": {
+      "width": 640,
+      "height": 480,
+      "fx": 391.18,
+      "fy": 391.18,
+      "cx": 321.78,
+      "cy": 239.94
+    }
+  },
+  "scope_note": "The existing 305.176 m route is unchanged. The target reaches its endpoint after about 244.14 s and remains there; the remaining time checks long-horizon tracking, locomotion, physics and logging stability without changing the route."
+}

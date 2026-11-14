@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "profile": "sim2real_v1",
+  "inherits": "configs/sim2real_nominal.json",
+  "d455_calibration": "configs/d455_sim_calibration.json",
+  "enabled": {
+    "rgb_degradation": true,
+    "depth_degradation": true,
+    "camera_vibration": true,
+    "lighting_randomization": true,
+    "material_randomization": true,
+    "person_appearance_randomization": true,
+    "distractors_occlusion": true,
+    "sensor_latency": true,
+    "action_latency": true
+  }
+}

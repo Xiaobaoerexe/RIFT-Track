@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "robot": {
+    "name": "Unitree As2",
+    "source": "Unitree official unitree_ros repository",
+    "local_urdf": "third_party/unitree_ros/robots/as2_description/urdf/as2.urdf",
+    "usd": "assets/robots/as2/as2/as2.usda",
+    "status": "downloaded_and_imported_official_sdk2_bridge_compiled_simulator_locomotion_policy_still_required",
+    "real_robot_control": "third_party/unitree_sdk2 a2::SportClient",
+    "simulation_control": "planar velocity surrogate for visual-task validation only"
+  },
+  "simulation_robot_override": {
+    "name": "Unitree Go2",
+    "purpose": "temporary dynamics-validation replacement for As2",
+    "source": "Isaac Sim 6.1 IsaacLab Unitree Go2 asset",
+    "simulation_control": "MaSTrack kaiwu2025_v6-2_124004 ONNX locomotion policy at 50 Hz",
+    "status": "305m_baseline_native_road_collision_and_tensor_actor_updates_fixed_formal_244s_episode_passed"
+  },
+  "camera": {
+    "name": "Intel RealSense D455",
+    "status": "active_project_intrinsics_applied_mount_height_and_pitch_applied_forward_offset_still_assumed",
+    "calibration": "configs/d455_sim_calibration.json",
+    "simulation": "Isaac RGB plus depth at 640x480 with fx=fy=391.18 cx=321.78 cy=239.94"
+  },
+  "city": {
+    "baseline_usd": "assets/scenes/hd_route_city/hd_route_city.usda",
+    "builder": "scripts/build_hd_route_city.py",
+    "validator": "scripts/validate_hd_route_city.py",
+    "route": "configs/hd_route_city_route.json",
+    "status": "intersecting_hd_city_ready_with_305m_route_friction_and_full_task_collision",
+    "dimensions_m": [116.0, 102.0, 17.6],
+    "requirements": ["outdoor_blocks", "sidewalks", "road_crossings", "ramps_or_curbs", "walkable_polygon", "physics_colliders", "redistribution_license"],
+    "preferred_format": "USD",
+    "fallback_imports": ["FBX", "OBJ", "glTF"]
+  },
+  "people": {
+    "status": "single_high_quality_rigged_target_with_speed_matched_walk_and_kinematic_collision_no_distractors",
+    "assets": [
+      "assets/external/nvidia/people/F_Business_02.usd",
+      "Isaac/People/Characters/original_male_adult_police_04/male_adult_police_04.usd",
+      "Isaac/People/Characters/original_male_adult_medical_01/male_adult_medical_01.usd",
+      "Isaac/People/Characters/original_male_adult_construction_03/male_adult_construction_03.usd"
+    ],
+    "active_task_roles": ["target"],
+    "active_distractor_count": 0,
+    "motion": ["walk_at_1.25_mps", "route_aligned_turns", "three_obstacle_deviations"]
+  },
+  "obstacles_and_occluders": {
+    "static": ["bollard", "planter", "bench", "fence", "bus_shelter", "wall_corner", "parked_vehicle", "construction_barrier"],
+    "dynamic": ["pedestrian", "bicycle_or_cart_proxy", "moving_vehicle_proxy"],
+    "hd_cc0_assets": ["concrete_road_barrier", "covered_car", "fire_hydrant", "metal_trash_can", "painted_wooden_bench", "planter_box_01"],
+    "manifest": "assets/external/polyhaven/manifest.json",
+    "status": "six_2k_pbr_cc0_assets_integrated_with_separate_low_cost_collision_proxies"
+  },
+  "asset_acceptance": ["scale_verified", "up_axis_verified", "colliders_verified", "materials_work_in_rtx", "license_recorded", "lod_or_proxy_available"]
+}

@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "dependencies": {
+    "IsaacLab": {
+      "url": "https://github.com/isaac-sim/IsaacLab.git",
+      "commit": "ae37b028ea415c91ea2bc32609efcd759ed2b974"
+    },
+    "unitree_ros": {
+      "url": "https://github.com/unitreerobotics/unitree_ros.git",
+      "commit": "15ebe53f4cd77e7d745ae83b9d7ff90e685e8998"
+    }
+  }
+}
