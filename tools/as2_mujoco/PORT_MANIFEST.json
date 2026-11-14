@@ -1,0 +1,24 @@
+{
+  "origin": "Validated independent AS2_MUJOCO_20261110, originally run on137",
+  "upstream": "RoboGauge add2c7ee0185ea8fd93d242f86e1c8cac6e9913b",
+  "changes": [
+    "Repository-relative source/assets paths and explicit output/iteration arguments",
+    "Optional speed selection for acceptance checks",
+    "Metadata course_end_x corrected to existing3.5m evaluation boundary",
+    "Whitespace-only normalization; Python AST and canonical XML unchanged"
+  ],
+  "unchanged": [
+    "Official simulator and BasePipeline",
+    "Robot control/observation and teacher reconstruction",
+    "Terrain generation/representation",
+    "Success and failure criteria; torque/contact settings"
+  ],
+  "original_sha256": {
+    "export_as2.py": "789e0daa7a140e484c93b3cfe363a53de14135e47cad3405f60784dace453c31",
+    "prepare_assets.py": "f309a8a7a082ee647bc6f856bd8c2281e7a8cde17eb0b11c8bcb7500adc9d467",
+    "evaluate_as2.py": "7918995bd2228866a6fa3d6c696281a0ad00e1cc2b8b5fa288125444e98fbc68",
+    "audit_geometry.py": "a5d5b67e65b2a0080c0a9ec3fe6f81e1335e189ce1ee9283362901b7b0323d6a"
+  },
+  "original_official_as2_snapshot_sha256": "05ba05c3a1db0179ec6182a7fa06e11a16e06fdca5128aaf5c72e36a8e90af78",
+  "packaged_xml_sha256": "b1eebf463bf12bf27dc5eb17c26e491534e673b10af726389571f19efadd9a83"
+}

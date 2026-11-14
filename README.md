@@ -1,3 +1,13 @@
+<!-- AS2_INDEPENDENT_MUJOCO_20261114 -->
+## As2 独立 MuJoCo 多地形评测（2026-11-14）
+
+已将137上验证过的 As2 独立评测整理到 `tools/as2_mujoco/`，并同步到175。
+入口：`python3 tools/as2_mujoco/run.py --checkpoint CHECKPOINT --output NEW_OUTPUT_DIRECTORY`。
+加 `--check` 执行覆盖十类地形、教师/学生的38条真实动力学验收；完整默认354条。
+依赖固定 RoboGauge 提交、MuJoCo3.2.3 和既有两个运行环境，详见 `tools/as2_mujoco/README.txt`。
+此工具独立于训练，不新增 As2 训练内自动 MuJoCo 评测接口；Go2 原有评测逻辑保留。
+下文历史的“As2尚无迁移适配”描述不再适用于本独立工具，训练内自动入口仍未启用。
+
 > Current server175 release: see [BLIND_REVISION.md](BLIND_REVISION.md). Run `python3 run_blind_as2.py` for As2 only (120k,no experts). Everything below is archived release documentation/source snapshots; use current source/configs for active behavior.
 
 # Go2 / As2 · PhysX + SuperMimic + CTS
