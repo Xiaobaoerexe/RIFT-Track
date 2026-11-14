@@ -30,6 +30,7 @@ class GeneratedTerrainRoute:
     maximum_turn_deg: float
     minimum_obstacle_clearance_m: float
     challenge_zones_visited: tuple[str, ...]
+    traversable_features_visited: tuple[str, ...]
     target_reachable: bool
 
     def to_dict(self) -> dict[str, Any]:
@@ -159,6 +160,64 @@ def terrain_mesh_height(
     return h00 + tx * (h11 - h01) + ty * (h01 - h00)
 
 
+def _feature_local_xy(feature: dict[str, Any], x_m: float, y_m: float) -> tuple[float, float]:
+    """Return along-track and cross-track coordinates for a route feature."""
+
+    cx, cy = map(float, feature["center_m"])
+    yaw = radians(float(feature.get("yaw_deg", 0.0)))
+    dx, dy = float(x_m) - cx, float(y_m) - cy
+    return dx * cos(yaw) + dy * sin(yaw), -dx * sin(yaw) + dy * cos(yaw)
+
+
+def traversable_feature_surface_height(
+    map_config: dict[str, Any], x_m: float, y_m: float, *,
+    base_height_m: float | None = None,
+) -> float:
+    """Return the walkable top surface of authored curb/platform/stair features.
+
+    Low logs and embedded stones remain obstacles on top of the terrain and do
+    not alter target root grounding.  The structured features handled here are
+    broad enough for the target and robot to cross, so the target root follows
+    their top surface instead of intersecting the collision geometry.
+    """
+
+    base = terrain_height(map_config, x_m, y_m) if base_height_m is None else float(base_height_m)
+    surface = base
+    for feature in map_config.get("traversable_step_features", []):
+        kind = str(feature.get("kind", ""))
+        if kind not in {"curb_table", "platform", "stair_platform"}:
+            continue
+        along, across = _feature_local_xy(feature, x_m, y_m)
+        width = float(feature["width_m"])
+        reference_ground = terrain_height(map_config, *map(float, feature["center_m"]))
+        if abs(across) > width * 0.5:
+            continue
+        if kind in {"curb_table", "platform"}:
+            length = float(feature["length_m"])
+            if abs(along) <= length * 0.5:
+                surface = max(surface, reference_ground + float(feature["height_m"]))
+            continue
+
+        step_count = int(feature["step_count"])
+        tread = float(feature["tread_depth_m"])
+        plateau = float(feature["platform_length_m"])
+        rise = float(feature["step_rise_m"])
+        total_length = 2.0 * step_count * tread + plateau
+        position = along + total_length * 0.5
+        if not 0.0 <= position <= total_length:
+            continue
+        ascent_length = step_count * tread
+        if position < ascent_length:
+            level = min(step_count, int(position / tread) + 1)
+        elif position <= ascent_length + plateau:
+            level = step_count
+        else:
+            descent_index = int((position - ascent_length - plateau) / tread)
+            level = max(1, step_count - descent_index)
+        surface = max(surface, reference_ground + level * rise)
+    return surface
+
+
 class TerrainRouteGenerator:
     """Generate reproducible routes with slope, obstacle, and zone constraints."""
 
@@ -184,6 +243,9 @@ class TerrainRouteGenerator:
         self.maximum_length_m = float(defaults["maximum_length_m"])
         self.maximum_attempts = int(defaults["maximum_attempts"])
         self.maximum_turn_deg = float(defaults.get("maximum_turn_deg", 150.0))
+        self.maximum_traversable_step_height_m = float(
+            defaults.get("maximum_traversable_step_height_m", 0.30)
+        )
         self.obstacles = tuple(
             item if isinstance(item, Obstacle2D) else Obstacle2D(
                 obstacle_id=str(item["id"]),
@@ -205,6 +267,7 @@ class TerrainRouteGenerator:
         for _ in range(self.maximum_attempts):
             gate_sets = self.map.get("route_gate_sets", [self.map["route_gates"]])
             anchors = [self._sample_gate(gate, rng) for gate in rng.choice(gate_sets)]
+            anchors = self._insert_required_feature_anchors(anchors)
             if not all(self._point_valid(*point) for point in anchors):
                 continue
             grid_path: list[tuple[float, float]] = []
@@ -232,10 +295,52 @@ class TerrainRouteGenerator:
                 and turn_valid
                 and self.minimum_length_m <= length <= self.maximum_length_m
             ):
-                return self._summarize(seed, resampled)
+                summary = self._summarize(seed, resampled)
+                required = {
+                    str(feature["id"])
+                    for feature in self.map.get("traversable_step_features", [])
+                    if bool(feature.get("required_on_route", False))
+                }
+                if not required.issubset(summary.traversable_features_visited):
+                    continue
+                if summary.maximum_step_height_m > self.maximum_traversable_step_height_m + 1e-6:
+                    continue
+                return summary
         raise RuntimeError(
             f"could not generate a valid {self.map_id} route in {self.maximum_attempts} attempts"
         )
+
+    def _insert_required_feature_anchors(
+        self, anchors: Sequence[tuple[float, float]]
+    ) -> list[tuple[float, float]]:
+        """Insert mandatory terrain centers where they add the least detour.
+
+        The insertion is deterministic and preserves the start/end task gates.
+        Each selected feature therefore becomes a hard A* waypoint instead of a
+        decorative object that the planner can silently route around.
+        """
+
+        output = list(anchors)
+        required = [
+            (str(feature["id"]), tuple(map(float, feature["center_m"])))
+            for feature in self.map.get("traversable_step_features", [])
+            if bool(feature.get("required_on_route", False))
+        ]
+        for _, point in required:
+            if len(output) < 2:
+                output.append(point)
+                continue
+            insertion = min(
+                range(1, len(output)),
+                key=lambda index: (
+                    hypot(point[0] - output[index - 1][0], point[1] - output[index - 1][1])
+                    + hypot(output[index][0] - point[0], output[index][1] - point[1])
+                    - hypot(output[index][0] - output[index - 1][0], output[index][1] - output[index - 1][1]),
+                    index,
+                ),
+            )
+            output.insert(insertion, point)
+        return output
 
     def _sample_gate(self, gate: Sequence[float], rng: random.Random) -> tuple[float, float]:
         cx, cy, width, height = map(float, gate)
@@ -321,7 +426,9 @@ class TerrainRouteGenerator:
 
     def _cell_height(self, cell: tuple[int, int]) -> float:
         if cell not in self._cell_height_cache:
-            self._cell_height_cache[cell] = terrain_height(self.map, *self._to_world(cell))
+            self._cell_height_cache[cell] = traversable_feature_surface_height(
+                self.map, *self._to_world(cell)
+            )
         return self._cell_height_cache[cell]
 
     def _cell_zone_cost(self, cell: tuple[int, int]) -> float:
@@ -477,11 +584,11 @@ class TerrainRouteGenerator:
                 ratio = index / count
                 x_m = start[0] + ratio * (end[0] - start[0])
                 y_m = start[1] + ratio * (end[1] - start[1])
-                point = (x_m, y_m, terrain_height(self.map, x_m, y_m))
+                point = (x_m, y_m, traversable_feature_surface_height(self.map, x_m, y_m))
                 if not output or hypot(point[0]-output[-1][0], point[1]-output[-1][1]) > 1e-6:
                     output.append(point)
         x_m, y_m = points[-1]
-        output.append((x_m, y_m, terrain_height(self.map, x_m, y_m)))
+        output.append((x_m, y_m, traversable_feature_surface_height(self.map, x_m, y_m)))
         return output
 
     @staticmethod
@@ -528,6 +635,11 @@ class TerrainRouteGenerator:
             zone["id"] for zone in self.map.get("challenge_zones", [])
             if any(self._inside_zone(point[0], point[1], zone) for point in points)
         )
+        feature_visited = tuple(
+            str(feature["id"])
+            for feature in self.map.get("traversable_step_features", [])
+            if any(self._inside_traversable_feature(point[0], point[1], feature) for point in points)
+        )
         return GeneratedTerrainRoute(
             map_id=self.map_id,
             seed=seed,
@@ -540,5 +652,26 @@ class TerrainRouteGenerator:
             maximum_turn_deg=self._maximum_turn_deg(points),
             minimum_obstacle_clearance_m=clearance,
             challenge_zones_visited=visited,
+            traversable_features_visited=feature_visited,
             target_reachable=max(slopes, default=0.0) <= self.target_maximum_slope_deg + 1e-6,
         )
+
+    @staticmethod
+    def _inside_traversable_feature(
+        x_m: float, y_m: float, feature: dict[str, Any], margin_m: float = 0.25,
+    ) -> bool:
+        along, across = _feature_local_xy(feature, x_m, y_m)
+        kind = str(feature.get("kind", ""))
+        if kind in {"curb_table", "platform"}:
+            length = float(feature["length_m"])
+            width = float(feature["width_m"])
+        elif kind == "stair_platform":
+            length = (
+                2.0 * int(feature["step_count"]) * float(feature["tread_depth_m"])
+                + float(feature["platform_length_m"])
+            )
+            width = float(feature["width_m"])
+        else:
+            radius = float(feature.get("route_visit_radius_m", 2.0))
+            return hypot(along, across) <= radius + margin_m
+        return abs(along) <= length * 0.5 + margin_m and abs(across) <= width * 0.5 + margin_m

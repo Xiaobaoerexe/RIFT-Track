@@ -18,7 +18,10 @@ from pxr import Usd, UsdGeom, UsdPhysics, UsdShade
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "source"))
-from isaac_track_lab.task.terrain_routes import terrain_height
+from isaac_track_lab.task.terrain_routes import (
+    terrain_height,
+    traversable_feature_surface_height,
+)
 
 
 DEFAULT_CONFIG = ROOT / "configs/terrain_dataset_v2_catalog.json"
@@ -159,8 +162,11 @@ def validate_map(config: dict[str, Any], map_config: dict[str, Any], root: Path)
         for point in points:
             x, y, z = map(float, point)
             coverage.add((int((x + 90.0) // 10.0), int((y + 90.0) // 10.0)))
-            if abs(z - terrain_height(map_config, x, y)) > 0.02:
-                errors.append(f"{prefix}: point height does not match USD analytic terrain")
+            expected_surface = traversable_feature_surface_height(map_config, x, y)
+            if abs(z - expected_surface) > 0.02:
+                errors.append(
+                    f"{prefix}: point height does not match USD walkable surface"
+                )
                 break
             for zone in map_config.get("challenge_zones", []):
                 if not zone["traversable"] and inside_zone(x, y, zone, clearance):

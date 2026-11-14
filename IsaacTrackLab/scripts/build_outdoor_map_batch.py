@@ -703,10 +703,11 @@ def build_procedural_structures(
 
 def build_traversable_features(
     stage: Usd.Stage, layer_path: Path, map_config: dict[str, Any],
-    debug_material: UsdShade.Material,
+    materials: dict[str, UsdShade.Material], physical: UsdShade.Material,
 ) -> list[dict[str, Any]]:
-    """Build low, collidable features that routes intentionally cross."""
+    """Build collidable route features with physically usable top surfaces."""
     instances: list[dict[str, Any]] = []
+    records: list[dict[str, Any]] = []
     for feature in map_config.get("traversable_step_features", []):
         cx, cy = map(float, feature["center_m"])
         yaw = float(feature.get("yaw_deg", 0.0))
@@ -735,18 +736,85 @@ def build_traversable_features(
                     "yaw_deg": yaw + index * 37.0, "scale": 0.85 + 0.08 * index,
                     "proxy": "sphere", "radius_m": 0.17,
                 })
+        elif feature["kind"] in {"curb_table", "platform", "stair_platform"}:
+            yaw_radians = yaw * pi / 180.0
+            width = float(feature["width_m"])
+            reference_ground = terrain_height(map_config, cx, cy)
+            bottom = reference_ground - 0.08
+            material_id = str(feature.get("material", "rock"))
+            if material_id not in materials:
+                raise ValueError(f"unknown traversable feature material: {material_id}")
+
+            def add_block(local_id: str, along_m: float, length_m: float, top_m: float) -> None:
+                x_m = cx + cos(yaw_radians) * along_m
+                y_m = cy + sin(yaw_radians) * along_m
+                height = max(0.02, top_m - bottom)
+                path = f"/OutdoorMap/TraversableFeatures/{safe_id}/{local_id}"
+                block = cube(
+                    stage, path, (x_m, y_m, bottom + height * 0.5),
+                    (length_m, width, height), materials[material_id], collision=True,
+                    yaw_deg=yaw,
+                )
+                bind_physics_material(block.GetPrim(), physical)
+                set_role(block.GetPrim(), "traversable_step_collision")
+                block.GetPrim().CreateAttribute(
+                    "route:featureId", Sdf.ValueTypeNames.String
+                ).Set(str(feature["id"]))
+                block.GetPrim().CreateAttribute(
+                    "route:required", Sdf.ValueTypeNames.Bool
+                ).Set(bool(feature.get("required_on_route", False)))
+                records.append({
+                    "id": f"{safe_id}_{local_id}", "feature_id": str(feature["id"]),
+                    "kind": str(feature["kind"]), "x_m": round(x_m, 5),
+                    "y_m": round(y_m, 5), "z_m": round(bottom + height * 0.5, 5),
+                    "yaw_deg": yaw, "size_m": [length_m, width, height],
+                    "surface_top_m": round(top_m, 5), "proxy": "box",
+                    "collision_prim": path,
+                })
+
+            if feature["kind"] in {"curb_table", "platform"}:
+                add_block(
+                    "Body", 0.0, float(feature["length_m"]),
+                    reference_ground + float(feature["height_m"]),
+                )
+            else:
+                step_count = int(feature["step_count"])
+                tread = float(feature["tread_depth_m"])
+                plateau = float(feature["platform_length_m"])
+                rise = float(feature["step_rise_m"])
+                total_length = 2.0 * step_count * tread + plateau
+                cursor = -total_length * 0.5
+                for index in range(step_count):
+                    add_block(
+                        f"Up_{index + 1:02d}", cursor + tread * 0.5, tread,
+                        reference_ground + (index + 1) * rise,
+                    )
+                    cursor += tread
+                add_block(
+                    "Plateau", cursor + plateau * 0.5, plateau,
+                    reference_ground + step_count * rise,
+                )
+                cursor += plateau
+                for index in range(step_count):
+                    add_block(
+                        f"Down_{index + 1:02d}", cursor + tread * 0.5, tread,
+                        reference_ground + (step_count - index) * rise,
+                    )
+                    cursor += tread
         else:
             raise ValueError(f"unknown traversable feature: {feature['kind']}")
-    if not instances:
-        return []
-    feature_config = dict(map_config)
-    feature_config["obstacle_instances"] = instances
-    records = place_explicit_obstacles(stage, layer_path, feature_config, debug_material)
-    for record in records:
-        visual = stage.GetPrimAtPath(f"/OutdoorMap/Props/{record['id']}")
-        proxy = stage.GetPrimAtPath(record["collision_prim"])
-        set_role(visual, "traversable_step_visual")
-        set_role(proxy, "traversable_step_collision")
+    if instances:
+        feature_config = dict(map_config)
+        feature_config["obstacle_instances"] = instances
+        asset_records = place_explicit_obstacles(
+            stage, layer_path, feature_config, materials["debug"]
+        )
+        for record in asset_records:
+            visual = stage.GetPrimAtPath(f"/OutdoorMap/Props/{record['id']}")
+            proxy = stage.GetPrimAtPath(record["collision_prim"])
+            set_role(visual, "traversable_step_visual")
+            set_role(proxy, "traversable_step_collision")
+        records.extend(asset_records)
     return records
 
 
@@ -912,6 +980,7 @@ def build_one(
     }
     for scope in (
         "Looks", "Terrain", "Surfaces", "Curbs", "Structures", "Props", "Collision",
+        "TraversableFeatures",
         "ChallengeZones", "Shore", "Route", "Lighting",
     ):
         UsdGeom.Scope.Define(stage, f"/OutdoorMap/{scope}")
@@ -940,7 +1009,7 @@ def build_one(
         props = place_obstacles(stage, layer_path, map_config, materials["debug"], occupied=structures)
     obstacles = structures + props
     traversable_features = build_traversable_features(
-        stage, layer_path, map_config, materials["debug"]
+        stage, layer_path, map_config, materials, physical
     )
     challenge_collisions = build_challenge_zones(stage, map_config, materials, zone_physics)
     add_lighting(stage, layer_path, map_config)

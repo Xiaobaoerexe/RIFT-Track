@@ -6,8 +6,8 @@
     {
       "map_id": "city_01",
       "route_count": 20,
-      "minimum_length_m": 289.3802752332564,
-      "maximum_length_m": 346.81114167002846,
+      "minimum_length_m": 289.14271990338676,
+      "maximum_length_m": 350.1643571404844,
       "json": "assets/scenes/terrain_dataset_v3_realistic/city_01/routes/generated_routes.json",
       "preview_usd": "assets/scenes/terrain_dataset_v3_realistic/city_01/routes/generated_routes.usda"
     },
@@ -166,8 +166,8 @@
     {
       "map_id": "park_01",
       "route_count": 20,
-      "minimum_length_m": 283.31906448950616,
-      "maximum_length_m": 304.63356633113256,
+      "minimum_length_m": 282.11482034823274,
+      "maximum_length_m": 304.6697505332929,
       "json": "assets/scenes/terrain_dataset_v3_realistic/park_01/routes/generated_routes.json",
       "preview_usd": "assets/scenes/terrain_dataset_v3_realistic/park_01/routes/generated_routes.usda"
     },
@@ -326,8 +326,8 @@
     {
       "map_id": "forest_trail_01",
       "route_count": 20,
-      "minimum_length_m": 310.64587380789754,
-      "maximum_length_m": 346.54318900106733,
+      "minimum_length_m": 311.00593023906674,
+      "maximum_length_m": 359.1896509459976,
       "json": "assets/scenes/terrain_dataset_v3_realistic/forest_trail_01/routes/generated_routes.json",
       "preview_usd": "assets/scenes/terrain_dataset_v3_realistic/forest_trail_01/routes/generated_routes.usda"
     },

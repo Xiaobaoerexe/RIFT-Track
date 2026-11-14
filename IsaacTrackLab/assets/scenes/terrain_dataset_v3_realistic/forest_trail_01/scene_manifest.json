@@ -2344,6 +2344,159 @@
   "curb_count": 0,
   "traversable_features": [
     {
+      "id": "forest_natural_ledge_Body",
+      "feature_id": "forest_natural_ledge",
+      "kind": "curb_table",
+      "x_m": -7.515,
+      "y_m": 69.348,
+      "z_m": -1.61683,
+      "yaw_deg": -28.63,
+      "size_m": [
+        1.1,
+        2.6,
+        0.20000000000000018
+      ],
+      "surface_top_m": -1.51683,
+      "proxy": "box",
+      "collision_prim": "/OutdoorMap/TraversableFeatures/forest_natural_ledge/Body"
+    },
+    {
+      "id": "forest_boardwalk_platform_Body",
+      "feature_id": "forest_boardwalk_platform",
+      "kind": "platform",
+      "x_m": 0.221,
+      "y_m": 65.125,
+      "z_m": -2.20217,
+      "yaw_deg": -28.63,
+      "size_m": [
+        3.2,
+        2.7,
+        0.26000000000000023
+      ],
+      "surface_top_m": -2.07217,
+      "proxy": "box",
+      "collision_prim": "/OutdoorMap/TraversableFeatures/forest_boardwalk_platform/Body"
+    },
+    {
+      "id": "forest_rock_stairs_Up_01",
+      "feature_id": "forest_rock_stairs",
+      "kind": "stair_platform",
+      "x_m": 6.11276,
+      "y_m": 61.90922,
+      "z_m": -2.28096,
+      "yaw_deg": -28.63,
+      "size_m": [
+        0.5,
+        2.8,
+        0.16999999999999993
+      ],
+      "surface_top_m": -2.19596,
+      "proxy": "box",
+      "collision_prim": "/OutdoorMap/TraversableFeatures/forest_rock_stairs/Up_01"
+    },
+    {
+      "id": "forest_rock_stairs_Up_02",
+      "feature_id": "forest_rock_stairs",
+      "kind": "stair_platform",
+      "x_m": 6.55163,
+      "y_m": 61.66964,
+      "z_m": -2.23596,
+      "yaw_deg": -28.63,
+      "size_m": [
+        0.5,
+        2.8,
+        0.26000000000000023
+      ],
+      "surface_top_m": -2.10596,
+      "proxy": "box",
+      "collision_prim": "/OutdoorMap/TraversableFeatures/forest_rock_stairs/Up_02"
+    },
+    {
+      "id": "forest_rock_stairs_Up_03",
+      "feature_id": "forest_rock_stairs",
+      "kind": "stair_platform",
+      "x_m": 6.99049,
+      "y_m": 61.43007,
+      "z_m": -2.19096,
+      "yaw_deg": -28.63,
+      "size_m": [
+        0.5,
+        2.8,
+        0.3500000000000001
+      ],
+      "surface_top_m": -2.01596,
+      "proxy": "box",
+      "collision_prim": "/OutdoorMap/TraversableFeatures/forest_rock_stairs/Up_03"
+    },
+    {
+      "id": "forest_rock_stairs_Plateau",
+      "feature_id": "forest_rock_stairs",
+      "kind": "stair_platform",
+      "x_m": 7.956,
+      "y_m": 60.903,
+      "z_m": -2.19096,
+      "yaw_deg": -28.63,
+      "size_m": [
+        1.7,
+        2.8,
+        0.3500000000000001
+      ],
+      "surface_top_m": -2.01596,
+      "proxy": "box",
+      "collision_prim": "/OutdoorMap/TraversableFeatures/forest_rock_stairs/Plateau"
+    },
+    {
+      "id": "forest_rock_stairs_Down_01",
+      "feature_id": "forest_rock_stairs",
+      "kind": "stair_platform",
+      "x_m": 8.92151,
+      "y_m": 60.37593,
+      "z_m": -2.19096,
+      "yaw_deg": -28.63,
+      "size_m": [
+        0.5,
+        2.8,
+        0.3500000000000001
+      ],
+      "surface_top_m": -2.01596,
+      "proxy": "box",
+      "collision_prim": "/OutdoorMap/TraversableFeatures/forest_rock_stairs/Down_01"
+    },
+    {
+      "id": "forest_rock_stairs_Down_02",
+      "feature_id": "forest_rock_stairs",
+      "kind": "stair_platform",
+      "x_m": 9.36037,
+      "y_m": 60.13636,
+      "z_m": -2.23596,
+      "yaw_deg": -28.63,
+      "size_m": [
+        0.5,
+        2.8,
+        0.26000000000000023
+      ],
+      "surface_top_m": -2.10596,
+      "proxy": "box",
+      "collision_prim": "/OutdoorMap/TraversableFeatures/forest_rock_stairs/Down_02"
+    },
+    {
+      "id": "forest_rock_stairs_Down_03",
+      "feature_id": "forest_rock_stairs",
+      "kind": "stair_platform",
+      "x_m": 9.79924,
+      "y_m": 59.89678,
+      "z_m": -2.28096,
+      "yaw_deg": -28.63,
+      "size_m": [
+        0.5,
+        2.8,
+        0.16999999999999993
+      ],
+      "surface_top_m": -2.19596,
+      "proxy": "box",
+      "collision_prim": "/OutdoorMap/TraversableFeatures/forest_rock_stairs/Down_03"
+    },
+    {
       "id": "trail_step_0_log_0",
       "asset": "dead_tree_trunk",
       "x_m": -59.78,
@@ -2584,10 +2737,11 @@
       ]
     }
   ],
-  "traversable_feature_count": 15,
+  "traversable_feature_count": 24,
   "planning_contract": {
     "semantic_layout_required": true,
     "routes_must_follow_navigation_corridors": true,
+    "required_route_features_must_be_visited": true,
     "city_requires": [
       "road_network",
       "sidewalks",
@@ -2730,7 +2884,7 @@
     }
   ],
   "terrain_collision_tile_count": 36,
-  "collision_prims_expected": 215,
+  "collision_prims_expected": 224,
   "route_generator": "isaac_track_lab.task.terrain_routes.TerrainRouteGenerator",
   "route_defaults": {
     "algorithm": "semantic_corridor_cost_aware_astar",
@@ -2740,6 +2894,7 @@
     "maximum_slope_deg": 28.0,
     "target_maximum_slope_deg": 18.0,
     "maximum_turn_deg": 150.0,
+    "maximum_traversable_step_height_m": 0.3,
     "minimum_length_m": 280.0,
     "maximum_length_m": 360.0,
     "maximum_attempts": 120

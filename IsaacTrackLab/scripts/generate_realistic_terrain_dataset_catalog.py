@@ -34,6 +34,34 @@ def gate(point, size=6.0):
     return [round(point[0], 3), round(point[1], 3), size, size]
 
 
+def midpoint(left, right):
+    return [(float(left[0]) + float(right[0])) * 0.5,
+            (float(left[1]) + float(right[1])) * 0.5]
+
+
+def lerp(left, right, ratio):
+    return [
+        float(left[0]) + ratio * (float(right[0]) - float(left[0])),
+        float(left[1]) + ratio * (float(right[1]) - float(left[1])),
+    ]
+
+
+def travel_yaw(left, right):
+    return degrees(atan2(float(right[1]) - float(left[1]), float(right[0]) - float(left[0])))
+
+
+def gait_feature(feature_id, kind, center, yaw_deg, **parameters):
+    """Create a route-mandatory, semantically labelled locomotion feature."""
+
+    return {
+        "id": feature_id, "kind": kind,
+        "center_m": [round(float(center[0]), 3), round(float(center[1]), 3)],
+        "yaw_deg": round(float(yaw_deg), 2),
+        "required_on_route": True,
+        **parameters,
+    }
+
+
 def instance(asset, x, y, scale, proxy, yaw=0.0, **shape):
     return {
         "id": "", "asset": asset, "x_m": round(x, 3), "y_m": round(y, 3),
@@ -171,7 +199,35 @@ def city_map(index, seed):
         ],
     }
     zones=[{"id":"road_repair","kind":"rough_ground","center_m":[xs[1]+18,ys[1]],"size_m":[18,road_width*.8],"cost":1.7,"traversable":True,"static_friction":.70,"dynamic_friction":.52}]
-    return base_map("city",index,seed,terrain,roads,surfaces,gate_sets,zones,assign_ids(props),structures,curb_segments,[])
+    gait_features = []
+    if index == 1:
+        course_left, course_right = nodes["d"], nodes["e"]
+        course_yaw = travel_yaw(course_left, course_right)
+        gait_features = [
+            gait_feature(
+                "urban_raised_curb_crossing", "curb_table",
+                lerp(course_left, course_right, 0.35), course_yaw,
+                width_m=2.8, length_m=1.2, height_m=0.10,
+                material="curb", gait_hint="step_up_down",
+            ),
+            gait_feature(
+                "urban_service_platform", "platform",
+                lerp(course_left, course_right, 0.50), course_yaw,
+                width_m=2.8, length_m=2.8, height_m=0.18,
+                material="curb", gait_hint="low_jump_up_down",
+            ),
+            gait_feature(
+                "urban_plaza_stairs", "stair_platform",
+                lerp(course_left, course_right, 0.65), course_yaw,
+                width_m=3.0, step_count=3, step_rise_m=0.08,
+                tread_depth_m=0.46, platform_length_m=1.8,
+                material="curb", gait_hint="stair_transition",
+            ),
+        ]
+    return base_map(
+        "city", index, seed, terrain, roads, surfaces, gate_sets, zones,
+        assign_ids(props), structures, curb_segments, gait_features,
+    )
 
 
 def park_map(index, seed):
@@ -233,6 +289,27 @@ def park_map(index, seed):
     for n,p in enumerate((loop[1],loop[5],west_east[2])):
         step_features.append({"id":f"path_stones_{n}","kind":"embedded_stones","center_m":[round(p[0],3),round(p[1],3)],"yaw_deg":rng.uniform(-180,180),"count":3})
         terrain["features"].append({"id":f"path_bump_{n}","kind":"step_bump","center_m":p,"amplitude_m":.10,"radius_x_m":1.6,"radius_y_m":.9,"angle_deg":rng.uniform(-180,180)})
+    if index == 1:
+        course_left, course_right = loop[0], loop[1]
+        course_yaw = travel_yaw(course_left, course_right)
+        step_features.extend((
+            gait_feature(
+                "park_path_curb", "curb_table", lerp(course_left, course_right, 0.35),
+                course_yaw, width_m=2.5, length_m=1.0,
+                height_m=0.10, material="rock", gait_hint="step_up_down",
+            ),
+            gait_feature(
+                "park_timber_platform", "platform", lerp(course_left, course_right, 0.50),
+                course_yaw, width_m=2.6, length_m=3.0,
+                height_m=0.16, material="wood", gait_hint="low_jump_up_down",
+            ),
+            gait_feature(
+                "park_terrace_stairs", "stair_platform", lerp(course_left, course_right, 0.65),
+                course_yaw, width_m=2.7, step_count=3,
+                step_rise_m=0.08, tread_depth_m=0.48, platform_length_m=1.8,
+                material="rock", gait_hint="stair_transition",
+            ),
+        ))
     return base_map("park",index,seed,terrain,corridors,surfaces,gate_sets,[lake_zone],assign_ids(props),[],[],step_features)
 
 
@@ -281,6 +358,27 @@ def forest_map(index, seed):
         step_features.append({"id":f"trail_step_{n}","kind":kind,"center_m":[round(p[0],3),round(p[1],3)],"yaw_deg":round(yaw,2),"count":3})
         terrain["features"].append({"id":f"trail_step_bump_{n}","kind":"step_bump","center_m":p,
                                     "amplitude_m":round(rng.uniform(.10,.17),3),"radius_x_m":1.7,"radius_y_m":.75,"angle_deg":yaw})
+    if index == 1:
+        course_left, course_right = main[5], main[6]
+        course_yaw = travel_yaw(course_left, course_right)
+        step_features.extend((
+            gait_feature(
+                "forest_natural_ledge", "curb_table", lerp(course_left, course_right, 0.30),
+                course_yaw, width_m=2.6, length_m=1.1,
+                height_m=0.12, material="rock", gait_hint="step_up_down",
+            ),
+            gait_feature(
+                "forest_boardwalk_platform", "platform", lerp(course_left, course_right, 0.50),
+                course_yaw, width_m=2.7, length_m=3.2,
+                height_m=0.18, material="wood", gait_hint="low_jump_up_down",
+            ),
+            gait_feature(
+                "forest_rock_stairs", "stair_platform", lerp(course_left, course_right, 0.70),
+                course_yaw, width_m=2.8, step_count=3,
+                step_rise_m=0.09, tread_depth_m=0.50, platform_length_m=1.7,
+                material="rock", gait_hint="stair_transition",
+            ),
+        ))
     zones=[{"id":"mud_section","kind":"soft_ground","center_m":main[7],"size_m":[12,8],"cost":1.8,"traversable":True,"static_friction":.56,"dynamic_friction":.38}]
     return base_map("forest_trail",index,seed,terrain,corridors,surfaces,gate_sets,zones,assign_ids(props),[],[],step_features)
 
@@ -309,11 +407,12 @@ def main():
         "quality_contract":{"texture_resolution":"2k","terrain_grid_spacing_m":1.0,"terrain_buffer_m":30.0,"usd_extension":"usdc","collision_required":True,"target_routes_must_be_reachable":True,"dynamic_events":[],"distractor_people":0},
         "planning_contract":{
             "semantic_layout_required":True,"routes_must_follow_navigation_corridors":True,
+            "required_route_features_must_be_visited":True,
             "city_requires":["road_network","sidewalks","curb_breaks_at_intersections","roadside_props","zoned_buildings"],
             "park_requires":["terrain_bowl_lake","elliptical_water_surface","hills","connected_paths","shore_and_path_stones"],
             "forest_requires":["dense_off-trail_trees","rugged_ridges","mud_trails","rocks","deadwood","traversable_step_features"],
         },
-        "route_defaults":{"algorithm":"semantic_corridor_cost_aware_astar","grid_resolution_m":1.0,"resample_spacing_m":1.0,"robot_clearance_m":1.2,"maximum_slope_deg":28.0,"target_maximum_slope_deg":18.0,"maximum_turn_deg":150.0,"minimum_length_m":280.0,"maximum_length_m":360.0,"maximum_attempts":120},
+        "route_defaults":{"algorithm":"semantic_corridor_cost_aware_astar","grid_resolution_m":1.0,"resample_spacing_m":1.0,"robot_clearance_m":1.2,"maximum_slope_deg":28.0,"target_maximum_slope_deg":18.0,"maximum_turn_deg":150.0,"maximum_traversable_step_height_m":0.30,"minimum_length_m":280.0,"maximum_length_m":360.0,"maximum_attempts":120},
         "maps":maps,
     }
     OUTPUT.write_text(json.dumps(catalog,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")

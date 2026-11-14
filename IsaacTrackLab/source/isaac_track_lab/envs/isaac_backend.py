@@ -26,6 +26,7 @@ from isaac_track_lab.sim2real import (
 from isaac_track_lab.sim2real.events import ScenarioEventRuntime
 from isaac_track_lab.task import (
     DisturbanceEvent, TerrainTargetFollower, build_scenario_plan, terrain_mesh_height,
+    traversable_feature_surface_height,
 )
 from isaac_track_lab.task.motion import inside_route_corridor
 
@@ -343,6 +344,8 @@ class IsaacTrackingBackend:
     def _update_character_animation(
         controller: dict[str, Any], elapsed_s: float, *, playback_rate: float
     ) -> None:
+        if playback_rate <= 1e-6 and controller["last_index"] is not None:
+            return
         frames = controller["frames"]
         pose_index = (
             int(elapsed_s * controller["fps"] * playback_rate)
@@ -416,7 +419,7 @@ class IsaacTrackingBackend:
             map_id=self.options.map_id,
         )
         self.randomization_apply_log = {}
-        self.target_trajectory: list[dict[str, float | bool]] = []
+        self.target_trajectory: list[dict[str, float | bool | str | None]] = []
         self.sensor = D455PostProcessor(episode_profile, self.robot.device)
         self.timeline = SensorControlTimeline(
             episode_profile.section("timing"), request.seed, episode_profile.enabled
@@ -445,6 +448,7 @@ class IsaacTrackingBackend:
             nominal_speed_mps=self.randomization.target_speed_mps,
             minimum_speed_mps=min(1.0, self.randomization.target_speed_mps),
             maximum_speed_mps=max(1.5, self.randomization.target_speed_mps),
+            traversal_speed_mps=min(0.65, self.randomization.target_speed_mps),
             terrain_grid_spacing_m=float(self.manifest["terrain_grid_spacing_m"]),
         )
         target_pose = self.target_follower.reset(3.0)
@@ -556,7 +560,7 @@ class IsaacTrackingBackend:
             self._update_character_animation(
                 self.target_motion_controller, self.target_motion_time_s,
                 playback_rate=(
-                    self.randomization.target_speed_mps / 0.82
+                    pose.speed_mps / 0.82
                     * (1.0 + 0.5 * pose_profile_weight)
                 ),
             )
@@ -570,6 +574,14 @@ class IsaacTrackingBackend:
                 "x_m": pose.position_m[0], "y_m": pose.position_m[1],
                 "z_m": pose.position_m[2], "yaw_deg": pose.yaw_deg,
                 "paused": paused,
+                "locomotion_mode": pose.locomotion_mode,
+                "traversable_feature_id": pose.traversable_feature_id,
+                "walkable_surface_z_m": pose.walkable_surface_z_m,
+                "surface_clearance_m": pose.surface_clearance_m,
+                "vertical_speed_mps": pose.vertical_speed_mps,
+                "collision_penetration_detected": (
+                    pose.position_m[2] + 1e-5 < pose.walkable_surface_z_m
+                ),
             })
             self._apply_camera_vibration(1.0 / self.profile.d455.rgb_hz)
             self.next_camera_s += 1.0 / self.profile.d455.rgb_hz
@@ -738,6 +750,11 @@ class IsaacTrackingBackend:
         from dataclasses import replace
 
         assert self.request is not None and self.randomization is not None
+        # A lateral scripted maneuver while a foot is negotiating a narrow
+        # curb/stair can place the character beside the collision geometry.
+        # Keep the root on the authored route until the transition is clear.
+        if pose.locomotion_mode != "walk":
+            return pose
         start = 0.55 * self.request.horizon_s
         duration = max(0.75, min(2.5, 0.20 * self.request.horizon_s))
         local = min(1.0, max(0.0, (self.elapsed_s - start) / duration))
@@ -747,11 +764,17 @@ class IsaacTrackingBackend:
         yaw_rad = radians(pose.yaw_deg)
         x = pose.position_m[0] - sin(yaw_rad) * lateral
         y = pose.position_m[1] + cos(yaw_rad) * lateral
-        z = terrain_mesh_height(self.map_config, x, y)
+        base_z = terrain_mesh_height(self.map_config, x, y)
+        z = traversable_feature_surface_height(
+            self.map_config, x, y, base_height_m=base_z
+        )
         return replace(
             pose,
-            position_m=(float(x), float(y), float(z)),
+            position_m=(float(x), float(y), float(z + self.target_follower.ground_clearance_m)),
             yaw_deg=float(pose.yaw_deg + self.randomization.target_turn_deg * blend),
+            walkable_surface_z_m=float(z),
+            surface_clearance_m=0.0,
+            vertical_speed_mps=0.0,
         )
 
     def _apply_camera_vibration(self, dt: float) -> None:
@@ -1091,6 +1114,17 @@ class IsaacTrackingBackend:
                 if dropout_samples else 0.0
             ),
         }
+        mode_counts: dict[str, int] = {}
+        for row in self.target_trajectory:
+            mode = str(row["locomotion_mode"])
+            mode_counts[mode] = mode_counts.get(mode, 0) + 1
+        target_clearances = [
+            float(row["surface_clearance_m"]) for row in self.target_trajectory
+        ]
+        penetration_count = sum(
+            bool(row["collision_penetration_detected"])
+            for row in self.target_trajectory
+        )
         return {
             "schema_version": 1,
             "backend": "IsaacTrackingBackend",
@@ -1110,6 +1144,22 @@ class IsaacTrackingBackend:
                 "pause_duration_s": self.randomization.target_pause_duration_s,
                 "lateral_shift_m": self.randomization.target_lateral_shift_m,
                 "turn_deg": self.randomization.target_turn_deg,
+                "traversal_validation": {
+                    "mode_counts": mode_counts,
+                    "minimum_surface_clearance_m": (
+                        min(target_clearances) if target_clearances else None
+                    ),
+                    "maximum_absolute_vertical_speed_mps": (
+                        max(
+                            abs(float(row["vertical_speed_mps"]))
+                            for row in self.target_trajectory
+                        )
+                        if self.target_trajectory else None
+                    ),
+                    "collision_penetration_count": penetration_count,
+                    "skeletal_foot_ik_enabled": False,
+                    "validation_scope": "character_root_and_collision_capsule",
+                },
                 "trajectory": self.target_trajectory,
             },
             "reset_diagnostics": self.reset_diagnostics,

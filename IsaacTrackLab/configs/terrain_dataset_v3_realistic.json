@@ -17,6 +17,7 @@
   "planning_contract": {
     "semantic_layout_required": true,
     "routes_must_follow_navigation_corridors": true,
+    "required_route_features_must_be_visited": true,
     "city_requires": [
       "road_network",
       "sidewalks",
@@ -48,6 +49,7 @@
     "maximum_slope_deg": 28.0,
     "target_maximum_slope_deg": 18.0,
     "maximum_turn_deg": 150.0,
+    "maximum_traversable_step_height_m": 0.3,
     "minimum_length_m": 280.0,
     "maximum_length_m": 360.0,
     "maximum_attempts": 120
@@ -1506,7 +1508,55 @@
           "yaw_deg": 90.0
         }
       ],
-      "traversable_step_features": []
+      "traversable_step_features": [
+        {
+          "id": "urban_raised_curb_crossing",
+          "kind": "curb_table",
+          "center_m": [
+            -33.275,
+            4.479
+          ],
+          "yaw_deg": 0.0,
+          "required_on_route": true,
+          "width_m": 2.8,
+          "length_m": 1.2,
+          "height_m": 0.1,
+          "material": "curb",
+          "gait_hint": "step_up_down"
+        },
+        {
+          "id": "urban_service_platform",
+          "kind": "platform",
+          "center_m": [
+            -24.425,
+            4.479
+          ],
+          "yaw_deg": 0.0,
+          "required_on_route": true,
+          "width_m": 2.8,
+          "length_m": 2.8,
+          "height_m": 0.18,
+          "material": "curb",
+          "gait_hint": "low_jump_up_down"
+        },
+        {
+          "id": "urban_plaza_stairs",
+          "kind": "stair_platform",
+          "center_m": [
+            -15.575,
+            4.479
+          ],
+          "yaw_deg": 0.0,
+          "required_on_route": true,
+          "width_m": 3.0,
+          "step_count": 3,
+          "step_rise_m": 0.08,
+          "tread_depth_m": 0.46,
+          "platform_length_m": 1.8,
+          "material": "curb",
+          "gait_hint": "stair_transition"
+        }
+      ]
     },
     {
       "id": "city_02",
@@ -31108,6 +31158,53 @@
           ],
           "yaw_deg": 61.40071198416567,
           "count": 3
+        },
+        {
+          "id": "park_path_curb",
+          "kind": "curb_table",
+          "center_m": [
+            -70.282,
+            -18.429
+          ],
+          "yaw_deg": 80.21,
+          "required_on_route": true,
+          "width_m": 2.5,
+          "length_m": 1.0,
+          "height_m": 0.1,
+          "material": "rock",
+          "gait_hint": "step_up_down"
+        },
+        {
+          "id": "park_timber_platform",
+          "kind": "platform",
+          "center_m": [
+            -68.647,
+            -8.963
+          ],
+          "yaw_deg": 80.21,
+          "required_on_route": true,
+          "width_m": 2.6,
+          "length_m": 3.0,
+          "height_m": 0.16,
+          "material": "wood",
+          "gait_hint": "low_jump_up_down"
+        },
+        {
+          "id": "park_terrace_stairs",
+          "kind": "stair_platform",
+          "center_m": [
+            -67.013,
+            0.503
+          ],
+          "yaw_deg": 80.21,
+          "required_on_route": true,
+          "width_m": 2.7,
+          "step_count": 3,
+          "step_rise_m": 0.08,
+          "tread_depth_m": 0.48,
+          "platform_length_m": 1.8,
+          "material": "rock",
+          "gait_hint": "stair_transition"
         }
       ]
     },
@@ -66543,6 +66640,53 @@
           ],
           "yaw_deg": 26.53,
           "count": 3
+        },
+        {
+          "id": "forest_natural_ledge",
+          "kind": "curb_table",
+          "center_m": [
+            -7.515,
+            69.348
+          ],
+          "yaw_deg": -28.63,
+          "required_on_route": true,
+          "width_m": 2.6,
+          "length_m": 1.1,
+          "height_m": 0.12,
+          "material": "rock",
+          "gait_hint": "step_up_down"
+        },
+        {
+          "id": "forest_boardwalk_platform",
+          "kind": "platform",
+          "center_m": [
+            0.221,
+            65.125
+          ],
+          "yaw_deg": -28.63,
+          "required_on_route": true,
+          "width_m": 2.7,
+          "length_m": 3.2,
+          "height_m": 0.18,
+          "material": "wood",
+          "gait_hint": "low_jump_up_down"
+        },
+        {
+          "id": "forest_rock_stairs",
+          "kind": "stair_platform",
+          "center_m": [
+            7.956,
+            60.903
+          ],
+          "yaw_deg": -28.63,
+          "required_on_route": true,
+          "width_m": 2.8,
+          "step_count": 3,
+          "step_rise_m": 0.09,
+          "tread_depth_m": 0.5,
+          "platform_length_m": 1.7,
+          "material": "rock",
+          "gait_hint": "stair_transition"
         }
       ]
     },

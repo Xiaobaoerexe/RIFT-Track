@@ -137,6 +137,13 @@ def main() -> None:
         for item in selected
     ]
     output = scene_root / "route_dataset_summary.json"
+    if args.map_ids and output.exists():
+        existing = json.loads(output.read_text(encoding="utf-8"))
+        replacements = {item["map_id"]: item for item in summaries}
+        summaries = [
+            replacements.pop(item["map_id"], item)
+            for item in existing.get("maps", [])
+        ] + list(replacements.values())
     output.write_text(json.dumps({
         "schema_version": 1, "batch_id": config["batch_id"],
         "total_routes": sum(item["route_count"] for item in summaries), "maps": summaries,

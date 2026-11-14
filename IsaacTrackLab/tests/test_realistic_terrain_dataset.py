@@ -1,4 +1,5 @@
 import json
+from math import atan2, degrees
 from pathlib import Path
 import unittest
 
@@ -60,6 +61,75 @@ class RealisticTerrainDatasetTests(unittest.TestCase):
                         TerrainRouteGenerator._inside_corridor(x_m, y_m, corridor)
                         for corridor in map_config["navigation_corridors"]
                     ))
+
+    def test_baseline_maps_have_collidable_route_mandatory_gait_courses(self):
+        expected_kinds = {"curb_table", "platform", "stair_platform"}
+        for map_id in ("city_01", "park_01", "forest_trail_01"):
+            with self.subTest(map=map_id):
+                map_config = next(
+                    item for item in self.catalog["maps"] if item["id"] == map_id
+                )
+                required = [
+                    feature for feature in map_config["traversable_step_features"]
+                    if feature.get("required_on_route")
+                ]
+                self.assertEqual({feature["kind"] for feature in required}, expected_kinds)
+                required_ids = {feature["id"] for feature in required}
+                for feature in required:
+                    self.assertGreaterEqual(float(feature["width_m"]), 2.5)
+                    if feature["kind"] == "stair_platform":
+                        self.assertTrue(0.08 <= float(feature["step_rise_m"]) <= 0.10)
+                        self.assertGreaterEqual(float(feature["tread_depth_m"]), 0.45)
+                        self.assertLessEqual(
+                            int(feature["step_count"]) * float(feature["step_rise_m"]),
+                            0.30,
+                        )
+                    else:
+                        self.assertLessEqual(float(feature["height_m"]), 0.18)
+
+                manifest = json.loads(
+                    (SCENES / map_id / "scene_manifest.json").read_text(encoding="utf-8")
+                )
+                authored_ids = {
+                    item["feature_id"] for item in manifest["traversable_features"]
+                    if "feature_id" in item
+                }
+                self.assertTrue(required_ids <= authored_ids)
+                self.assertTrue(all(
+                    item.get("collision_prim")
+                    for item in manifest["traversable_features"]
+                    if item.get("feature_id") in required_ids
+                ))
+
+                routes = json.loads(
+                    (SCENES / map_id / "routes/generated_routes.json").read_text(
+                        encoding="utf-8"
+                    )
+                )["routes"]
+                for route in routes:
+                    self.assertTrue(
+                        required_ids <= set(route["traversable_features_visited"])
+                    )
+                    self.assertLessEqual(float(route["maximum_step_height_m"]), 0.30)
+                    points = route["points_m"]
+                    for feature in required:
+                        closest = min(
+                            range(len(points)),
+                            key=lambda index: (
+                                (points[index][0] - feature["center_m"][0]) ** 2
+                                + (points[index][1] - feature["center_m"][1]) ** 2
+                            ),
+                        )
+                        before = points[max(0, closest - 2)]
+                        after = points[min(len(points) - 1, closest + 2)]
+                        route_yaw = degrees(atan2(
+                            after[1] - before[1], after[0] - before[0]
+                        ))
+                        error = abs(
+                            (route_yaw - float(feature["yaw_deg"]) + 180.0)
+                            % 360.0 - 180.0
+                        )
+                        self.assertLessEqual(min(error, 180.0 - error), 15.0)
 
 
 if __name__ == "__main__":

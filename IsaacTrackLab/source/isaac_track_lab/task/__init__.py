@@ -12,7 +12,7 @@ from .runtime import (
 from .scenario import DisturbanceEvent, ScenarioPlan, build_scenario_plan
 from .terrain_routes import (
     GeneratedTerrainRoute, Obstacle2D, TerrainRouteGenerator, terrain_height,
-    terrain_mesh_height,
+    terrain_mesh_height, traversable_feature_surface_height,
 )
 from .target_motion import TargetMotionPose, TerrainTargetFollower
 
@@ -34,6 +34,7 @@ __all__ = [
     "TerrainRouteGenerator",
     "terrain_height",
     "terrain_mesh_height",
+    "traversable_feature_surface_height",
     "TargetMotionPose",
     "TerrainTargetFollower",
 ]

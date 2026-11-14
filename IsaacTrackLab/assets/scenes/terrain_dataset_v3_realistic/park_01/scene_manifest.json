@@ -1110,6 +1110,159 @@
   "curb_count": 0,
   "traversable_features": [
     {
+      "id": "park_path_curb_Body",
+      "feature_id": "park_path_curb",
+      "kind": "curb_table",
+      "x_m": -70.282,
+      "y_m": -18.429,
+      "z_m": -0.53071,
+      "yaw_deg": 80.21,
+      "size_m": [
+        1.0,
+        2.5,
+        0.17999999999999994
+      ],
+      "surface_top_m": -0.44071,
+      "proxy": "box",
+      "collision_prim": "/OutdoorMap/TraversableFeatures/park_path_curb/Body"
+    },
+    {
+      "id": "park_timber_platform_Body",
+      "feature_id": "park_timber_platform",
+      "kind": "platform",
+      "x_m": -68.647,
+      "y_m": -8.963,
+      "z_m": -0.8471,
+      "yaw_deg": 80.21,
+      "size_m": [
+        3.0,
+        2.6,
+        0.24
+      ],
+      "surface_top_m": -0.7271,
+      "proxy": "box",
+      "collision_prim": "/OutdoorMap/TraversableFeatures/park_timber_platform/Body"
+    },
+    {
+      "id": "park_terrace_stairs_Up_01",
+      "feature_id": "park_terrace_stairs",
+      "kind": "stair_platform",
+      "x_m": -67.37008,
+      "y_m": -1.56642,
+      "z_m": -1.12715,
+      "yaw_deg": 80.21,
+      "size_m": [
+        0.48,
+        2.7,
+        0.16000000000000014
+      ],
+      "surface_top_m": -1.04715,
+      "proxy": "box",
+      "collision_prim": "/OutdoorMap/TraversableFeatures/park_terrace_stairs/Up_01"
+    },
+    {
+      "id": "park_terrace_stairs_Up_02",
+      "feature_id": "park_terrace_stairs",
+      "kind": "stair_platform",
+      "x_m": -67.28846,
+      "y_m": -1.09341,
+      "z_m": -1.08715,
+      "yaw_deg": 80.21,
+      "size_m": [
+        0.48,
+        2.7,
+        0.2400000000000001
+      ],
+      "surface_top_m": -0.96715,
+      "proxy": "box",
+      "collision_prim": "/OutdoorMap/TraversableFeatures/park_terrace_stairs/Up_02"
+    },
+    {
+      "id": "park_terrace_stairs_Up_03",
+      "feature_id": "park_terrace_stairs",
+      "kind": "stair_platform",
+      "x_m": -67.20684,
+      "y_m": -0.6204,
+      "z_m": -1.04715,
+      "yaw_deg": 80.21,
+      "size_m": [
+        0.48,
+        2.7,
+        0.32000000000000006
+      ],
+      "surface_top_m": -0.88715,
+      "proxy": "box",
+      "collision_prim": "/OutdoorMap/TraversableFeatures/park_terrace_stairs/Up_03"
+    },
+    {
+      "id": "park_terrace_stairs_Plateau",
+      "feature_id": "park_terrace_stairs",
+      "kind": "stair_platform",
+      "x_m": -67.013,
+      "y_m": 0.503,
+      "z_m": -1.04715,
+      "yaw_deg": 80.21,
+      "size_m": [
+        1.8,
+        2.7,
+        0.32000000000000006
+      ],
+      "surface_top_m": -0.88715,
+      "proxy": "box",
+      "collision_prim": "/OutdoorMap/TraversableFeatures/park_terrace_stairs/Plateau"
+    },
+    {
+      "id": "park_terrace_stairs_Down_01",
+      "feature_id": "park_terrace_stairs",
+      "kind": "stair_platform",
+      "x_m": -66.81916,
+      "y_m": 1.6264,
+      "z_m": -1.04715,
+      "yaw_deg": 80.21,
+      "size_m": [
+        0.48,
+        2.7,
+        0.32000000000000006
+      ],
+      "surface_top_m": -0.88715,
+      "proxy": "box",
+      "collision_prim": "/OutdoorMap/TraversableFeatures/park_terrace_stairs/Down_01"
+    },
+    {
+      "id": "park_terrace_stairs_Down_02",
+      "feature_id": "park_terrace_stairs",
+      "kind": "stair_platform",
+      "x_m": -66.73754,
+      "y_m": 2.09941,
+      "z_m": -1.08715,
+      "yaw_deg": 80.21,
+      "size_m": [
+        0.48,
+        2.7,
+        0.2400000000000001
+      ],
+      "surface_top_m": -0.96715,
+      "proxy": "box",
+      "collision_prim": "/OutdoorMap/TraversableFeatures/park_terrace_stairs/Down_02"
+    },
+    {
+      "id": "park_terrace_stairs_Down_03",
+      "feature_id": "park_terrace_stairs",
+      "kind": "stair_platform",
+      "x_m": -66.65592,
+      "y_m": 2.57242,
+      "z_m": -1.12715,
+      "yaw_deg": 80.21,
+      "size_m": [
+        0.48,
+        2.7,
+        0.16000000000000014
+      ],
+      "surface_top_m": -1.04715,
+      "proxy": "box",
+      "collision_prim": "/OutdoorMap/TraversableFeatures/park_terrace_stairs/Down_03"
+    },
+    {
       "id": "path_stones_0_stone_0",
       "asset": "rock_09",
       "x_m": -63.04087,
@@ -1227,10 +1380,11 @@
       "collision_prim": "/OutdoorMap/Collision/path_stones_2_stone_2"
     }
   ],
-  "traversable_feature_count": 9,
+  "traversable_feature_count": 18,
   "planning_contract": {
     "semantic_layout_required": true,
     "routes_must_follow_navigation_corridors": true,
+    "required_route_features_must_be_visited": true,
     "city_requires": [
       "road_network",
       "sidewalks",
@@ -1377,7 +1531,7 @@
     }
   ],
   "terrain_collision_tile_count": 36,
-  "collision_prims_expected": 148,
+  "collision_prims_expected": 157,
   "route_generator": "isaac_track_lab.task.terrain_routes.TerrainRouteGenerator",
   "route_defaults": {
     "algorithm": "semantic_corridor_cost_aware_astar",
@@ -1387,6 +1541,7 @@
     "maximum_slope_deg": 28.0,
     "target_maximum_slope_deg": 18.0,
     "maximum_turn_deg": 150.0,
+    "maximum_traversable_step_height_m": 0.3,
     "minimum_length_m": 280.0,
     "maximum_length_m": 360.0,
     "maximum_attempts": 120

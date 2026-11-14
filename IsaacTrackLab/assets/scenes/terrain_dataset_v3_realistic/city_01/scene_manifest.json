@@ -732,11 +732,166 @@
   "prop_count": 26,
   "surface_corridor_count": 12,
   "curb_count": 48,
-  "traversable_features": [],
-  "traversable_feature_count": 0,
+  "traversable_features": [
+    {
+      "id": "urban_raised_curb_crossing_Body",
+      "feature_id": "urban_raised_curb_crossing",
+      "kind": "curb_table",
+      "x_m": -33.275,
+      "y_m": 4.479,
+      "z_m": 0.71608,
+      "yaw_deg": 0.0,
+      "size_m": [
+        1.2,
+        2.8,
+        0.17999999999999994
+      ],
+      "surface_top_m": 0.80608,
+      "proxy": "box",
+      "collision_prim": "/OutdoorMap/TraversableFeatures/urban_raised_curb_crossing/Body"
+    },
+    {
+      "id": "urban_service_platform_Body",
+      "feature_id": "urban_service_platform",
+      "kind": "platform",
+      "x_m": -24.425,
+      "y_m": 4.479,
+      "z_m": 1.0166,
+      "yaw_deg": 0.0,
+      "size_m": [
+        2.8,
+        2.8,
+        0.2599999999999999
+      ],
+      "surface_top_m": 1.1466,
+      "proxy": "box",
+      "collision_prim": "/OutdoorMap/TraversableFeatures/urban_service_platform/Body"
+    },
+    {
+      "id": "urban_plaza_stairs_Up_01",
+      "feature_id": "urban_plaza_stairs",
+      "kind": "stair_platform",
+      "x_m": -17.625,
+      "y_m": 4.479,
+      "z_m": 1.05198,
+      "yaw_deg": 0.0,
+      "size_m": [
+        0.46,
+        3.0,
+        0.16000000000000003
+      ],
+      "surface_top_m": 1.13198,
+      "proxy": "box",
+      "collision_prim": "/OutdoorMap/TraversableFeatures/urban_plaza_stairs/Up_01"
+    },
+    {
+      "id": "urban_plaza_stairs_Up_02",
+      "feature_id": "urban_plaza_stairs",
+      "kind": "stair_platform",
+      "x_m": -17.165,
+      "y_m": 4.479,
+      "z_m": 1.09198,
+      "yaw_deg": 0.0,
+      "size_m": [
+        0.46,
+        3.0,
+        0.23999999999999988
+      ],
+      "surface_top_m": 1.21198,
+      "proxy": "box",
+      "collision_prim": "/OutdoorMap/TraversableFeatures/urban_plaza_stairs/Up_02"
+    },
+    {
+      "id": "urban_plaza_stairs_Up_03",
+      "feature_id": "urban_plaza_stairs",
+      "kind": "stair_platform",
+      "x_m": -16.705,
+      "y_m": 4.479,
+      "z_m": 1.13198,
+      "yaw_deg": 0.0,
+      "size_m": [
+        0.46,
+        3.0,
+        0.31999999999999995
+      ],
+      "surface_top_m": 1.29198,
+      "proxy": "box",
+      "collision_prim": "/OutdoorMap/TraversableFeatures/urban_plaza_stairs/Up_03"
+    },
+    {
+      "id": "urban_plaza_stairs_Plateau",
+      "feature_id": "urban_plaza_stairs",
+      "kind": "stair_platform",
+      "x_m": -15.575,
+      "y_m": 4.479,
+      "z_m": 1.13198,
+      "yaw_deg": 0.0,
+      "size_m": [
+        1.8,
+        3.0,
+        0.31999999999999995
+      ],
+      "surface_top_m": 1.29198,
+      "proxy": "box",
+      "collision_prim": "/OutdoorMap/TraversableFeatures/urban_plaza_stairs/Plateau"
+    },
+    {
+      "id": "urban_plaza_stairs_Down_01",
+      "feature_id": "urban_plaza_stairs",
+      "kind": "stair_platform",
+      "x_m": -14.445,
+      "y_m": 4.479,
+      "z_m": 1.13198,
+      "yaw_deg": 0.0,
+      "size_m": [
+        0.46,
+        3.0,
+        0.31999999999999995
+      ],
+      "surface_top_m": 1.29198,
+      "proxy": "box",
+      "collision_prim": "/OutdoorMap/TraversableFeatures/urban_plaza_stairs/Down_01"
+    },
+    {
+      "id": "urban_plaza_stairs_Down_02",
+      "feature_id": "urban_plaza_stairs",
+      "kind": "stair_platform",
+      "x_m": -13.985,
+      "y_m": 4.479,
+      "z_m": 1.09198,
+      "yaw_deg": 0.0,
+      "size_m": [
+        0.46,
+        3.0,
+        0.23999999999999988
+      ],
+      "surface_top_m": 1.21198,
+      "proxy": "box",
+      "collision_prim": "/OutdoorMap/TraversableFeatures/urban_plaza_stairs/Down_02"
+    },
+    {
+      "id": "urban_plaza_stairs_Down_03",
+      "feature_id": "urban_plaza_stairs",
+      "kind": "stair_platform",
+      "x_m": -13.525,
+      "y_m": 4.479,
+      "z_m": 1.05198,
+      "yaw_deg": 0.0,
+      "size_m": [
+        0.46,
+        3.0,
+        0.16000000000000003
+      ],
+      "surface_top_m": 1.13198,
+      "proxy": "box",
+      "collision_prim": "/OutdoorMap/TraversableFeatures/urban_plaza_stairs/Down_03"
+    }
+  ],
+  "traversable_feature_count": 9,
   "planning_contract": {
     "semantic_layout_required": true,
     "routes_must_follow_navigation_corridors": true,
+    "required_route_features_must_be_visited": true,
     "city_requires": [
       "road_network",
       "sidewalks",
@@ -865,7 +1020,7 @@
     }
   ],
   "terrain_collision_tile_count": 36,
-  "collision_prims_expected": 126,
+  "collision_prims_expected": 135,
   "route_generator": "isaac_track_lab.task.terrain_routes.TerrainRouteGenerator",
   "route_defaults": {
     "algorithm": "semantic_corridor_cost_aware_astar",
@@ -875,6 +1030,7 @@
     "maximum_slope_deg": 28.0,
     "target_maximum_slope_deg": 18.0,
     "maximum_turn_deg": 150.0,
+    "maximum_traversable_step_height_m": 0.3,
     "minimum_length_m": 280.0,
     "maximum_length_m": 360.0,
     "maximum_attempts": 120
