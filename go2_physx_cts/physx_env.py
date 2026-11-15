@@ -269,7 +269,6 @@ class PhysXEnv:
         self.task_ids.zero_();self.terrain_ids.fill_(7);self.terrain_levels.zero_()
         self.task_assignment_version+=1
         self.reset(self.ids,advance_curriculum=False)
-    prepare_flat_calibration=place_calibration_flat
     def set_diagnostic_levels(self,level=0):
         self.terrain_levels.fill_(int(level))
         self._place_arenas(self.ids);self._snapshot=None

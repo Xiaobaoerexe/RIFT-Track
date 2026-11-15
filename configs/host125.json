@@ -86,8 +86,6 @@
   "explore_frac": 0.25,
   "explore_noise": 0.3,
   "explore_theta": 2.0,
-  "driver_policy": "",
-  "driver_frac": 0.0,
   "log_interval": 50,
   "save_interval": 1000,
   "seed": 17,

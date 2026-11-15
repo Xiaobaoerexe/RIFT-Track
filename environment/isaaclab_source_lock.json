@@ -1,0 +1,11 @@
+{
+  "source_host": "137",
+  "source_path": "/home/abc/Documents/go2_supermimic_runtime/physx_resolved",
+  "upstream_checkout_commit": "4eac8b68f27e5960d9a9a72f8fb3974d334bfa76",
+  "note": "Installed resolved workspace; use these actual lock files, not a generic pip isaaclab version. Fresh workstation installation not yet verified.",
+  "sha256": {
+    "pyproject.toml": "459ffd39f3d546550bf68d1823010e5229181e73ae4f9cfc85ca35664e1ade00",
+    "uv.lock": "33e63ed592e7fbed39c4e56d473f103f6d58bb780e415e7cae040d08cfcaf3d5",
+    "LICENSE": "932e8d7120d38062d68754314b8be64380bc8236eb012626f9c6c1353d6dc9df"
+  }
+}

@@ -57,7 +57,7 @@ def subset(data,index):
 
 class Learner:
     schema='as2-perceptive-wm50-policy10-v3'
-    def __init__(self,cfg,env,output,driver=None):
+    def __init__(self,cfg,env,output):
         self.cfg,self.env,self.output=cfg,env,Path(output);self.output.mkdir(parents=True,exist_ok=True)
         self.device=cfg.device;torch.manual_seed(cfg.seed)
         self.policy=Policy(cfg.actor_hidden,experts=cfg.actor_experts,mixed_precision=cfg.mixed_precision).to(cfg.device)

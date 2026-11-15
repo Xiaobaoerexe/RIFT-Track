@@ -66,8 +66,6 @@ class TrainCfg:
     explore_frac: float = .25
     explore_noise: float = .3
     explore_theta: float = 2.
-    driver_policy: str = ''
-    driver_frac: float = 0.
     log_interval: int = 50
     save_interval: int = 1000
     seed: int = 17
@@ -108,8 +106,6 @@ class TrainCfg:
         expected = (1, 3) if self.variant == 'simple' else (4, 3 if self.variant == 'moe' else 1)
         if (self.task_count, self.actor_experts) != expected:
             raise ValueError('Variant/task/actor mismatch')
-        if self.driver_frac or self.driver_policy:
-            raise ValueError('The AS2 baseline has no external training provider')
         if (self.collect_steps, self.horizon, self.wm_window) != (1, 32, 8):
             raise ValueError('Source collect/H/K contract is 1/32/8')
         if production and (self.num_envs, self.buffer_len, self.imag_batch, self.wm_batch) != (4096, 1000, 8192, 2048):

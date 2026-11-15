@@ -1,8 +1,0 @@
-2026-11-15新版本实施说明
-
-已按用户最新决定回退至32步总奖励BPTT加末端总价值，删除事件价值通道、rootQ、事件TD、恢复任务及旧几何生成器。
-175/125为4独立Critic；156为单Critic单奖励；137仅代码版与175相比只在预测latent进入学生策略时detach。
-相机50Hz，固定光心(.101958,0,.327)m，水平朝前；机身高度目标.36m。
-精确配置见configs/host*.json，物理实载参数在每轮正式运行的physics_contract.json。
-验收性能与边界见RELEASE_ACCEPTANCE.json，源码事实与项目适配见UPSTREAM.json。
-本文件不将冒烟测试当作训练成功或MuJoCo迁移成功证据。

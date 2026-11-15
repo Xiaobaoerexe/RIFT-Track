@@ -5,3 +5,11 @@ __pycache__/
 build/
 dist/
 logs/
+
+# Local environments and experiment outputs.
+.venv/
+runs/
+outputs/
+checkpoints/
+.env
+.env.*
