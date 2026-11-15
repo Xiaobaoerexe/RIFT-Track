@@ -35,3 +35,5 @@ Run
 python -m go2_physx_cts.train --config <host-json> --output <run-directory> --usd <assets/as2/as2.usd>
 Each run records actual loaded physics, resolved config, code commit, depth weights and runtime dependencies. See RELEASE_ACCEPTANCE.json for measured release evidence when populated.
 No new locomotion capability or official MuJoCo visual-chain success is claimed by a smoke test. Fixed teacher/student native tests remain distinct from curriculum statistics. TRANSFER_ADAPTATION.txt defines the0.36m transfer/scoring contract and remaining integration boundary.
+
+Latest visual timing contract: VISUAL_CLOCK_ACCEPTANCE.json supersedes the initial50Hzpolicy throughput. 156 uses a2GiB re-renderable CPU depth cache after a4GiB-cache run exhausted host RAM/swap; Replay samples and update counts are unchanged.

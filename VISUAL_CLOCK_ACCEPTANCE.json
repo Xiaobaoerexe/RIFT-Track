@@ -1,0 +1,247 @@
+{
+  "schema": "as2_wm50_policy10_acceptance_v3",
+  "tested_code_commit": "c08049954d36ee87c110e6086585303ea0c5ef79",
+  "scope": "50Hz real capture/WM recurrence and supervision, 10Hz imagined policy visual sample-and-hold; full-shape mechanics and timing, not learned skill",
+  "hosts": {
+    "175": {
+      "steady": {
+        "mean_seconds": 6.961013215128332,
+        "median_seconds": 6.666119623929262,
+        "minimum_seconds": 6.343607162125409,
+        "maximum_seconds": 8.571072474122047,
+        "updates": 5,
+        "real_transitions_per_second": 588.4200867623962,
+        "imagined_transitions_per_second": 37658.885552793356,
+        "projected_120k_hours_without_evaluation_or_checkpoint": 232.03377383761108
+      },
+      "gpu_utilization": {
+        "mean_pct": 81.96875,
+        "maximum_pct": 99.0,
+        "samples": 32
+      },
+      "latent_gradient_probe": {
+        "action_to_refreshed_latent_vjp_l2": 0.08710206300020218,
+        "latent_to_student_actor_vjp_l2": 0.026139458641409874,
+        "actual_instinct_core_policy_latent_vjp_absent": true,
+        "actual_instinct_core_wm_latent_vjp_l2": 45.255577087402344,
+        "frozen_module_parameter_grads_absent": true,
+        "scope": "GPU VJP on real replay states; every-step latent forecast; not latent prediction accuracy"
+      },
+      "visual_clock_probe": {
+        "wm_steps": 32,
+        "policy_refresh_steps": [
+          0,
+          5,
+          10,
+          15,
+          20,
+          25,
+          30
+        ],
+        "held_frame_exact": true,
+        "wm_supervision_mask_every_valid_step": true,
+        "held_visual_actor_gradient_norm": 0.11969146132469177,
+        "wm_current_latent_gradient_norm": 45.25564956665039,
+        "current_wm_latent_direct_policy_gradient_absent_between_refreshes": true
+      },
+      "counts": {
+        "collect": 103,
+        "transitions": 421888,
+        "wm": 36,
+        "actor": 7,
+        "critic": 140,
+        "cts": 14
+      },
+      "host_memory_kib": {
+        "MemTotal": 131540444,
+        "MemAvailable": 78115584,
+        "SwapTotal": 15999996,
+        "SwapFree": 15538600
+      },
+      "depth_cache_gib": 26.0,
+      "actor_microbatch": 8192,
+      "replay_storage": "device",
+      "device_min_free_observed_bytes": 14353104896,
+      "gpu_max_sampled_mib": 34813.0,
+      "torch_peak_allocated_bytes": 22748618240,
+      "steady_iteration_seconds": [
+        6.514450972434133,
+        6.343607162125409,
+        6.70981584303081,
+        6.666119623929262,
+        8.571072474122047
+      ],
+      "full_cpu_cache_committed": true
+    },
+    "125": {
+      "steady": {
+        "mean_seconds": 6.126310607022606,
+        "median_seconds": 6.12621398398187,
+        "minimum_seconds": 6.029610210098326,
+        "maximum_seconds": 6.257177387014963,
+        "updates": 5,
+        "real_transitions_per_second": 668.5916308756439,
+        "imagined_transitions_per_second": 42789.86437604121,
+        "projected_120k_hours_without_evaluation_or_checkpoint": 204.21035356742019
+      },
+      "gpu_utilization": {
+        "mean_pct": 87.06896551724138,
+        "maximum_pct": 99.0,
+        "samples": 29
+      },
+      "latent_gradient_probe": {
+        "action_to_refreshed_latent_vjp_l2": 0.12405317276716232,
+        "latent_to_student_actor_vjp_l2": 0.056786324828863144,
+        "actual_instinct_core_policy_latent_vjp_absent": true,
+        "actual_instinct_core_wm_latent_vjp_l2": 45.26866912841797,
+        "frozen_module_parameter_grads_absent": true,
+        "scope": "GPU VJP on real replay states; every-step latent forecast; not latent prediction accuracy"
+      },
+      "visual_clock_probe": {
+        "wm_steps": 32,
+        "policy_refresh_steps": [
+          0,
+          5,
+          10,
+          15,
+          20,
+          25,
+          30
+        ],
+        "held_frame_exact": true,
+        "wm_supervision_mask_every_valid_step": true,
+        "held_visual_actor_gradient_norm": 0.18961982429027557,
+        "wm_current_latent_gradient_norm": 45.2685546875,
+        "current_wm_latent_direct_policy_gradient_absent_between_refreshes": true
+      },
+      "counts": {
+        "collect": 103,
+        "transitions": 421888,
+        "wm": 36,
+        "actor": 7,
+        "critic": 140,
+        "cts": 14
+      },
+      "host_memory_kib": {
+        "MemTotal": 65290784,
+        "MemAvailable": 9307588,
+        "SwapTotal": 60000252,
+        "SwapFree": 51837088
+      },
+      "depth_cache_gib": 26.0,
+      "actor_microbatch": 8192,
+      "replay_storage": "cpu",
+      "device_min_free_observed_bytes": 4269932544,
+      "gpu_max_sampled_mib": 20002.0,
+      "torch_peak_allocated_bytes": 8285773312,
+      "steady_iteration_seconds": [
+        6.0468252199934795,
+        6.029610210098326,
+        6.12621398398187,
+        6.257177387014963,
+        6.171726234024391
+      ],
+      "full_cpu_cache_committed": true
+    },
+    "156": {
+      "steady": {
+        "mean_seconds": 8.322372117801569,
+        "median_seconds": 8.322116173047107,
+        "minimum_seconds": 8.20717921690084,
+        "maximum_seconds": 8.435226815985516,
+        "updates": 10,
+        "real_transitions_per_second": 492.1673703148467,
+        "imagined_transitions_per_second": 31498.71170015019,
+        "projected_120k_hours_without_evaluation_or_checkpoint": 277.412403926719
+      },
+      "gpu_utilization": {
+        "mean_pct": 71.91463414634147,
+        "maximum_pct": 100.0,
+        "samples": 82
+      },
+      "latent_gradient_probe": {
+        "action_to_refreshed_latent_vjp_l2": 0.09617692232131958,
+        "latent_to_student_actor_vjp_l2": 0.016911547631025314,
+        "actual_instinct_core_policy_latent_vjp_absent": true,
+        "actual_instinct_core_wm_latent_vjp_l2": 45.27773666381836,
+        "frozen_module_parameter_grads_absent": true,
+        "scope": "GPU VJP on real replay states; every-step latent forecast; not latent prediction accuracy"
+      },
+      "visual_clock_probe": {
+        "wm_steps": 32,
+        "policy_refresh_steps": [
+          0,
+          5,
+          10,
+          15,
+          20,
+          25,
+          30
+        ],
+        "held_frame_exact": true,
+        "wm_supervision_mask_every_valid_step": true,
+        "held_visual_actor_gradient_norm": 0.0902864933013916,
+        "wm_current_latent_gradient_norm": 45.276084899902344,
+        "current_wm_latent_direct_policy_gradient_absent_between_refreshes": true
+      },
+      "counts": {
+        "collect": 108,
+        "transitions": 442368,
+        "wm": 56,
+        "actor": 12,
+        "critic": 240,
+        "cts": 24
+      },
+      "host_memory_kib": {
+        "MemTotal": 32801616,
+        "MemAvailable": 2868664,
+        "SwapTotal": 2097148,
+        "SwapFree": 480
+      },
+      "depth_cache_gib": 2.0,
+      "actor_microbatch": 2048,
+      "replay_storage": "cpu",
+      "device_min_free_observed_bytes": 9546432512,
+      "gpu_max_sampled_mib": 14977.0,
+      "torch_peak_allocated_bytes": 3273608704,
+      "steady_iteration_seconds": [
+        8.241202912991866,
+        8.333857758087106,
+        8.40751630696468,
+        8.294737388030626,
+        8.279164338018745,
+        8.310374588007107,
+        8.345576848951168,
+        8.435226815985516,
+        8.368885004078038,
+        8.20717921690084
+      ],
+      "full_cpu_cache_committed": true
+    }
+  },
+  "historical_evidence": "RELEASE_ACCEPTANCE.json describes the preceding policy50Hz validation; this record supersedes its throughput measurements.",
+  "resource_pressure_156_4g": {
+    "steady": {
+      "mean_seconds": 13.595661783823743,
+      "median_seconds": 8.885135962045752,
+      "minimum_seconds": 8.35285704699345,
+      "maximum_seconds": 32.67618412896991,
+      "updates": 5,
+      "real_transitions_per_second": 301.272572466716,
+      "imagined_transitions_per_second": 19281.444637869823,
+      "projected_120k_hours_without_evaluation_or_checkpoint": 453.1887261274581
+    },
+    "host_memory_kib": {
+      "MemTotal": 32801616,
+      "MemAvailable": 640668,
+      "SwapTotal": 2097148,
+      "SwapFree": 116
+    },
+    "gpu_utilization": {
+      "mean_pct": 48.285714285714285,
+      "maximum_pct": 100.0,
+      "samples": 56
+    },
+    "interpretation": "Functional checks passed; insufficient host RAM and exhausted swap coincided with a32.68s outlier. Not accepted as steady throughput."
+  }
+}

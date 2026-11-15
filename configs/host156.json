@@ -105,7 +105,7 @@
   "depth_precision": "fp32",
   "compile": true,
   "device": "cuda:0",
-  "depth_cache_gib": 4.0,
+  "depth_cache_gib": 2.0,
   "latent_actor_stop_gradient": false,
   "base_height_target": 0.36,
   "imagination_depth_period": 5
