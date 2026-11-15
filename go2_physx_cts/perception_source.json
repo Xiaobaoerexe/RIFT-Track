@@ -46,6 +46,7 @@
     "Reconstruction of clean collision-mesh optical depth from noisy input",
     "latent loss over every valid control transition",
     "175/125/156 retain predictedlatent->GRU->Actor input derivative;137policy-entry stop-gradient ablation",
-    "teacher geometry without taskID;CTS updates proprioMoE/GRU/fusion only"
+    "teacher geometry without taskID;CTS updates proprioMoE/GRU/fusion only",
+    "Imagined policy observes predicted latent at10Hz with sample-and-hold; WM recurrence/real captures/CTS remain50Hz (user confirmed2026-11-15)"
   ]
 }

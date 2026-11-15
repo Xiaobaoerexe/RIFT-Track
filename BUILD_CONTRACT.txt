@@ -4,7 +4,7 @@ Authorized: replace failed175/125depth projects, add156project, prepare137code-o
 
 Source training invariants:4096x1real,Replay1000,8192x32imagination6144/2048,WM2048x8 with2/4updates,CTS2x160x64+16burn-in,Critic20steps,120000iterations. Execution-only CPU transport/chunking may differ by memory capacity. No reduction of statistical batch or optimizer counts for throughput.
 Height0.36m and corresponding q0 apply to reward,foot regularization,live default stance,diagnostics,physical contract and future official-chain scoring. Retain baseline robot dynamics/PD/limits.
-Camera mount(.101958,0,.327)m confirmed; forward horizontal,50Hz. Full xyz+xyzw pose transform. No self-occlusion renderer. No stale5Hz hold/capture-age conditioning.
+Camera mount(.101958,0,.327)m confirmed; forward horizontal,50Hz. Full xyz+xyzw pose transform. No self-occlusion renderer. WM supervises and recurs at50Hz. Imagined policy visual input refreshes at10Hz (steps0,5,10,...), held without detach between refreshes; proprioception/GRU remain50Hz. Real policy,CTS and fixed diagnostics remain50Hz. No capture-age conditioning.
 Teacher has no taskID;WM has no taskID. Critic uses physical state/reward memory and teacher/student tag, never trainable policy latent. Ten-task/avoidance/recovery/eventTD/rootQ paths are removed.
 
 Task/curriculum

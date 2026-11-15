@@ -81,6 +81,7 @@ class TrainCfg:
     depth_package: str = 'observation/depth_input'
     depth_chunk_size: int = 1024
     depth_period: int = 1
+    imagination_depth_period: int = 5
     depth_cache_gib: float = 26.
     latent_actor_stop_gradient: bool = False
     base_height_target: float = .36
@@ -123,5 +124,7 @@ class TrainCfg:
             raise ValueError('Invalid equivalent imagination partition')
         if self.payload_max_kg != 2. or self.depth_period != 1 or self.base_height_target != .36:
             raise ValueError('AS2 contract requires 0..2kg payload, 50Hz depth and 0.36m height')
+        if self.imagination_depth_period != 5:
+            raise ValueError('Imagined policy visual input refreshes every 5 control steps (10Hz)')
         if self.task_context_dim != 62 or self.depth_cache_gib <= 0:
             raise ValueError('Invalid completion memory or depth cache capacity')

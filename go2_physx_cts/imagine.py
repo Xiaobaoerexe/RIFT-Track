@@ -3,6 +3,8 @@
 A frozen module still passes derivatives to its inputs. Only replay burn-in and
 TD target construction use no_grad. The Instinct ablation detaches predicted
 visual features only at policy entry; physical/latent WM recurrence is retained.
+WM latent dynamics run at 50Hz. The policy reads a held visual feature refreshed
+at steps 0,5,10,... (10Hz); holding a feature does not detach its input gradient.
 """
 import torch
 from .activation import matrix_checkpoint
@@ -71,14 +73,14 @@ class Imagination:
             new=policy.student_encoder.advance_memory(singles[:,j],features[:,j],hidden,sequence['reset'][:,j].reshape(-1).bool())
             hidden=torch.where(sequence['valid'][:,j].reshape(-1,1).bool(),new,hidden)
         return hidden
-    def _core(self,wm,policy,s,pose,a_prev,a_prev2,hist,cmd_state,xi,hidden,context,depth_features,branch,tasks,terrains,iteration):
+    def _core(self,wm,policy,s,pose,a_prev,a_prev2,hist,cmd_state,xi,hidden,context,depth_features,policy_depth_features,branch,tasks,terrains,iteration):
         command=self.commands.command(cmd_state)
         nt=branch[0] if isinstance(branch,tuple) else (len(s) if branch==0 else 0)
         if nt:
             priv=st.privileged(s[:nt],a_prev[:nt],command[:nt],xi[:nt],relief(pose[:nt],self.field))
             height=geometry_crop(s[:nt],pose[:nt],self.field,kind='teacher')
         else:priv=s.new_empty((0,st.PRIV_DIM));height=s.new_empty((0,2,1,1))
-        a,nhidden,_,_=policy.step(hist,priv,branch,depth=None,depth_features=(depth_features.detach() if self.cfg.latent_actor_stop_gradient else depth_features),hidden=hidden,height=height,task_ids=tasks)
+        a,nhidden,_,_=policy.step(hist,priv,branch,depth=None,depth_features=(policy_depth_features.detach() if self.cfg.latent_actor_stop_gradient else policy_depth_features),hidden=hidden,height=height,task_ids=tasks)
         raw,dp,telemetry,next_latent=wm.predict(s,a,a_prev,xi,geometry_crop(s,pose,self.field,kind='world_model'),pose,
             latent=depth_features)
         np=st.apply_pose_delta(pose,dp); ns=st.reconcile_state(raw,np,self.field,self.c.default_q)
@@ -88,9 +90,9 @@ class Imagination:
             context=context,pose0=pose,pose=np,telemetry=telemetry,previous2=a_prev2,
             iteration=iteration,field=self.field,soft=True,variant=self.cfg.variant,base_height_target=self.cfg.base_height_target)
         return ns,np,a,nhidden,ncontext,terms['continuous_reward'],done,next_latent,telemetry['contact_prob']
-    def _step(self,wm,policy,s,pose,a_prev,a_prev2,hist,cmd_state,xi,hidden,context,depth_features,branch,tasks,terrains,iteration,reward_iteration,active):
+    def _step(self,wm,policy,s,pose,a_prev,a_prev2,hist,cmd_state,xi,hidden,context,depth_features,policy_depth_features,branch,tasks,terrains,iteration,reward_iteration,active):
         ns,np,a,nhidden,ncontext,r,done,next_latent,contact=self._core_fn(wm,policy,s,pose,a_prev,a_prev2,hist,cmd_state,xi,
-            hidden,context,depth_features,branch,tasks,terrains,reward_iteration)
+            hidden,context,depth_features,policy_depth_features,branch,tasks,terrains,reward_iteration)
         ncmd=self.commands.advance(cmd_state,np[:,:2],iteration,task_ids=tasks,completed=ncontext[:,3],post_command=ncontext[:,POST_COMMAND])
         nhist=st.push_history(hist,st.frame(ns,a,self.commands.command(ncmd),noise=True))
         def select(new,old): return torch.where(active[:,None],new,old)
@@ -118,11 +120,15 @@ class Imagination:
         active=~episode_time_reached(context[:,ELAPSED],context[:,EPISODE_LIMIT]); valid_start=active.to(s.dtype)
         rewards=[]; soft_done=[]; timeouts=[]; valid=[]; features=[]; bounds=[]; values=[s.new_zeros(b)]
         for t in range(cfg.horizon):
+            # This is a policy observation clock, never the WM recurrence clock.
+            # Start with the real capture; refresh from z_t only every five steps.
+            # Keep the same tensor/graph between refreshes, including its gradients.
+            if t%cfg.imagination_depth_period==0:policy_depth_features=depth_features
             command=self.commands.command(cmd_state)
             priv=st.privileged(s,a_prev,command,xi,relief(pose,self.field))
             features.append(critic.features(priv,branch,tasks,context,pose,contacts))
             valid.append(active);bounds.append(self.value_upper(context,tasks))
-            args=(s,pose,a_prev,a_prev2,hist,cmd_state,xi,hidden,context,depth_features)
+            args=(s,pose,a_prev,a_prev2,hist,cmd_state,xi,hidden,context,depth_features,policy_depth_features)
             # The core owns selective activation storage inside torch.compile.
             # Command/noise/history operations retain their ordinary small graph;
             # a second outer checkpoint would discard the selected expensive work.

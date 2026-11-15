@@ -107,5 +107,6 @@
   "device": "cuda:0",
   "depth_cache_gib": 26.0,
   "latent_actor_stop_gradient": true,
-  "base_height_target": 0.36
+  "base_height_target": 0.36,
+  "imagination_depth_period": 5
 }

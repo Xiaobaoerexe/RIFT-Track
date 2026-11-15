@@ -56,7 +56,7 @@ def subset(data,index):
 
 
 class Learner:
-    schema='as2-perceptive-latent-50hz-v2'
+    schema='as2-perceptive-wm50-policy10-v3'
     def __init__(self,cfg,env,output,driver=None):
         self.cfg,self.env,self.output=cfg,env,Path(output);self.output.mkdir(parents=True,exist_ok=True)
         self.device=cfg.device;torch.manual_seed(cfg.seed)
@@ -105,7 +105,8 @@ class Learner:
             'branch_loss':'teacher_loss.mean() + student_loss.mean()','replay_tensor_bytes':self.buf.storage_bytes,
             'replay_storage_device':str(self.buf.storage_device),'replay_compute_device':str(self.buf.device),
             'depth_cnn_owner':'world_model_reconstruction_only','student_sequence_effective_frames':20480,
-            'init':'cold','external_providers':0,'future_depth':'50Hz WM latent; no imagined rendering','latent_actor_stop_gradient':cfg.latent_actor_stop_gradient},indent=2))
+            'init':'cold','external_providers':0,'future_depth':'50Hz WM latent, 10Hz held policy visual input; no imagined rendering',
+            'imagination_depth_period':cfg.imagination_depth_period,'latent_actor_stop_gradient':cfg.latent_actor_stop_gradient},indent=2))
 
     def refresh_providers(self,before=None):
         before=self.env.snapshot() if before is None else before

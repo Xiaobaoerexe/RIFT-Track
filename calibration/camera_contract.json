@@ -23,5 +23,7 @@
   ],
   "evidence": "user-confirmed inherited model coordinates; not measured AS2 hardware calibration",
   "base_mesh_head_top_z_m": 0.13478276133537292,
-  "camera_above_head_top_m": 0.1922172386646271
+  "camera_above_head_top_m": 0.1922172386646271,
+  "imagination_policy_visual_hz": 10,
+  "wm_latent_recurrence_hz": 50
 }
