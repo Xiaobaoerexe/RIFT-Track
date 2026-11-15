@@ -10,11 +10,12 @@ import time
 import torch
 from . import state as st
 from .commands import CMD_STATE_DIM
+from .task import TASK_CONTEXT_DIM
 
 FLOAT_FIELDS = {
     's':70,'s_next':70,'pose':7,'pose_next':7,'a':12,'a_prev':12,'a_prev2':12,
     'obs':450,'relief':77,'command':3,'command_next':3,'timer':1,'cmd_state':CMD_STATE_DIM,'cmd_state_next':CMD_STATE_DIM,
-    'xi':st.CONTEXT_DIM,'task_context':21,'task_context_next':21,
+    'xi':st.CONTEXT_DIM,'task_context':TASK_CONTEXT_DIM,'task_context_next':TASK_CONTEXT_DIM,
     'contact_prob':14,'next_contact_prob':14,'applied_torque':12,
     'next_applied_torque':12,'foot_velocity':12,'next_foot_velocity':12,
     'joint_acceleration':12,'next_joint_acceleration':12,

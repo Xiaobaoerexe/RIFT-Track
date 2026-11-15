@@ -11,9 +11,9 @@ class RobotProfile:
     velocity_limits: tuple
 
 PROFILES = {
-    # .30 is the prior project's engineering stance target, not an official reward.
+    # User-approved 0.36m stance target; asset dynamics remain pinned to AS2.
     # Fixed foot bodies are mandatory: no Go2 geometry fallback is permitted.
-    'as2': RobotProfile('as2', .4, -.1, .30, None, (24., 24., 16.)),
+    'as2': RobotProfile('as2', .4, -.1, .36, None, (24., 24., 16.)),
 }
 
 def profile(name):

@@ -31,10 +31,10 @@ class TrainCfg:
     actor_microbatch: int = 8192
     actor_hidden: tuple = (512, 256, 128)
     critic_hidden: tuple = (512, 256, 128)
-    actor_experts: int = 1
+    actor_experts: int = 3
     proprio_experts: int = 8
     task_count: int = 1
-    task_context_dim: int = 21
+    task_context_dim: int = 62
     cts_updates: int = 2
     cts_batch: int = 160
     cts_sequence_steps: int = 64
@@ -46,7 +46,6 @@ class TrainCfg:
     critic_minibatches: int = 4
     critic_microbatch: int = 16384
     critic_huber_delta: float = 1.
-    event_batch: int = 2048
     lr: float = 2e-4
     teacher_lr: float = 2e-4
     wm_lr: float = 2e-4
@@ -79,12 +78,14 @@ class TrainCfg:
     reward_calibration: str = ''
     evaluation_interval: int = 5000
     evaluation_python: str = ''
-    depth_package: str = '/home/abc/Documents/go2_supermimic_runtime/depth_input'
-    depth_chunk_size: int = 32
-    depth_period: int = 10
+    depth_package: str = 'observation/depth_input'
+    depth_chunk_size: int = 1024
+    depth_period: int = 1
+    depth_cache_gib: float = 26.
+    latent_actor_stop_gradient: bool = False
+    base_height_target: float = .36
     mixed_precision: bool = True
     depth_precision: str = 'fp32'
-    fast_depth_checkpoint: str = ''
     compile: bool = True
     device: str = 'cuda:0'
 
@@ -103,7 +104,7 @@ class TrainCfg:
             raise ValueError('Only the three AS2 experiments are supported')
         if self.replay_storage not in ('device','cpu'):
             raise ValueError('Replay storage must be device or cpu')
-        expected = (1, 1) if self.variant == 'simple' else (5, 3 if self.variant == 'moe' else 1)
+        expected = (1, 3) if self.variant == 'simple' else (4, 3 if self.variant == 'moe' else 1)
         if (self.task_count, self.actor_experts) != expected:
             raise ValueError('Variant/task/actor mismatch')
         if self.driver_frac or self.driver_policy:
@@ -120,7 +121,7 @@ class TrainCfg:
             raise ValueError('Keep the AS2 five passes / four minibatches')
         if not 0 < self.actor_microbatch <= self.imag_batch or self.teacher_fraction != .75:
             raise ValueError('Invalid equivalent imagination partition')
-        if self.payload_max_kg != 2. or self.depth_period != 10:
-            raise ValueError('AS2 payload and 5Hz visual cadence changed')
-        if production and not self.fast_depth_checkpoint:
-            raise ValueError('A qualified frozen depth generator is required')
+        if self.payload_max_kg != 2. or self.depth_period != 1 or self.base_height_target != .36:
+            raise ValueError('AS2 contract requires 0..2kg payload, 50Hz depth and 0.36m height')
+        if self.task_context_dim != 62 or self.depth_cache_gib <= 0:
+            raise ValueError('Invalid completion memory or depth cache capacity')

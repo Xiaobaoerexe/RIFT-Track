@@ -1,26 +1,13 @@
-ISOLATED AS2 DEPTH CHANGE INVENTORY —2026-11-15
+AS2 REVISION CHANGE INVENTORY —2026-11-15
 
-REPLACED
-1. AS2 robot asset,IdealPD,defaultpose,0..2kgpayload and measuredrewardtelemetry from2061be6.
-2. Go2 FK constants with actual AS2 URDF geometry while retaining fullpose7/delta6.
-3. Ten-task teacherID/actionMoE/largeCritic path with variant1/5/5tasks and1/1/3actionexperts; teacher has noID; Critic simpleAS2MLP or sharedfive-task two-value outputs.
-4. Future rendereddepth with WM-predicted heldcamera latent; shareddepthCNN ownership moved toWMreconstruction; frozen realcapturegenerator/noise retained.
-5. Oldsoftsuccess rewards with exactAS2motion rewards plus optional realhard-event value; permanentcalibration replaces oldGo2numbers.
-6. Ten-task grids/allocation with simpleAS2sampling orfive-task terrain-conditionedgrids; highspeedvxcap8; specialfixedapproach and forwardcompletioncorridor.
-7. Single-stepLRtrials/rollback with actual1000iteration matched-window AS2scheduler.
-8. AS2 terrain allocator retained with events/moe transfers confined to task0; minimum count scaled by eligible population while source matching/10%/2xcap rules remain.
-9. Special-task speedfloor now follows actualepisodebudget/goalgeometry/stability:8s permits.6..1m/s initially; failedcurriculumcannotretractbelowfeasibility. Addedperfect-tracking hard-eventclocktest, explicitlynotphysicsjumpvalidation.
-10. Training manifest/docs rewritten around the actual primarybaseline and explicit adaptations.
+DELETE
+Independent event value,root eventQ,eventTD and event-specific learner/archive;recovery task/reset/reward;avoidance;old5Hzlatent hold/age metadata;learned geometric depth generator in active training;obsolete tests and smoke outputs. Keep required long-term rare-motion replay,which is not an event-value learner.
 
-REMOVED FROM THIS COPY
-Modules:driver.py;robogauge_visualize.py;robogauge_assets.py;robogauge_feedback.py;robogauge_bridge.py;robogauge_export.py;robogauge_source.json;lr_feedback.py;task_allocation.py;allocation_assets.py;allocation_evaluation.py;critic_cache.py;supervise.py;recovery_fixtures.json.
-Obsolete environment metadata:ROBOGAUGE_RUNTIME.json;robogauge.uv.lock.
-Obsolete tests:test_task_transfers.py;test_task_allocation.py;test_rollback_schedule.py;test_loop_overhead.py;test_collection_providers.py;test_allocation_cases.py.
-Removed active geometry/task mechanisms:indoor_obstacles highpillars,old10taskIDs,oldsuccesssigmoid/stableaccumulation,oldGo2rewardcalibration,obsoletehugeCriticgeometrycache.
-No prior physx_depth/blind tree,checkpoint,evidence bundle or server run was deleted by this local cleanup.
+REPLACE
+Four independent scalar task critics on125/175;one scalar motion critic on156.32stepdirect total-reward BPTT+tailvalue. Once-only soft run-length completion with exact physical success counters. Source action penalty caps become differentiable tails.0.36mstance and jointzero;0.3sabrupt width;10percentordinary forcedforward.50Hzreal mesh-ray depth+frozennoise,50HzWMlatent increments,8stepsupervision. Bounded directindexCPUimagecache and host-specificlossless transfer/chunking.137policy-entrylatentdetach variant only.
 
-RETAINED
-Pinned official10terrain mesh/heightfield helpers andlicenses;physicalstate semantics;45x10propriohistory;8proprioexperts;CNN+GRU+Linear/LN studentfusion;AS2rawactionscale;fullpose/depthcapturekeys;productionfast_depth package;immutablecapturecache;selectivematrixcheckpoint;sourceOU/replay/window/archive;necessarynewtests.
+KEEP
+Pinned AS2 dynamics,PD,limits,delay,source terrain recipes;4096env and all source learning counts;1024x3WM;450Dhistory,8proprioexperts,CNN128/GRU256/fusion32;source normalization,OU,rarity/archive and measured-window LR scheduling;fullpose/FK;learned torque/contact/footvelocity telemetry;separate teacher/student fixed diagnostics.
 
-VALIDATION STATUS
-CPU physics/command tests passed before this inventory. Other agents own newlatent/reward/integrationtests and runtimevalidation; no GPUthroughput or learnedcapability is asserted here. Formal launch and transientartifactcleanup are owned by the root task after three-host acceptance.
+SOURCE VS ADAPTATION
+Source pins are in UPSTREAM.json. Four-task rewards and completion surrogate are our approved adaptation,not CTS-MoE original training code or a reproduced DiffDreamer algorithm. This release abandons the failed event-value adaptation. A passed smoke test is not a locomotion result.

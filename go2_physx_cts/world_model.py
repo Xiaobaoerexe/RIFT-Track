@@ -1,4 +1,4 @@
-"""Full-pose physical model plus held-camera latent dynamics.
+"""Full-pose physical model plus every-control-step camera latent dynamics.
 
 No task ID enters dynamics. The 1024x3 backbone is retained; only its interfaces
 grow. Physical telemetry includes the exact AS2 reward measurements. Visual
@@ -11,7 +11,7 @@ from . import state as st
 from .networks import RunningNorm, GeometryEncoder, mlp
 from .terrain import geometry_crop
 from .precision import network_autocast
-from .latent import LATENT_DIM, CAPTURE_CONTEXT_DIM, LatentDecoder, camera_context, camera_refresh, prepare_latent_targets
+from .latent import LATENT_DIM, LatentDecoder, prepare_latent_targets
 
 
 def supervised_loss(model,window,field,default_q,*,depth=None,encoder=None,latent_targets=None):
@@ -33,7 +33,7 @@ class WorldModel(nn.Module):
     contact_dim=14
     telemetry_dim=44  # torque12, feet velocityXYZ12, qacc12, limb log1p(force)8
     latent_dim=LATENT_DIM
-    def __init__(self,hidden=(1024,1024,1024),mixed_precision=True,depth_period=10):
+    def __init__(self,hidden=(1024,1024,1024),mixed_precision=True,depth_period=1):
         super().__init__();self.mixed_precision=mixed_precision;self.depth_period=int(depth_period)
         if self.depth_period<1:raise ValueError('depth_period must be positive')
         self.physical_norm=RunningNorm(st.STATE_DIM+4)
@@ -42,7 +42,7 @@ class WorldModel(nn.Module):
         self.action_encoder=mlp(25,(64,),64);self.context_encoder=mlp(st.CONTEXT_DIM,(32,),32)
         self.geometry_encoder=GeometryEncoder(128,mixed_precision=mixed_precision)
         self.output_dim=st.STATE_DIM+st.POSE_DELTA_DIM
-        self.net=mlp(352+LATENT_DIM+CAPTURE_CONTEXT_DIM,hidden,
+        self.net=mlp(352+LATENT_DIM,hidden,
                      self.output_dim+self.telemetry_dim+self.contact_dim+LATENT_DIM)
         # Instinct initializes predicted increments at zero. Apply that source
         # choice only to the newly added latent rows: the first visual forecast
@@ -58,15 +58,12 @@ class WorldModel(nn.Module):
         self.register_buffer('z_std',torch.ones(LATENT_DIM))
         self.register_buffer('dz_std',torch.ones(LATENT_DIM))
 
-    def _features(self,s,a,a_prev,xi,local_map,pose,latent,frame_index,capture_pose):
+    def _features(self,s,a,a_prev,xi,local_map,pose,latent):
         delayed=torch.cat((a,a_prev,xi[:,3:4]),-1)
         if latent is None:
-            visual=s.new_zeros((len(s),LATENT_DIM+CAPTURE_CONTEXT_DIM))
+            visual=s.new_zeros((len(s),LATENT_DIM))
         else:
-            if frame_index is None or capture_pose is None:
-                raise ValueError('Latent dynamics requires control frame and last capture pose')
-            visual=torch.cat(((latent-self.z_mean)/self.z_std,
-                              camera_context(pose,frame_index,capture_pose,self.depth_period)),-1)
+            visual=(latent-self.z_mean)/self.z_std
         return torch.cat((self.physical_encoder(self.physical_norm(torch.cat((s,pose[:,3:]),-1))),
             self.action_encoder(self.action_norm(delayed)),self.context_encoder(self.context_norm(xi)),
             self.geometry_encoder(local_map),visual),-1)
@@ -90,9 +87,9 @@ class WorldModel(nn.Module):
         rms=((targets.increments.square()*weight).sum((0,1))/count.clamp_min(1)).sqrt().clamp_min(1e-3)
         self.dz_std.lerp_(torch.where(count>0,rms,self.dz_std),rate)
 
-    def predict(self,s,a,a_prev,xi,local_map,pose,latent=None,frame_index=None,capture_pose=None):
+    def predict(self,s,a,a_prev,xi,local_map,pose,latent=None):
         with network_autocast(s,self.mixed_precision):
-            y=self.net(self._features(s,a,a_prev,xi,local_map,pose,latent,frame_index,capture_pose))
+            y=self.net(self._features(s,a,a_prev,xi,local_map,pose,latent))
         y=y.float();end=self.output_dim+self.telemetry_dim
         physical=self.out_norm.unnormalize(y[:,:self.output_dim])
         auxiliary=self.telemetry_norm.unnormalize(y[:,self.output_dim:end])
@@ -105,7 +102,7 @@ class WorldModel(nn.Module):
         next_latent=None
         if latent is not None:
             candidate=latent+y[:,end+self.contact_dim:]*self.dz_std
-            next_latent=torch.where(camera_refresh(frame_index,self.depth_period)[:,None],candidate,latent)
+            next_latent=candidate
         return s+physical[:,:st.STATE_DIM],physical[:,st.STATE_DIM:],telemetry,next_latent
 
     def forward(self,s,a,a_prev,xi,local_map,pose):
@@ -121,8 +118,6 @@ class WorldModel(nn.Module):
         s=w['s'][:,0];pose=w['pose'][:,0]
         scale,aux_scale=scales
         z=None if latent_targets is None else latent_targets.initial
-        capture=None if z is None else w['depth_pose'][:,0]
-        frame=None if z is None else w['frame_index'][:,0].reshape(-1)
         rows={name:[] for name in ('state','pose','contact','telemetry','consistency','velocity_mse','pose_mse','latent')}
         if z is not None:
             weight=latent_targets.refresh.to(s.dtype)[...,None];count=weight.sum().clamp_min(1)
@@ -132,7 +127,7 @@ class WorldModel(nn.Module):
         for j in range(w['a'].shape[1]):
             xi=w['xi'][:,j] if w['xi'].ndim==3 else w['xi']
             raw,dp,telemetry,next_z=self.predict(s,w['a'][:,j],w['a_prev'][:,j],xi,
-                geometry_crop(s,pose,field,kind='world_model'),pose,z,frame,capture)
+                geometry_crop(s,pose,field,kind='world_model'),pose,z)
             next_pose=st.apply_pose_delta(pose,dp)
             ns=st.reconcile_state(raw,next_pose,field,default_q)
             pe=st.pose_delta(w['pose_next'][:,j],next_pose)
@@ -149,10 +144,7 @@ class WorldModel(nn.Module):
                 'pose_mse':pe.square().mean(-1),
                 'latent':latent_error}
             for name,value in terms.items():rows[name].append(value)
-            if z is not None:
-                refresh=camera_refresh(frame,self.depth_period)
-                capture=torch.where(refresh[:,None],next_pose,capture)
-                frame=frame+1;z=next_z
+            if z is not None:z=next_z
             s,pose=ns,next_pose
         return {name:torch.stack(values,1) for name,values in rows.items()}
 
@@ -180,7 +172,7 @@ class WorldModel(nn.Module):
         terms={name:(errors[name]*valid).sum()/den for name in ('state','pose','contact','telemetry','consistency')}
         result=terms['state']+terms['pose']+terms['contact']+terms['telemetry']+.1*terms['consistency']
         if target is not None:
-            # Refresh-only mean avoids counting nine held copies as nine labels.
+            # Every valid control transition has its own current-image label.
             terms['latent']=(errors['latent']*target.refresh).sum()/target.refresh.sum().clamp_min(1)
             reconstruction=self.latent_decoder(encoder(target.reconstruction_noisy))
             terms['reconstruction']=F.l1_loss(reconstruction,target.reconstruction_clean)

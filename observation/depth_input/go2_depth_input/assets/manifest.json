@@ -5,7 +5,7 @@
   "noise_checkpoint": "/home/abc/data2/depth_noise/runs/DEPTH_NOISE_LOCAL_D455_s317_20261031_162934/best_local_calibration.pt",
   "noise_checkpoint_sha256": "a966c6f53a7db39ae4e98fba44663ea9e658b2f7986b4919926bcf2dee116001",
   "noise_step": 100,
-  "weights_sha256": "137f90824abc604c03e19a3f15edc232f168c64bb9d1c47930d48bfe6260d8ae",
+  "weights_sha256": "9e98bb745b34c32f2c782ebc91cd4dc848d0a8659df35fd6bc97ce7fb1ba89e7",
   "defaults": {
     "hole_strength": 2.0,
     "site": "local D455 calibration",
@@ -27,18 +27,17 @@
       0.327
     ],
     "camera_forward": "body forward",
-    "pose_rotation": "world_from_optical; optical right/down/forward",
-    "atlas_shape": [
-      512,
-      512
-    ],
-    "atlas_extent_m": 25.6
+    "pose_rotation": "world_from_optical; optical right/down/forward"
   },
-  "gradient": "weights frozen; first-order pose VJP; hard masks have Concrete/sigmoid straight-through surrogate gradients",
+  "gradient": "real captures are no_grad; future imagined latent carries gradients through WM",
   "runtime": {
     "torch": "2.11.0+cu130",
     "cuda": "13.0",
     "python": "3.12.16"
   },
-  "training_not_modified": true
+  "training_not_modified": true,
+  "geometry_retired": true,
+  "geometry_replacement": "static collision mesh GPU first-hit rays",
+  "source_weights_sha256": "137f90824abc604c03e19a3f15edc232f168c64bb9d1c47930d48bfe6260d8ae",
+  "weights_contents": "noise tensors only, bitwise equal to source noise state_dict"
 }

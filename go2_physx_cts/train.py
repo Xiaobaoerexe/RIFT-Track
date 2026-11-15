@@ -3,7 +3,7 @@ import os
 if 'PYTORCH_ALLOC_CONF' not in os.environ and 'PYTORCH_CUDA_ALLOC_CONF' not in os.environ:
     os.environ['PYTORCH_ALLOC_CONF']='expandable_segments:True'
 os.environ.setdefault('OMNI_KIT_ACCEPT_EULA','YES')
-import argparse,hashlib,importlib,importlib.util,importlib.metadata,json,signal,subprocess,sys,time,runpy
+import argparse,hashlib,importlib,importlib.util,importlib.metadata,json,signal,subprocess,sys,time
 from pathlib import Path
 from .config import TrainCfg
 
@@ -127,14 +127,14 @@ def write_contract(env,cfg,usd,out,sim_cfg,code_commit):
         'context_dim':5,'wm_state_dim':70,'full_pose_dim':7,'wm_pose_delta_dim':6,
         'reward_telemetry_dim':40,'wm_regression_telemetry_dim':44,'wm_contact_dim':14,
         'teacher_map':[2,64,128],'wm_local_map':[2,41,49],'depth_image':[1,48,64],
-        'depth_latent_dim':128,'wm_capture_context_dim':7,'student_history_dim':450,'student_hidden_dim':256,
-        'task_count':cfg.task_count,'value_channels':1 if cfg.variant=='simple' else 2,
+        'depth_latent_dim':128,'wm_capture_context_dim':0,'student_history_dim':450,'student_hidden_dim':256,
+        'task_count':cfg.task_count,'value_channels':1,
         'actor_experts':cfg.actor_experts,'proprio_experts':cfg.proprio_experts,
         'actor_structure':'plain MLP' if cfg.actor_experts==1 else 'dense 3-expert MoE',
         'policy_hz':1/cfg.dt,'physics_hz':1/cfg.physics_dt,'depth_hz':1/(cfg.dt*cfg.depth_period),
         'network_precision':'bf16 mixed' if cfg.mixed_precision else 'fp32',
         'depth_cnn_optimizer':'world_model only, clean-depth reconstruction',
-        'future_imagination':'held depth latent predicted by WM; no future depth-image rendering',
+        'future_imagination':'50Hz depth latent predicted by WM; no future depth-image rendering','height_target_m':cfg.base_height_target,'latent_actor_stop_gradient':cfg.latent_actor_stop_gradient,
         'payload_model':'rigid mass at existing base COM, reset only; inertia unchanged',
         'payload_max_kg':cfg.payload_max_kg,'control_delay':'per-episode 0/1/2 physics substeps',
         'curriculum_clock':'one real vector step per learner iteration',
@@ -161,15 +161,25 @@ def calibrate_reference(env,reference_project,reference_policy,out):
     policy=source_networks.Policy(tuple(ck['cfg']['actor_hidden'])).to(env.device).eval().requires_grad_(False)
     policy.load_state_dict(ck['policy'],strict=True)
     for name,value in ck.get('consts',{}).items():
+        if name=='default_q':continue  # Explicit old-policy/new-environment joint-zero adapter.
         if not torch.allclose(getattr(env.consts,name),value.to(env.device),rtol=1e-5,atol=1e-6):
             raise ValueError('Calibration checkpoint physical constants disagree: '+name)
+    old_q=ck['consts']['default_q'].to(env.device)
+    offset=(old_q-env.consts.default_q)/env.consts.action_scale
+    old_history=torch.zeros(env.num_envs,450,device=env.device)
     @torch.no_grad()
     def action(snapshot):
-        priv=st.privileged(snapshot['s'],snapshot['a_prev'],snapshot['command'],snapshot['xi'],snapshot['relief'])
-        return policy(snapshot['obs'].float(),priv,1)
+        reset=snapshot['frame_index'].reshape(-1)==0
+        old_history[reset]=0
+        state=snapshot['s'].clone();state[:,st.Q]+=env.consts.default_q-old_q
+        previous=torch.where(reset[:,None],torch.zeros_like(snapshot['a_prev']),snapshot['a_prev']-offset)
+        old_history.copy_(st.push_history(old_history,st.frame(state,previous,snapshot['command'],noise=True)))
+        priv=st.privileged(state,previous,snapshot['command'],snapshot['xi'],snapshot['relief'])
+        return policy(old_history,priv,1)+offset
     result=calibrate_as2_reward(env,action,out/'reward_calibration.json',reference_policy,branch='student')
     revision=subprocess.run(['git','-C',str(project),'rev-parse','HEAD'],capture_output=True,text=True,check=True).stdout.strip()
-    result['source'].update(reference_project=str(project),reference_source_commit=revision,
+    result['height_protocol']='h036_rescored_reference_policy_original_joint_zero'
+    result['source'].update(reward_height_target_m=env.cfg.base_height_target,reference_joint_zero=old_q.tolist(),environment_joint_zero=env.consts.default_q.tolist(),joint_zero_adapter='absolute PD joint targets preserved; proprio/history rebuilt at original reference zero',height_capability_claim=False,reference_project=str(project),reference_source_commit=revision,
         source_network_sha256=hashlib.sha256((source/'networks.py').read_bytes()).hexdigest())
     (out/'reward_calibration.json').write_text(json.dumps(result,indent=2,allow_nan=False))
     return result
@@ -183,28 +193,23 @@ def main():
     parser.add_argument('--usd',required=True);parser.add_argument('--resume')
     parser.add_argument('--calibrate-rewards',action='store_true',help='Dedicated mature blind-AS2 reward measurement; builds no WM or depth cache')
     parser.add_argument('--reference-policy');parser.add_argument('--reference-project')
-    parser.add_argument('--validate',action='store_true',help='Run bounded GPU qualification; never enter formal training')
-    parser.add_argument('--validation-start-iteration',type=int,default=1500)
-    parser.add_argument('--validation-prefill',type=int,default=96)
-    parser.add_argument('--validation-wm-warmup',type=int,default=4)
-    parser.add_argument('--validation-warmup-iterations',type=int,default=2)
-    parser.add_argument('--validation-iterations',type=int,default=5)
-    parser.add_argument('--validation-diagnostics-steps',type=int,default=0)
     add_launcher_args(parser);args=parser.parse_args()
     cfg=TrainCfg.from_record(json.loads(Path(args.config).read_text()))
-    if args.validate and args.calibrate_rewards:raise ValueError('Choose validation or calibration, not both')
     if args.calibrate_rewards and (not args.reference_policy or not args.reference_project):
         raise ValueError('Calibration requires --reference-policy and --reference-project')
-    cfg.validate(production=not (args.validate or args.calibrate_rewards))
+    cfg.validate(production=not args.calibrate_rewards)
     if args.calibrate_rewards and cfg.variant!='simple':raise ValueError('Dedicated calibration configuration must be simple')
     root=Path(__file__).resolve().parents[1]
+    for key in ('depth_package','reward_calibration'):
+        value=getattr(cfg,key)
+        if value and not Path(value).is_absolute():setattr(cfg,key,str(root/value))
     version=subprocess.run(['git','-C',str(root),'rev-parse','HEAD'],capture_output=True,text=True)
     commit=version.stdout.strip() if version.returncode==0 else None
     dirty=subprocess.run(['git','-C',str(root),'status','--porcelain'],capture_output=True,text=True)
-    if not (args.validate or args.calibrate_rewards) and (commit is None or dirty.returncode or dirty.stdout.strip()):
+    if not args.calibrate_rewards and (commit is None or dirty.returncode or dirty.stdout.strip()):
         raise RuntimeError('Formal launch requires a clean versioned release')
     if cfg.variant!='simple' and not cfg.reward_calibration:
-        raise ValueError('Events/MoE launch requires the measured mature-AS2 reward budget')
+        raise ValueError('Four-task launch requires the measured mature-AS2 reward budget')
     import torch
     torch.manual_seed(cfg.seed);torch.set_num_threads(8);torch.set_float32_matmul_precision('high')
     if cfg.reward_calibration:
@@ -217,7 +222,7 @@ def main():
         sim=SimulationContext(sim_cfg);env=PhysXEnv(cfg,sim,args.usd)
         write_contract(env,cfg,args.usd,out,sim_cfg,commit)
         identity={'pid':os.getpid(),'started_unix':time.time(),'backend':type(env.robot).__module__,
-            'mode':'calibration' if args.calibrate_rewards else 'validation' if args.validate else 'formal','command':sys.argv,'code_commit':commit,
+            'mode':'calibration' if args.calibrate_rewards else 'formal','command':sys.argv,'code_commit':commit,
             'dirty_worktree':bool(dirty.stdout.strip()),'config_sha256':hashlib.sha256(Path(args.config).read_bytes()).hexdigest()}
         (out/'process.json').write_text(json.dumps(identity,indent=2))
         if args.calibrate_rewards:
@@ -229,13 +234,12 @@ def main():
         if args.resume:learner.load(args.resume,continue_run=True)
         def stop(signum,frame):learner.stop_requested=True
         learner.stop_requested=False;signal.signal(signal.SIGTERM,stop);signal.signal(signal.SIGINT,stop)
-        if args.validate:
-            validate=runpy.run_path(str(root/'tools/validate_training.py'),run_name='as2_validation_tools')['validate_training']
-            report=validate(learner,start_iteration=args.validation_start_iteration,prefill=args.validation_prefill,
-                wm_warmup=args.validation_wm_warmup,warmup_iterations=args.validation_warmup_iterations,
-                iterations=args.validation_iterations,diagnostics_steps=args.validation_diagnostics_steps)
-            print(json.dumps(report,allow_nan=False),flush=True)
-            return
-        learner.run();learner.export(out/'student_latest.pt')
+        from .imagine import ValueRangeStop
+        try:learner.run()
+        except ValueRangeStop:
+            learner.save(out/'value_guard_stop.pt')
+            (out/'value_guard_stop.json').write_text(json.dumps(learner.imag.last_value_guard,indent=2))
+            raise
+        learner.export(out/'student_latest.pt')
 
 if __name__=='__main__':main()

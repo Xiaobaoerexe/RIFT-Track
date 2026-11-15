@@ -2,7 +2,7 @@
 import math
 import torch
 from . import state as st
-from .task import RobotConsts,task_reward,initial_task_context,reward_budget,episode_time_reached,COMPLETED,ELAPSED,EPISODE_LIMIT,RECOVERY_DEADLINE,ROUTE_LENGTH,TASK_CONTEXT_DIM
+from .task import RobotConsts,task_reward,initial_task_context,reward_budget,episode_time_reached,COMPLETED,ELAPSED,EPISODE_LIMIT,ROUTE_LENGTH,TASK_CONTEXT_DIM,POST_COMMAND,PREVIOUS_COMMAND,COMMAND_INITIALIZED
 from .commands import OfficialCommands,TERRAIN_NAMES,TASK_TERRAINS,task_assignments,phase,speed_cap,GRID_BIN
 from .terrain import relief,ground
 
@@ -23,33 +23,6 @@ def materialize_metrics(metrics):
         result.append(item)
     return result
 
-
-def recovery_configuration(n,default_q,limits,device):
-    """Varied feasible joint ranges and side/back/belly/front/rear orientations."""
-    kind=torch.randint(6,(n,),device=device);roll=torch.zeros(n,device=device);pitch=torch.zeros_like(roll)
-    roll=torch.where(kind==0,torch.full_like(roll,math.pi/2),roll);roll=torch.where(kind==1,torch.full_like(roll,-math.pi/2),roll);roll=torch.where(kind==2,torch.full_like(roll,math.pi),roll)
-    pitch=torch.where(kind==4,torch.full_like(pitch,math.pi/3),pitch);pitch=torch.where(kind==5,torch.full_like(pitch,-math.pi/3),pitch)
-    roll+=(torch.rand(n,device=device)-.5)*.35;pitch+=(torch.rand(n,device=device)-.5)*.3;yaw=(torch.rand(n,device=device)*2-1)*math.pi
-    rotations=st.quat_mul(st.rotvec_quat(torch.stack((torch.zeros_like(yaw),torch.zeros_like(yaw),yaw),-1)),st.quat_mul(st.rotvec_quat(torch.stack((torch.zeros_like(pitch),pitch,torch.zeros_like(pitch)),-1)),st.rotvec_quat(torch.stack((roll,torch.zeros_like(roll),torch.zeros_like(roll)),-1))))
-    q=default_q.expand(n,12).clone().reshape(n,4,3)
-    q[:,:,0]+=(torch.rand(n,4,device=device)-.5)*1.1
-    q[:,:,1]=torch.rand(n,4,device=device)*2.1-.1
-    q[:,:,2]=-(.9+torch.rand(n,4,device=device)*1.7)
-    q=q.flatten(1).clamp(limits[:,0]+.04,limits[:,1]-.04)
-    return rotations,q,kind
-
-def clearance_height(position_xy,quaternion,q,field):
-    """Place sampled body/leg collision envelopes above local terrain at reset."""
-    h,k,f=st.forward_kinematics(q);segments=[]
-    # URDF body box corners, foot spheres, link envelopes and head proxy.
-    corners=q.new_tensor([[x,y,z] for x in (-.1,.1) for y in (-.112,.112) for z in (-.064,.076)]).expand(len(q),-1,-1)
-    segments.extend((corners,h,k,f))
-    for alpha in (.25,.5,.75):segments.extend((h*(1-alpha)+k*alpha,k*(1-alpha)+f*alpha))
-    head=q.new_tensor([[.283,0,.078]]).expand(len(q),-1,-1);segments.append(head)
-    body=torch.cat(segments,1);relative=st.quat_apply(quaternion[:,None,:],body)
-    xy=position_xy[:,None,:]+relative[...,:2];surface=ground(xy,field)
-    radius=torch.full_like(surface,.035);radius[:,:8]=.012;radius[:,-1]=.043
-    return (surface+radius-relative[...,2]).amax(-1)+.015
 
 class PhysXEnv:
     def __init__(self,cfg,sim,usd_path):
@@ -72,7 +45,7 @@ class PhysXEnv:
             spawn=su.UsdFileCfg(usd_path=usd_path,activate_contact_sensors=True,
                 rigid_props=PhysxRigidBodyCfg(disable_gravity=False,linear_damping=0.,angular_damping=0.,max_depenetration_velocity=1.),
                 articulation_props=PhysxArticulationCfg(enabled_self_collisions=True,solver_position_iteration_count=4,solver_velocity_iteration_count=0)),
-            init_state=ArticulationCfg.InitialStateCfg(pos=(0,0,self.profile.initial_height),joint_pos={'.*L_hip_joint':self.profile.left_hip,'.*R_hip_joint':-self.profile.left_hip,'.*_thigh_joint':.9,'.*_calf_joint':-1.8},joint_vel={'.*':0.}),soft_joint_pos_limit_factor=.9,
+            init_state=ArticulationCfg.InitialStateCfg(pos=(0,0,self.profile.initial_height),joint_pos={'.*L_hip_joint':self.profile.left_hip,'.*R_hip_joint':-self.profile.left_hip,'.*_thigh_joint':st.DEFAULT_THIGH,'.*_calf_joint':st.DEFAULT_CALF},joint_vel={'.*':0.}),soft_joint_pos_limit_factor=.9,
             actuators={'legs':IdealPDActuatorCfg(joint_names_expr=['.*'],stiffness=mapping(kp),damping=mapping(kd),armature=mapping(inertia),friction=0.,
                 actuator_effort_limit=mapping(effort),actuator_velocity_limit={'.*_hip_joint':24.,'.*_thigh_joint':24.,'.*_calf_joint':16.},joint_velocity_limit={'.*_hip_joint':24.,'.*_thigh_joint':24.,'.*_calf_joint':16.})})
         @configclass
@@ -100,7 +73,7 @@ class PhysXEnv:
         self.task_ids=task_assignments(n,0,dev,cfg.variant);self.terrain_ids=torch.full((n,),7,dtype=torch.long,device=dev);self.terrain_levels=torch.zeros(n,dtype=torch.long,device=dev)
         self.pending_terrain=torch.full((n,),-1,dtype=torch.long,device=dev);self.pending_level=self.pending_terrain.clone()
         self.allocation_target=None
-        self.arena_index=torch.full((n,),-1,dtype=torch.long,device=dev);self.recovery_kind=torch.full_like(self.arena_index,-1)
+        self.arena_index=torch.full((n,),-1,dtype=torch.long,device=dev)
         self.xi=torch.zeros(n,st.CONTEXT_DIM,device=dev);self.xi[:,0]=1.
         self.hist=torch.zeros(n,450,device=dev);self.last=torch.zeros(n,12,device=dev);self.last2=torch.zeros_like(self.last)
         self.steps=torch.zeros(n,dtype=torch.long,device=dev);self.episode=torch.zeros(n,1,dtype=torch.int32,device=dev);self.own_mask=torch.ones(n,dtype=torch.bool,device=dev)
@@ -113,7 +86,7 @@ class PhysXEnv:
         self.command=self.cmd_state[:,3:6];self.timer=self.cmd_state[:,6:7]
         self.task_context=torch.zeros(n,TASK_CONTEXT_DIM,device=dev)
         self.source=torch.zeros(n,dtype=torch.long,device=dev)
-        self.group_sums=torch.zeros(cfg.task_count*2*len(self.terrain_names)*4,21,device=dev)
+        self.group_sums=torch.zeros(4*2*len(self.terrain_names)*4,21,device=dev)
         self.fixed_reset=None
         self._segment_progress=torch.zeros(n,device=dev);self._segment_required=torch.zeros(n,device=dev);self._segment_steps=torch.zeros(n,device=dev);self._segment_yaw=torch.zeros(n,device=dev)
         self._episode_success=torch.zeros(n,dtype=torch.bool,device=dev);self._episode_all_own=torch.ones(n,dtype=torch.bool,device=dev)
@@ -127,22 +100,19 @@ class PhysXEnv:
     def task_id(self,v):
         self.task_ids=v;self.task_assignment_version+=1
     def _assign_terrains(self):
-        for task in range(self.cfg.task_count):
+        for task in range(4):
             ids=(self.task_ids==task).nonzero().flatten();n=len(ids)
             if not n:continue
             if task==0:
                 if self.iteration<2500:self.terrain_ids[ids]=7
                 else:
                     source=self.terrain_lookup.column_types
-                    if self.cfg.variant=='simple' and self.iteration>=5000:
-                        source=torch.cat((source,source.new_tensor([10,10,11,11,12,12])))
                     self.terrain_ids[ids]=source[torch.arange(n,device=self.device)%len(source)]
             else:
                 choices=torch.tensor(TASK_TERRAINS[task],device=self.device)
                 self.terrain_ids[ids]=choices[torch.arange(n,device=self.device)%len(choices)]
         self.terrain_levels=torch.randint(0,6,(self.num_envs,),device=self.device)
         self.terrain_levels[self.terrain_ids>=10]=0
-        self.terrain_levels[self.task_ids==4]=0
         if self.iteration<2500:self.terrain_levels=self.ids%10
     def _ensure_phase(self):
         p=phase(self.iteration)
@@ -150,7 +120,7 @@ class PhysXEnv:
             old_tasks=self.task_ids.clone();old_terrain=self.terrain_ids.clone();old_levels=self.terrain_levels.clone()
             self.task_ids=task_assignments(self.num_envs,self.iteration,self.device,self.cfg.variant);self._phase=p;self._assign_terrains()
             self.task_assignment_version+=1
-            retained=(old_tasks==self.task_ids)&(old_terrain==self.terrain_ids)&(self.task_ids!=4)
+            retained=(old_tasks==self.task_ids)&(old_terrain==self.terrain_ids)
             self.terrain_levels[retained]=old_levels[retained]
             self.reset(self.ids,advance_curriculum=False)
     def _build_placement_tables(self):
@@ -167,7 +137,7 @@ class PhysXEnv:
                 self._arena_count[tid,level]=len(values);self._arena_pool[tid,level,:len(values)]=torch.tensor(values,device=dev)
     def _place_arenas(self,ids):
         terrain=self.scene.terrain;gen=terrain.cfg.terrain_generator;tid=self.terrain_ids[ids];levels=self.terrain_levels[ids]
-        runway=(tid==7)&((self.task_ids[ids]==1)|((self.cfg.variant=='simple')&(self.iteration>=5000)))
+        runway=(tid==7)&(self.task_ids[ids]==1)
         normal=(tid<10)&~runway&(not self.calibration_flat)
         cols=self._column_pool[tid,ids%self._column_count[tid]]
         original=tensor(terrain.terrain_origins)[levels,cols]
@@ -239,10 +209,6 @@ class PhysXEnv:
         if self.fixed_reset is not None:
             pose[:,:2]=self.origins[ids,:2]+self.fixed_reset["jitter"][ids]
             yaw=self.fixed_reset["yaw"][ids];pose[:,3:]=st.rotvec_quat(torch.stack((torch.zeros_like(yaw),torch.zeros_like(yaw),yaw),-1))
-        rec=self.task_ids[ids]==4
-        if bool(rec.any()):
-            quat,rq,kind=recovery_configuration(int(rec.sum()),self.consts.default_q,self.consts.soft_limits,dev);pose[rec,3:]=quat;q[rec]=rq
-            pose[rec,2]=clearance_height(pose[rec,:2],quat,rq,self.field);self.recovery_kind[ids[rec]]=kind
         self.robot.write_root_pose_to_sim_index(root_pose=pose,env_ids=ids);self.robot.write_root_velocity_to_sim_index(root_velocity=torch.zeros(n,6,device=dev),env_ids=ids)
         self.robot.write_joint_position_to_sim_index(position=q,env_ids=ids);self.robot.write_joint_velocity_to_sim_index(velocity=torch.zeros_like(q),env_ids=ids);self.robot.reset(ids);self.sensor.reset(ids)
         self.hist[ids]=0;self.last[ids]=0;self.last2[ids]=0;self.steps[ids]=0;self.episode[ids]+=1;self._episode_success[ids]=False;self._episode_all_own[ids]=True
@@ -253,7 +219,7 @@ class PhysXEnv:
         ep=self._episode_limits(ids);length=torch.full((n,),8.,device=dev)
         custom=self.arena_index[ids]>=0
         if bool(custom.any()):length[custom]=self._arena_lengths[self.arena_index[ids[custom]]]
-        fast=(self.task_ids[ids]==1)|((self.cfg.variant=="simple")&(self.terrain_ids[ids]==7)&(self.iteration>=5000))
+        fast=self.task_ids[ids]==1
         if bool(fast.any()):
             speed=torch.as_tensor(speed_cap(1,self.iteration),device=dev);available=(ep[fast]-1.).clamp_min(.5)
             ramp=torch.minimum(available,speed/2.);travel=ramp.square()+speed*(available-ramp).clamp_min(0.)
@@ -265,7 +231,11 @@ class PhysXEnv:
         goals[:,:2]=torch.where(ordinary[:,None],pose[:,:2]+worlddir*length[:,None]*.7,goals[:,:2])
         goals[:,2]=ground(goals[:,:2],self.field);self.goals[ids]=goals
         stable_seconds=torch.where(self.terrain_ids[ids]==10,.64,.32)
-        self.task_context[ids]=initial_task_context(pose,goals,ep,8.,.8,length,stable_seconds=stable_seconds)
+        self.task_context[ids]=initial_task_context(pose,goals,ep,.8,length,stable_seconds=stable_seconds)
+        self.task_context[ids,PREVIOUS_COMMAND]=self.command[ids]
+        self.task_context[ids,COMMAND_INITIALIZED]=1.
+        post=(torch.rand(n,3,device=dev)*2-1)*torch.tensor([min(2.,speed_cap(0,self.iteration)),min(1.,speed_cap(0,self.iteration)),1.5],device=dev)
+        self.task_context[ids,POST_COMMAND]=post
         initial_state=torch.zeros(n,st.STATE_DIM,device=dev);initial_state[:,st.Q]=q-self.consts.default_q
         initial_state=st.reconcile_state(initial_state,pose,self.field,self.consts.default_q)
         self.hist[ids]=st.push_history(self.hist[ids],st.frame(initial_state,self.last[ids],self.command[ids],noise=True))
@@ -301,7 +271,7 @@ class PhysXEnv:
         self.reset(self.ids,advance_curriculum=False)
     prepare_flat_calibration=place_calibration_flat
     def set_diagnostic_levels(self,level=0):
-        self.terrain_levels.fill_(int(level));self.terrain_levels[self.task_ids==4]=0
+        self.terrain_levels.fill_(int(level))
         self._place_arenas(self.ids);self._snapshot=None
 
     def curriculum_state_dict(self):
@@ -317,7 +287,7 @@ class PhysXEnv:
         self._phase=int(s['phase']);self._terrain_max_levels.copy_(s['max_levels_reached']);self.command_sampler.load_state_dict(s['grid']);self._place_arenas(self.ids)
 
     def allocation_status(self):
-        return {'actual':torch.bincount(self.task_ids,minlength=self.cfg.task_count).tolist(),'target':self.allocation_target,'pending':int((self.pending_terrain>=0).sum())}
+        return {'actual':torch.bincount(self.task_ids,minlength=4).tolist(),'target':self.allocation_target,'pending':int((self.pending_terrain>=0).sum())}
 
     def _apply_terrain_transfers(self,ids):
         # Tasks remain equal; AS2 allocator may only transfer terrain slots.
@@ -351,7 +321,7 @@ class PhysXEnv:
             self.target_ring[self.ring_ptr]=target;delayed=self.target_ring[(self.ring_ptr-self.delay)%3,self.ids];self.ring_ptr=(self.ring_ptr+1)%3
             self.robot.set_joint_position_target_index(target=delayed);self.scene.write_data_to_sim();self.sim.step(render=False);self.scene.update(self.cfg.physics_dt)
         self.steps+=1;after=self._observe();s=after['s']
-        r,terms,context,terminated,success=task_reward(before['s'],s,a,self.last,self.command,self.consts,task_id=self.task_ids,terrain_id=after['terrain_ids'],context=self.task_context,pose0=before['pose'],pose=after['pose'],telemetry=after['telemetry'],previous2=self.last2,history_valid=before['history_valid'],iteration=self.iteration,field=self.field,height_above_crop=after['height_above_crop'],variant=self.cfg.variant)
+        r,terms,context,terminated,success=task_reward(before['s'],s,a,self.last,self.command,self.consts,task_id=self.task_ids,terrain_id=after['terrain_ids'],context=self.task_context,pose0=before['pose'],pose=after['pose'],telemetry=after['telemetry'],previous2=self.last2,history_valid=before['history_valid'],iteration=self.iteration,field=self.field,height_above_crop=after['height_above_crop'],variant=self.cfg.variant,base_height_target=self.cfg.base_height_target)
         self.task_context=context;self._episode_success|=success.bool();timeout=episode_time_reached(context[:,ELAPSED],context[:,EPISODE_LIMIT])
         done=terminated.bool()|timeout
         if not torch.isfinite(s).all():raise FloatingPointError('Nonfinite PhysX state')
@@ -362,13 +332,13 @@ class PhysXEnv:
         scalars=(s[own,0].mean(),(vb[own,:2]-self.command[own,:2]).square().mean().sqrt(),
                  (s[own,9]-self.command[own,2]).square().mean().sqrt(),r[own].mean(),
                  (terminated.bool()&own).sum(),terminated.sum())
-        counts=torch.bincount(self.task_ids[own],minlength=self.cfg.task_count).float();bad=torch.bincount(self.task_ids[own&terminated.bool()],minlength=self.cfg.task_count).float()
+        counts=torch.bincount(self.task_ids[own],minlength=4).float();bad=torch.bincount(self.task_ids[own&terminated.bool()],minlength=4).float()
         rates=bad/counts.clamp_min(1)*60/self.cfg.dt
-        metrics={'_packed':torch.cat((torch.stack([v.double() for v in scalars]),rates.double(),counts.double())).detach(),'_task_count':self.cfg.task_count}
+        metrics={'_packed':torch.cat((torch.stack([v.double() for v in scalars]),rates.double(),counts.double())).detach(),'_task_count':4}
         if not defer_metrics:metrics=materialize_metrics([metrics])[0]
         if not self.evaluation_mode:self._record_training_groups(after,terms,r,terminated)
         self.last2=self.last.clone();self.last=a.clone()
-        if self.command_override is None:self.cmd_state=self.command_sampler.advance(self.cmd_state,after['pose'][:,:2],self.iteration,completed=context[:,COMPLETED])
+        if self.command_override is None:self.cmd_state=self.command_sampler.advance(self.cmd_state,after['pose'][:,:2],self.iteration,completed=context[:,COMPLETED],post_command=context[:,POST_COMMAND])
         self._command_views();self.hist=st.push_history(self.hist,st.frame(s,a,self.command,noise=True))
         after.update(command=self.command.clone(),cmd_state=self.cmd_state.clone(),timer=self.timer.clone(),obs=self.hist.clone(),a_prev=a.clone(),a_prev2=self.last2.clone(),
             event_reward=terms['event_reward'],continuous_reward=terms['continuous_reward'],bootstrap_mask=terms['bootstrap_mask'])
@@ -403,7 +373,7 @@ class PhysXEnv:
         self.group_sums.zero_();return result
 
     def allocation_counts(self):
-        eligible=torch.ones_like(self.task_ids,dtype=torch.bool) if self.cfg.variant=='simple' else self.task_ids==0
+        eligible=self.task_ids==0
         return torch.bincount(self.terrain_ids[eligible],minlength=len(self.terrain_names)).tolist()
 
     def allocation_pending(self):return bool((self.pending_terrain>=0).any())
@@ -416,7 +386,7 @@ class PhysXEnv:
             raise ValueError('Terrain allocation must conserve its eligible subgroup')
         if self.cfg.variant!='simple' and any(target[t] for t in range(10,len(target))):
             raise ValueError('Event task0 allocation cannot acquire special terrains')
-        eligible=torch.ones_like(self.task_ids,dtype=torch.bool) if self.cfg.variant=='simple' else self.task_ids==0
+        eligible=self.task_ids==0
         pool=[]
         for terrain,(a,b) in enumerate(zip(current,target)):
             if a>b:

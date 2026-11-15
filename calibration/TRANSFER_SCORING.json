@@ -1,0 +1,24 @@
+{
+  "schema": "as2_h036_transfer_scoring_v1",
+  "target_base_height_m": 0.36,
+  "minimum_supported_height_m": 0.28,
+  "height_measurement": "base_link height over the same local-ground crop as training",
+  "height_error": "abs(actual_height_m-0.36)",
+  "default_joint_positions_canonical": [
+    -0.1,
+    0.708360615872145,
+    -1.41672123174429,
+    0.1,
+    0.708360615872145,
+    -1.41672123174429,
+    -0.1,
+    0.708360615872145,
+    -1.41672123174429,
+    0.1,
+    0.708360615872145,
+    -1.41672123174429
+  ],
+  "camera_contract": "camera_contract.json",
+  "official_visual_chain_verified": false,
+  "scope": "Scoring/adapter contract; does not claim an implemented or tested MuJoCo visual adapter."
+}

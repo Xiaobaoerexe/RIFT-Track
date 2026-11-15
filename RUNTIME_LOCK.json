@@ -1,0 +1,123 @@
+{
+  "date": "2026-11-15",
+  "isaaclab_source_comparison": {
+    "isaaclab": {
+      "reference_files": 606,
+      "shared_files": 606,
+      "shared_modified": [],
+      "reference_sha256": "26eb74e5187eaf17aba6989825e209178e318b01c3cfb9bb275367d181c3c722",
+      "extras_on156": 1095
+    },
+    "isaaclab_physx": {
+      "reference_files": 115,
+      "shared_files": 115,
+      "shared_modified": [],
+      "reference_sha256": "c0a3f34741a6d61a47a3980e654ddaad027d9cb92b0f412576d38e6c345e4350",
+      "extras_on156": 0
+    },
+    "isaaclab_tasks": {
+      "reference_files": 758,
+      "shared_files": 758,
+      "shared_modified": [],
+      "reference_sha256": "808e87bab7a925a3b082c218cab1d804b242be824770b7e822a4eee70ec0059b",
+      "extras_on156": 0
+    },
+    "isaaclab_rl": {
+      "reference_files": 59,
+      "shared_files": 59,
+      "shared_modified": [],
+      "reference_sha256": "94a09bcf9521dbe649f9cb0b64514c3ad801b9bf1697e68c06661fa949ffbf6d",
+      "extras_on156": 0
+    }
+  },
+  "runtime": {
+    "175": {
+      "versions": {
+        "python": "3.12.16 (main, Oct 26 2026, 14:08:45) [Clang 23.1.3 ]",
+        "python_executable": "/home/abc/Documents/go2_supermimic_runtime/physx/bin/python",
+        "isaacsim": "6.2.0.0",
+        "isaaclab": "28.0.0",
+        "torch": "2.11.0+cu130",
+        "numpy": "2.5.1",
+        "warp-lang": "1.17.0",
+        "trimesh": "4.11.1"
+      },
+      "cuda": {
+        "name": "NVIDIA GeForce RTX 4090",
+        "total_memory_bytes": 50857050112,
+        "capability": [
+          8,
+          9
+        ],
+        "allocator": "expandable_segments:True"
+      },
+      "loaded_contract_checks": {
+        "armature": true,
+        "actuator_stiffness": true,
+        "actuator_damping": true,
+        "nominal_mass_17_64kg": true
+      },
+      "usd_sha256": "b0f287f97ff8b28cfb74884dbcbb9122e51b931541b2d6c2f0ec1138e73b3b91",
+      "actuator_reader": "isaaclab.actuators.newton.read_group_parameter: live controller storage; physics is PhysX"
+    },
+    "125": {
+      "versions": {
+        "python": "3.12.16 (main, Oct 26 2026, 14:08:45) [Clang 23.1.3 ]",
+        "python_executable": "/home/abc/Documents/go2_supermimic_runtime/physx/bin/python",
+        "isaacsim": "6.2.0.0",
+        "isaaclab": "28.0.0",
+        "torch": "2.11.0+cu130",
+        "numpy": "2.5.1",
+        "warp-lang": "1.17.0",
+        "trimesh": "4.11.1"
+      },
+      "cuda": {
+        "name": "NVIDIA GeForce RTX 4090",
+        "total_memory_bytes": 25243287552,
+        "capability": [
+          8,
+          9
+        ],
+        "allocator": "expandable_segments:True"
+      },
+      "loaded_contract_checks": {
+        "armature": true,
+        "actuator_stiffness": true,
+        "actuator_damping": true,
+        "nominal_mass_17_64kg": true
+      },
+      "usd_sha256": "b0f287f97ff8b28cfb74884dbcbb9122e51b931541b2d6c2f0ec1138e73b3b91",
+      "actuator_reader": "isaaclab.actuators.newton.read_group_parameter: live controller storage; physics is PhysX"
+    },
+    "156": {
+      "versions": {
+        "python": "3.12.15 | packaged by Anaconda, Inc. | (main, Oct  1 2026, 20:20:25) [GCC 14.3.0]",
+        "python_executable": "/home/abc/miniconda3/envs/sim6/bin/python",
+        "isaacsim": "6.2.0.0",
+        "isaaclab": "3.0.0",
+        "torch": "2.11.0+cu130",
+        "numpy": "2.3.1",
+        "warp-lang": "1.17.0",
+        "trimesh": "4.11.1"
+      },
+      "cuda": {
+        "name": "NVIDIA GeForce RTX 4090",
+        "total_memory_bytes": 25250627584,
+        "capability": [
+          8,
+          9
+        ],
+        "allocator": "expandable_segments:True"
+      },
+      "loaded_contract_checks": {
+        "armature": true,
+        "actuator_stiffness": true,
+        "actuator_damping": true,
+        "nominal_mass_17_64kg": true
+      },
+      "usd_sha256": "b0f287f97ff8b28cfb74884dbcbb9122e51b931541b2d6c2f0ec1138e73b3b91",
+      "actuator_reader": "isaaclab.actuators.newton.read_group_parameter: live controller storage; physics is PhysX"
+    }
+  },
+  "packaging_difference": "156isaaclab distribution label3.0.0 vs175/125label28.0.0; reference core606/PhysX115files all match. Assets init has installation-specific data lookup. No metadata spoofing or unnecessary reinstall."
+}

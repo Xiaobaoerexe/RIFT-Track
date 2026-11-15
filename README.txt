@@ -1,42 +1,37 @@
-AS2 Depth CTS / SuperMimic-style learned physical and visual-latent imagination
+AS2 Depth CTS / SuperMimic-style physical and visual-latent imagination
 
-Three controlled experiments share one implementation, selected by cfg.variant:
-137, ~/Documents, 48GB: simple — plain Actor, one motion reward/value, no velocity grid or success reward.
-125, ~/motion_control, 24GB: events — same Actor, five task rewards, velocity grids and hard-event value learning.
-175, ~/Admin, 48GB: moe — events configuration plus three dense action experts.
+2026-11-15 revision. Four configurations share one implementation:
+175: variant=moe, three dense action experts, four independent task critics.
+125: variant=events (historical config name only), plain Actor, four task critics.
+156: variant=simple, three dense experts, one reward and one critic.
+137: code-only copy of175, latent_actor_stop_gradient=true; do not launch or overwrite the existing137 experiment.
+No variant contains a separate event-value channel or root event-Q objective.
 
-The engineering baseline is the actual137 AS2 blind source2061be6b0d592afe9e81223206cf5f864e45b9f4.
-UPSTREAM.json records pinned external references and what is adapted. Original blind/depth projects and historical evidence are outside this isolated tree and are not deleted.
+Primary baseline: AS2 blind2061be6b0d592afe9e81223206cf5f864e45b9f4. UPSTREAM.json fixes source versions and distinguishes adaptation from source facts.
 
-Common training contract
-Isaac Sim/PhysX; AS2 USD and IdealPD; raw12-joint actions with scale.3125 and no tanh.
-4096 real environments, one real step per iteration, Replay1000 steps/environment.
-8192 imagined trajectories=6144 teacher+2048 student, horizon32, exact teacher mean+student mean Actor objective.
-WM1024x3, batch2048, autoregressive8 steps; two updates before2500, four afterwards.
-AS2 Critic fitting: five passes/four minibatches; execution microbatches do not change sample membership or optimizer steps.
-Visual CTS:2x160 sequences,64 loss steps+16 burn-in, equivalent20480 supervised frames/iteration; adaptation from blind20x1024 independent histories, not a claim of identical temporal learning.
-120000 iterations, no6/8-hour cap. Actual GPU memory/throughput must be measured separately on each host before starting.
+Shared training
+Isaac Sim/PhysX, AS2 USD, IdealPD, raw12-joint action, no tanh. Target height0.36m; default thigh0.708360615872145, calf-1.41672123174429, mirrored hips+/-0.1. Initial release height0.4m. Load0..2kg per episode.
+4096 environments,1real step/iteration,1000Replay steps/environment.8192x32 imagined transitions:6144teacher+2048student; objective=teacher mean+student mean. Execution microbatches preserve these denominators and one Actor optimizer step.
+WM1024x3,2048x8 autoregressive windows,2updates before2500 and4after. Critic5passes x4minibatches=20optimizer steps total, not20per task. CTS2x160x64 supervised times with16stepburn-in;20480valid supervised frames/iteration.
+120000iterations. AS2 bounded measured-window learning-rate schedule retained; no PPO KL or one-step candidate selection.
 
-Perception and ownership
-Teacher sees proprioceptive privileged input and a forward height map; no taskID input.
-Student keeps8-expert proprioception MoE450->32, depth CNN128, GRU256, Linear+LayerNorm fusion32.
-Depth CNN has one optimizer owner: world-model reconstruction. Student MoE/GRU/fusion receive latent+action distillation only.
-Teacher+shared Actor share one Adam; world model+depth CNN share one Adam; student remainder and Critic each have their own Adam.
-Frozen depth/noise models generate held5Hz captures. Imagination starts from an encoded actual capture, then WM predicts128-D latent changes at capture refresh steps. It does not render future depth or reuse future real images.
-WM predicts physical state/complete pose, contacts and actual AS2 reward telemetry; it never consumes a hidden taskID.
+Scenes and rewards
+After5000:2458ordinary tracking,328fast running,327abrupt turning,983crossing (328gap/328up/327down). Before2500flat only;2500..5000original terrain recipe. Recovery and avoidance are absent.
+For156 these are sampling categories, not hidden policy tasks: one motion reward and one critic; no success reward or velocity grid. All three share20sordinary/8scrossing episode durations;156reads the calibration file only for this shared timing and geometry, not event rewards.125/175 use four task rewards and per-task/per-terrain grids.
+Ordinary tracking forced-pure-forward probability0.10; retain source standing/turning sampling. Abrupt commands change every1s; tracking width relaxes for0.3s proportional to command change, then returns to the original kernel. Crossing height coefficient-1.
+Crossing success: hard stable16ticks for up/down and32ticks for gap; once-only bonus, then continue3D motion. Pre-success pure-forward feasible approach commands; target corridor has no upper-forward boundary. Soft imagined completion is a run-length mass recurrence, bounded at1. It is a project surrogate, not a physical probability calibration.
+Actor uses32steps differentiable total reward plus terminal total future value. Four critics have independent MLPs/normalizers and no policy latent input. Termination removes continuation; ordinary time limits bootstrap; crossing finite deadlines do not.
+Value guard checks the reward upper bound before the Actor optimizer step; saves a stopped checkpoint on violation. No value clipping or automatic resume disguises a violation.
 
-Reward/value split
-simple uses exactly the fifteen AS2 motion terms, including its high-speed tracking-width blend and3k coefficient ramp. No success bonus is inserted.
-events/moe preserve continuous long-term value and add a task-conditioned hard-event channel in the same Critic trunk. Actor combines continuous32-step BPTT+tail value with one root afterstate event value; it does not sum repeated success values along all32 steps.
-Special approach commands start at0.6–1.0m/s for the8s deadline; the lowerbound is derived from the longestgap approach plus stability/startup time. Grid downgrades cannot make successful completion kinematically impossible.
-Hard success/failure labels come from pre-reset PhysX transitions. No sigmoid-product completion, soft stable timer or soft cumulative success remains.
-New event bonuses require complete-episode mature-AS2 policy calibration. Existing Go2 calibration numbers are invalid.
+Perception and gradient ownership
+Camera50Hz,48x64 metric optical depth,.1..6m. Mount relative to base_link=(.101958,0,.327)m, horizontal forward, nominal87x58degFOV; user confirmed2026-11-15. These are model coordinates, not measured AS2 hardware calibration.
+Real depth: GPU first-hit rays against the exact static terrain collision mesh, followed by the frozen supplied keyed noise model. No learned geometry generator or imagined future image renderer remains in the active training path. Robot self-occlusion is excluded; the fixed AS2 head mesh lies below this camera field of view.
+Every control step WM predicts next128Dvisual latent, with8step supervision. Real immutable cleanFP16images may be CPU-cached; latent targets are re-encoded by the current CNN. Old cached images never substitute for future imagined observations.
+Teacher takes privileged state and forward height map, no taskID. Student retains8expert proprioMoE450->32, depthCNN128,GRU256,fusionLinear+LayerNorm32.
+Teacher+Actor share Adam. WM+CNN+reconstruction decoder share Adam. Student proprioMoE/GRU/fusion have the CTS optimizer. Critic has its own optimizer. Actor optimization freezes WM/Critic/student parameters while preserving their input derivatives.
+137only: predicted latent is detached at student policy entry. WM latent recurrence and action->physical-reward derivatives remain connected. This is the sole intended algorithm difference from175.
 
-Run interface
-python -m go2_physx_cts.train --config <resolved-json> --output <run-directory> --usd <assets/as2/as2.usd>
-Use the runtime/version validation and complete-update GPU test implemented by tools/validate_training.py before formal runs. Host launch paths, checkpoint/depth hashes and measured throughput belong in each run manifest.
-No valid new-model MuJoCo/real-robot claim is made here. Obsolete Go2 RoboGauge adapters were removed; native fixed-condition PhysX diagnosis remains separate from curriculum statistics.
-
-Verification
-python -m unittest discover -s tests
-CPU invariants establish execution/algebra only. Loaded USD/PhysX parameter readback, full Actor backward, complete sustained updates and GPU memory/time acceptance remain required before launch.
+Run
+python -m go2_physx_cts.train --config <host-json> --output <run-directory> --usd <assets/as2/as2.usd>
+Each run records actual loaded physics, resolved config, code commit, depth weights and runtime dependencies. See RELEASE_ACCEPTANCE.json for measured release evidence when populated.
+No new locomotion capability or official MuJoCo visual-chain success is claimed by a smoke test. Fixed teacher/student native tests remain distinct from curriculum statistics. TRANSFER_ADAPTATION.txt defines the0.36m transfer/scoring contract and remaining integration boundary.

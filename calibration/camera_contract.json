@@ -1,0 +1,27 @@
+{
+  "confirmed_date": "2026-11-15",
+  "parent_frame": "base_link",
+  "axes": "x_forward_y_left_z_up",
+  "optical_center_m": [
+    0.101958,
+    0.0,
+    0.327
+  ],
+  "direction": "horizontal_forward",
+  "nominal_fov_degrees": [
+    87,
+    58
+  ],
+  "depth_hz": 50,
+  "optical_depth_range_m": [
+    0.1,
+    6.0
+  ],
+  "image_hw": [
+    48,
+    64
+  ],
+  "evidence": "user-confirmed inherited model coordinates; not measured AS2 hardware calibration",
+  "base_mesh_head_top_z_m": 0.13478276133537292,
+  "camera_above_head_top_m": 0.1922172386646271
+}

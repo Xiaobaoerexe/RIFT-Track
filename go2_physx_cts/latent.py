@@ -1,9 +1,9 @@
-"""Held camera-latent supervision, adapted from InstinctMJ's latent rollout.
+"""Every-control-step camera-latent supervision, adapted from InstinctMJ's latent rollout.
 
 Reference: project-instinct/InstinctMJ@03563ee02665f327425106372264070315673748,
 rl/supermimic/{runner,networks}.py (CC BY-NC 4.0; see licenses/).
-Our 5 Hz camera/50 Hz controller differs from its camera-every-step setup.
-The latent denotes the last captured image; only a real refresh is supervised.
+50 Hz camera and controller; eight autoregressive supervised transitions.
+The latent denotes the current image; every valid transition is supervised.
 No permanently cached trainable feature, target encoder, or imagined renderer.
 """
 from dataclasses import dataclass
@@ -11,27 +11,9 @@ import torch
 from torch import nn
 from . import state as st
 from .precision import network_autocast
+from .sequence_execution import batched_apply
 
 LATENT_DIM = 128
-CAPTURE_CONTEXT_DIM = 7
-
-
-def camera_context(pose, frame_index, capture_pose, period=10):
-    """Capture-frame displacement/rotation plus normalized capture age.
-
-    All geometric derivatives are retained. Quaternion relative orientation uses
-    the same full-pose algebra as the physical model, not only yaw.
-    """
-    phase = frame_index.reshape(-1).remainder(period).to(pose.dtype) / period
-    displacement = st.quat_inverse(capture_pose[:, 3:], pose[:, :3]-capture_pose[:, :3])
-    rotation = st.quat_rotvec(st.quat_mul(st.quat_conjugate(capture_pose[:, 3:]), pose[:, 3:]))
-    return torch.cat((phase[:, None], displacement, rotation), -1)
-
-
-def camera_refresh(frame_index, period=10):
-    return (frame_index.reshape(-1).long()+1).remainder(period) == 0
-
-
 class LatentDecoder(nn.Module):
     """Training-only 128-vector to clean normalized 48x64 depth reconstruction."""
     def __init__(self, latent_dim=LATENT_DIM, mixed_precision=True):
@@ -59,7 +41,7 @@ class LatentTargets:
 
 
 @torch.no_grad()
-def prepare_latent_targets(window, depth, encoder, period=10, reconstruction_images=512):
+def prepare_latent_targets(window, depth, encoder, period=1, reconstruction_images=512):
     """Re-encode immutable real captures with the current CNN, outside BPTT.
 
     Terminal targets use pose_next/frame+1 before reset, never the next episode.
@@ -79,8 +61,8 @@ def prepare_latent_targets(window, depth, encoder, period=10, reconstruction_ima
     cap_scene=sequence('depth_scene_ids')[:,0,0].long()
     cap_frame=sequence('depth_frame_index')[:,0,0].long()
     first=depth.captured(cap_pose,cap_scene,cap_frame,episode[:,0],trajectory[:,0])
-    initial=encoder(first).float()
-    refresh=camera_refresh(frame.flatten(),period).reshape(batch,steps)&w['valid'].reshape(batch,steps).bool()
+    initial=batched_apply(encoder,first).float()
+    refresh=w['valid'].reshape(batch,steps).bool()
     rows,cols=refresh.nonzero(as_tuple=True)
     targets=initial.new_zeros((batch,steps,LATENT_DIM))
     if len(rows):
@@ -89,7 +71,7 @@ def prepare_latent_targets(window, depth, encoder, period=10, reconstruction_ima
         next_frame=frame[rows,cols]+1
         noisy=depth.captured(next_pose,next_scene,next_frame,episode[rows,cols],trajectory[rows,cols])
         # Frozen image cache is FP16; captured() defines the canonical quantization.
-        targets[rows,cols]=encoder(noisy).float()
+        targets[rows,cols]=batched_apply(encoder,noisy).float()
         nr=min(reconstruction_images,len(rows))
         take=torch.randperm(len(rows),device=rows.device)[:nr]
         _,clean=depth.paired(next_pose[take],next_scene[take],next_frame[take],episode[rows[take],cols[take]],trajectory[rows[take],cols[take]])

@@ -25,7 +25,7 @@ def _box(x0,x1,y0,y1,z0,z1):
 
 def additional_arenas(bounds,seed,episode_seconds=20.,task_episode_seconds=None):
     meshes=[];arenas=[];base_x=float(bounds[1,0])+4.
-    durations=[20.]*5 if task_episode_seconds is None else task_episode_seconds
+    durations=[20.,20.,20.,8.] if task_episode_seconds is None else task_episode_seconds
     column_span=12.+2.*durations[3]+7.
     def add(kind,level,layout,x,y,length,width,parts,spawn,goal):
         offset=np.array([x,y,0.]);world=[]
@@ -115,7 +115,7 @@ class TerrainPositionLookup:
 def terrain_level_decisions(maximum_distance,accumulated_commands,resampling_time,
                             zero_command_probability,tile_length=9.,sub_terrain_border_width=.5,
                             *,success=None,task_ids=None):
-    """Pinned AS2 progress rules; special tasks use success, recovery stays fixed."""
+    """Pinned AS2 progress rules; crossing tasks use hard success."""
     length=torch.as_tensor(tile_length,device=maximum_distance.device,dtype=maximum_distance.dtype)-2.*sub_terrain_border_width
     up=maximum_distance>length.clamp_min(0.)/2.
     target=accumulated_commands.norm(dim=1)*resampling_time*(1.-zero_command_probability)
@@ -123,7 +123,6 @@ def terrain_level_decisions(maximum_distance,accumulated_commands,resampling_tim
     if task_ids is not None:
         if success is not None:
             up=torch.where(task_ids==3,success.bool(),up);down=torch.where(task_ids==3,~success.bool(),down)
-        up&=task_ids!=4;down&=task_ids!=4
     return up,down
 
 @wp.kernel

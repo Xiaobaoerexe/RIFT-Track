@@ -22,8 +22,8 @@ def build_budget(episodes, source):
     if bonus <= 0:
         raise RuntimeError('Measured AS2 return cannot support an 8 s task and positive success bonus')
     tasks = []
-    for task_id in range(5):
-        special = task_id >= 3
+    for task_id in range(4):
+        special = task_id == 3
         length = event_seconds if special else 20.
         tasks.append({'task_id':task_id, 'episode_seconds':length,
             'base_positive_rate_bound':positive_rate,
@@ -31,16 +31,15 @@ def build_budget(episodes, source):
             'success_bonus':bonus if special else 0.,
             'unfinished_rate':.002*ref if special else 0.})
     values = torch.tensor([row['net_return'] for row in complete], dtype=torch.float64)
-    result = {'schema':'as2_depth_event_budget_v1', 'robot':'as2',
+    result = {'schema':'as2_depth_crossing_budget_v2', 'robot':'as2',
         'reference_net_max':ref, 'positive_cap':cap, 'failure_penalty':.1*ref,
         'source':source, 'qualified_episodes':len(complete), 'total_episodes':len(episodes),
         'reference_statistics':{'mean':float(values.mean()), 'median':float(values.median()),
             'min':float(values.min()), 'max':float(values.max())},
         'tasks':tasks, 'episodes':episodes,
         'accounting':('AS2 continuous coefficients unchanged; rate rewards multiply dt=.02. '
-            'Hard success and failure bonuses occur once. Positive cap applies to event tasks 3/4; '
-            'ordinary AS2 tasks keep their original 20 s horizon. Recovery shaping <=1.5/s before '
-            'completion, tracking <=3/s after completion, so 3/s bounds their real positive total.'),
+            'Hard success and failure bonuses occur once. Positive cap applies to crossing task 3; '
+            'ordinary AS2 tasks keep their original 20 s horizon. Tracking <=3/s before and after completion.'),
         'design_status':'Measured scale plus explicitly chosen event coefficients; not AS2 upstream reward facts'}
     configure_reward_budget(result)
     return result

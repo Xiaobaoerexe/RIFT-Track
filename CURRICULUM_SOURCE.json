@@ -1,5 +1,5 @@
 {
-  "schema": "as2-perceptive-curriculum-v1",
+  "schema": "as2-perceptive-curriculum-v2",
   "baseline_commit": "2061be6b0d592afe9e81223206cf5f864e45b9f4",
   "terrain_names": [
     "wave",
@@ -38,37 +38,27 @@
     },
     {
       "from": 5000,
-      "variant": "simple",
-      "tasks": [
-        0
-      ],
-      "terrains": "original20sourcecolumns plus2slots each gap/up/down"
-    },
-    {
-      "from": 5000,
-      "variant": "events/moe",
-      "tasks": [
+      "variants": "all",
+      "sampling_categories": [
         0,
         1,
         2,
-        3,
-        4
+        3
       ],
       "counts_4096": [
-        820,
-        819,
-        819,
-        819,
-        819
-      ]
+        2458,
+        328,
+        327,
+        983
+      ],
+      "note": "categories become separate reward/value tasks only on125/175/137;156has one reward/value"
     }
   ],
   "tasks": {
     "0": "velocity tracking on original ten terrains",
     "1": "flat forward running",
     "2": "flat rapid command changes",
-    "3": "gap/up/down, once-only hard completion then continuing motion",
-    "4": "flat fallen-pose recovery"
+    "3": "gap/up/down, once-only hard completion then continuing motion"
   },
   "positive_vx_hard_caps": {
     "0": 0.5,
@@ -97,9 +87,8 @@
     "ordinary_measure": "actual signed command-direction displacement / integrated requested displacement",
     "special_measure": "hard episode success attributed to initial approach bin and assigned special terrain",
     "own_data_only": true,
-    "recovery_excluded": true,
-    "pure_vx_fraction_min": 0.3,
-    "empty_cells": "hold"
+    "empty_cells": "hold",
+    "ordinary_forced_pure_vx_fraction": 0.1
   },
   "special_command": "Hold pure positivevx within an attempt; dynamically deadline-aware lowerbound; initialrange[.6,1.] at8s; maximum2m/s; resample ordinary3D immediately after hard completion.",
   "rapid_turn_command_period_seconds": 1.0,
@@ -112,8 +101,7 @@
     ],
     "upgrade": "maximum displacement > half effective tile length",
     "downgrade": "maximum displacement < half requested source command distance and not upgrading",
-    "special_events": "hard success/failure upgrades/downgrades",
-    "recovery": "flat fixed level0"
+    "special_events": "hard success/failure upgrades/downgrades"
   },
   "geometry": {
     "gap": {
@@ -143,8 +131,8 @@
     "max_good_drop_lt": 0.1,
     "transfer_fraction": 0.1,
     "maximum": "2*initial terrain allocation",
-    "minimum": "round(200*eligible_environment_count/4096), capped by initial allocation; 200 forsimple,40 for820-env task0",
-    "simple_eligible": "all13 terrains/all environments",
+    "minimum": "round(200*2458/4096), capped by initial per-terrain allocation",
+    "simple_eligible": "ordinary tracking cohort only; preserve60/8/8/24scenario ratio",
     "events_moe_eligible": "task0 original10 terrains only; zero-base special terrains remainzero; other task counts unchanged"
   },
   "special_command_reachability": {
@@ -187,5 +175,11 @@
       "success_bonus_count_each": 1
     },
     "evidence_boundary": "Geometry/clock feasibility under idealtracking and stable support; does not establish realphysics jumping capability."
-  }
+  },
+  "shared_episode_seconds": {
+    "ordinary_running_turning": 20.0,
+    "crossing_scenarios": 8.0
+  },
+  "simple_reward": "Same episode geometry/timing for controlled comparison; motion reward only, no completion bonus, ordinary truncation bootstrap",
+  "rapid_turn_tracking_width_seconds": 0.3
 }

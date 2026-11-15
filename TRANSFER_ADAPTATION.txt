@@ -3,21 +3,23 @@ AS2 DEPTH TRANSFER STATUS AND REQUIRED ADAPTATION
 Current acceptance scope
 - The new three variants use native Isaac Sim / PhysX fixed cohorts and read back loaded AS2 physics.
 - No active old Go2 visual MuJoCo bridge, ten-task evaluator or cache is reused.
-- The successful blind AS2 transfer is historical reference evidence. It does not verify the new depth CNN, GRU, 5 Hz camera or imagined latent model.
+- The successful blind AS2 transfer is historical reference evidence. It does not verify the new depth CNN, GRU, 50 Hz camera or imagined latent model.
 - The historical official-chain runtime used MuJoCo 3.2.3, RoboGauge 1.1.9, Torch 2.4.1+cu124 and NumPy 1.26.4. A later AS2 visual integration must pin its own compatible source and dependency lock; never run the old <3.3 contract under MuJoCo 3.12 silently.
 
 Required controlled AS2 visual adapter, before claiming sim2sim acceptance
 1. Reuse the authoritative AS2 XML, fixed-foot inertias and official RoboGauge stepping/control path from the verified blind AS2 project, with exact source commit and asset hashes. Recheck loaded mass/COM/inertia, friction, collision/foot geometry, armature, joint and actuator limits, PD, initial q, 0.3125 action scaling, delay and solver timing against physics_contract.json.
 2. Preserve canonical FL/FR/RL/RR joint order, quaternion/frame conventions, IMU and body velocity semantics, 450-dimensional term-major history and all normalizers.
-3. Add only the visual/recurrent ABI: depth [B,1,48,64] in metric optical depth, 5 Hz capture / 50 Hz control hold, original fixed body mount, sensor noise keys, GRU memory [B,256], explicit reset. Images must correspond to the actual MuJoCo camera pose and terrain.
-4. The deployed student uses the shared CNN, proprio MoE, GRU, fusion and Actor. It does not use the training WM to hallucinate its real observations. Export each plain/3-expert Actor variant explicitly and compare sequence outputs, including reset and held frames, to Python at matched tensors.
+3. Add only the visual/recurrent ABI: depth [B,1,48,64] in metric optical depth, 50 Hz capture / 50 Hz control, original fixed body mount, sensor noise keys, GRU memory [B,256], explicit reset. Images must correspond to the actual MuJoCo camera pose and terrain.
+4. The deployed student uses the shared CNN, proprio MoE, GRU, fusion and Actor. It does not use the training WM to hallucinate its real observations. Export each plain/3-expert Actor variant explicitly and compare sequence outputs, including reset and consecutive50Hzframes, to Python at matched tensors.
 5. Teacher evaluation uses its real privileged AS2 state and forward geometry, without task-ID input. It is evaluated separately from student. Teacher is not substituted for a failed student transfer.
 6. Rebuild the original ten terrain types plus gap/up/down in the official transfer geometry. Exclude avoidance pillars, avoidance rewards and retired ten-task labels. Separate collision-geometry accuracy from policy capability.
-7. Run paired native/official-chain checkpoints with fixed terrain/commands/load, report velocity and yaw error, survival, height, foot slip and videos. Event variants additionally report first hard completion and post-success motion. Keep hard event semantics and finite-horizon timeout distinct from falls.
+7. Run paired native/official-chain checkpoints with fixed terrain/commands/load, report velocity and yaw error, survival, height, foot slip and videos. Four-task variants additionally report first hard completion and post-success motion. Keep hard event semantics and finite-horizon timeout distinct from falls.
 8. Complete import/export parity and loaded-parameter evidence before any capability claim. Do not retune physics silently to mask transfer error.
 
 Cleanup audit (implemented by physics owner; original project/evidence retained outside this copy)
 Retired driver.py, robogauge_*.py/json, allocation_assets.py, allocation_evaluation.py, critic_cache.py, lr_feedback.py, task_allocation.py, supervise.py and old Go2 recovery fixtures are not imported by the new training entry.
 The new terrain_allocation.py contains the pinned AS2 allocation rule; its historical source attribution is documentation, not a second active implementation.
-The frozen fast_depth observer, CapturedImages CPU image cache, full-pose algebra and sequence_execution remain required.
-Permanent tools/validate_training.py is a bounded qualification entry, not a parallel trainer. Delete temporary output directories, tests and __pycache__ before formal launch; retain concise acceptance/source/calibration receipts in the designated evidence location.
+The geometric generator is removed from active training. Mesh-ray capture, frozen keyed noise, CapturedImages CPU cache, full-pose algebra and sequence_execution remain required.
+Temporary GPU qualification entry and all test outputs are removed before formal launch; only compact acceptance/source/calibration evidence is retained.
+
+0.36m scoring contract: target_base_height_m=0.36;minimum_live_height_m=0.28;height_error=abs(measured_base_height_over_local_ground-0.36). Newq0 uses thigh0.708360615872145/calf-1.41672123174429 with mirroredhips+/-0.1. Do not rescore by silently using old0.30mreference or oldq0. Actual official visual MuJoCo runner remains outside this release; this protocol is not a claim that its integration has been tested.

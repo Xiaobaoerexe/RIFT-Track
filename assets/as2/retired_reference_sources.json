@@ -1,0 +1,12 @@
+[
+  {
+    "file": "as2_constants.py",
+    "sha256": "4e0099a1b3557e049fe2f5679e22bf3f64c061ae0d26c329fb029ef3e78c87e7",
+    "role": "retired unimported upstream MJLab reference; original retained in pre-revision git history, not a live new-AS2 configuration"
+  },
+  {
+    "file": "as2_env_cfgs.py",
+    "sha256": "4b979f27070295f3f46885f156afd0f5f2e4e27aae5852649a3a343e58b43b6f",
+    "role": "retired unimported upstream MJLab reference; original retained in pre-revision git history, not a live new-AS2 configuration"
+  }
+]

@@ -1,5 +1,5 @@
 {
-  "schema": "as2-perceptive-source-contract-v1",
+  "schema": "as2-perceptive-source-contract-v2",
   "updated": "2026-11-15",
   "primary_baseline": {
     "kind": "project-tested AS2 blind implementation",
@@ -27,7 +27,7 @@
       "rl/supermimic/networks.py"
     ],
     "license": "CC-BY-NC-4.0; bundled dependency MIT text retained",
-    "scope": "reference for encoding and predicting visual latent; this project uses held5Hz capture rather than every-control-step camera"
+    "scope": "every-control-step visual latent prediction, 8-step supervised rollout; 137 code-only ablation also stops predicted latent gradient at policy entry. Velocity-command quadruped control is an adaptation, not reference-motion tracking reproduction."
   },
   "rapid_locomotion": {
     "repository": "https://github.com/Improbable-AI/rapid-locomotion-rl",
@@ -43,45 +43,51 @@
     },
     "diffdreamer": {
       "arxiv": "2610.31617v1",
-      "evidence": "paper-inspired event/continuous split; not an exact algorithm reproduction",
-      "scope": "events/moe only; continuous BPTT plus a real-event afterstate value at the root"
+      "evidence": "historical rejected project adaptation; not used in this release",
+      "scope": "Independent event value,rootQ,eventTD removed by user decision."
     }
   },
   "frozen_depth": {
-    "source": "existing supplied depth_input package and accepted fast_depth checkpoint",
+    "source": "supplied depth_input noise weights only; geometric generator replaced by exact static collision mesh GPU ray query",
     "versioning": "training manifest records package and checkpoint hashes at launch; no unverified hash is filled here",
     "scope": "real/captured image generation only; future imagination uses WM latent"
   },
   "variants": {
-    "simple": {
-      "host": "137",
+    "moe": {
+      "host": "175",
       "gpu_gib": 48,
-      "parent_directory": "~/Documents",
-      "tasks": 1,
-      "actor": "plain MLP",
-      "velocity_grid": false,
+      "tasks": 4,
+      "actor": "3 dense experts",
+      "velocity_grid": true,
       "event_value": false
     },
     "events": {
       "host": "125",
       "gpu_gib": 24,
-      "parent_directory": "~/motion_control",
-      "tasks": 5,
-      "actor": "plain MLP",
+      "tasks": 4,
+      "actor": "MLP",
       "velocity_grid": true,
-      "event_value": true
+      "event_value": false,
+      "name_note": "historical config label only"
     },
-    "moe": {
-      "host": "175",
-      "gpu_gib": 48,
-      "parent_directory": "~/Admin",
-      "tasks": 5,
+    "simple": {
+      "host": "156",
+      "gpu_gib": 24,
+      "tasks": 1,
       "actor": "3 dense experts",
-      "velocity_grid": true,
-      "event_value": true
+      "velocity_grid": false,
+      "event_value": false
+    },
+    "instinct_ablation": {
+      "host": "137",
+      "tasks": 4,
+      "actor": "3 dense experts",
+      "same_as": "175",
+      "policy_entry_predicted_latent_detach": true,
+      "launch": false
     }
   },
-  "evidence_boundary": "AS2 blind results establish the reference only. The new visual-latent composition, 8m/s range and event tasks require their own runtime/learning evidence. CPU tests do not establish locomotion or GPU throughput.",
+  "evidence_boundary": "AS2 blind results establish the reference only. New perceptive recurrent composition,8m/s target and crossing tasks need their own learning evidence. Qualification establishes execution and measured throughput only.",
   "official_supermimic": {
     "repository": "https://github.com/HybridRobotics/supermimic",
     "commit": "abc124c1bd5976341034668af3d12c087f2f1f55",

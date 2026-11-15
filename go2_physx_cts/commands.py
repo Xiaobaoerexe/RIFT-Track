@@ -16,15 +16,18 @@ SOURCE_COMMIT = '6c95d9feef4814c25eb6536e61bb38e1d1d718d4'
 CMD_STATE_DIM = 21
 GRID_BIN,TASK_ID,TERRAIN_ID,COMPLETED = 17,18,19,20
 TERRAIN_NAMES=("wave","slope_up","slope_down","rough_slope","stairs_up","stairs_down","obstacles","flat","wheels","small_squares","gap","obstacle_up","obstacle_down")
-TASK_TERRAINS=(tuple(range(10)),(7,),(7,),(10,11,12),(7,))
-FINAL_TASK_COUNTS=(820,819,819,819,819)
+TASK_TERRAINS=(tuple(range(10)),(7,),(7,),(10,11,12))
+FINAL_TASK_COUNTS=(2458,328,327,983)
 
 def phase(iteration):return 0 if iteration<2500 else 1 if iteration<5000 else 2
 
 def task_assignments(n,iteration,device,variant="simple"):
-    active=1 if variant=="simple" or iteration<5000 else 5
-    counts=[n//active+(i<n%active) for i in range(active)]
-    return torch.repeat_interleave(torch.arange(active,device=device),torch.tensor(counts,device=device))
+    # In simple mode these are sampling categories only: one reward and value.
+    if iteration<5000:return torch.zeros(n,dtype=torch.long,device=device)
+    from .terrain_allocation import apportion
+    counts=apportion(n,FINAL_TASK_COUNTS)
+    return torch.repeat_interleave(torch.arange(4,device=device),torch.tensor(counts,device=device))
+
 
 def speed_cap(task,iteration):
     return .5 if iteration<5000 else 1. if iteration<10000 else 2. if iteration<20000 else 4. if iteration<30000 else 6. if iteration<35000 else 8.
@@ -140,10 +143,10 @@ class VelocityGrid:
         self.special_contract=special_speed_contract(special_episode_seconds)
         axes=(torch.arange(-9,17,device=device)*.5,torch.arange(-5,6,device=device)*.2,torch.arange(-30,31,device=device)*.1)
         self.shape=tuple(len(x) for x in axes);self.grid=torch.stack(torch.meshgrid(*axes,indexing='ij'),-1).reshape(-1,3)
-        self.width=self.grid.new_tensor([.5,.2,.1]);self.extent=self.grid.new_tensor([.5,.2,.1]).expand(5,13,3).clone()
+        self.width=self.grid.new_tensor([.5,.2,.1]);self.extent=self.grid.new_tensor([.5,.2,.1]).expand(4,13,3).clone()
         self.extent[3,:,0]=self.special_contract["initial_extent_mps"]
         initial=(self.grid.abs()<=self.width+1e-6).all(-1)
-        self.weights=initial.float().expand(5,13,-1).clone()
+        self.weights=initial.float().expand(4,13,-1).clone()
         special=(self.grid[:,0]>=self.special_contract["minimum_speed_mps"]-.25)&(self.grid[:,0]<=self.special_contract["initial_extent_mps"]+.25)&(self.grid[:,1:]==0).all(-1)
         self.weights[3]=special.float()[None]
         self.sum=torch.zeros_like(self.weights);self.count=torch.zeros_like(self.weights)
@@ -198,7 +201,7 @@ class VelocityGrid:
             lower=torch.maximum(local[:,:,0],caps[:,0]);upper=torch.minimum(local[:,:,1],caps[:,1])
             if iteration>=5000 and self.special_contract["minimum_speed_mps"]>speed_cap(3,iteration):
                 raise ValueError("Special deadline is unreachable under this iteration speed cap")
-            extent=self.extent.reshape(-1,3);lo=lower.repeat(5,1);hi=upper.repeat(5,1)
+            extent=self.extent.reshape(-1,3);lo=lower.repeat(4,1);hi=upper.repeat(4,1)
             lo=torch.maximum(lo,-extent);hi=torch.minimum(hi,extent)
             # Pure forward channel before special success; lower speed remains
             # available at early curriculum, rather than unconditionally1m/s.
@@ -210,15 +213,15 @@ class VelocityGrid:
             weights=torch.where((weights.sum(-1)==0)[:,None],enabled.float(),weights)
             self._cdf=weights.cumsum(-1)/weights.sum(-1,keepdim=True).clamp_min(1e-9)
             self._lo,self._hi=lo,hi;self._cache_key=key
-        terrain=terrain.clamp(0,12);key=task.clamp(0,4)*13+terrain;n=len(task)
-        u=torch.rand(65,n,device=task.device,generator=generator)
+        terrain=terrain.clamp(0,12);key=task.clamp(0,3)*13+terrain;n=len(task)
+        u=torch.rand(52,n,device=task.device,generator=generator)
         index=torch.searchsorted(self._cdf.contiguous(),u.contiguous()).clamp_max(len(self.grid)-1)[key,torch.arange(n,device=task.device)]
         sample=self.grid[index]+(torch.rand(n,3,device=task.device,generator=generator)-.5)*self.width
         sample=torch.maximum(torch.minimum(sample,self._hi[key]),self._lo[key])
-        # At least30% of samples per task use only vx, with random rotating rank.
-        membership=torch.nn.functional.one_hot(task,5);rank=(membership.cumsum(0)*membership).sum(-1)-1;totals=membership.sum(0).clamp_min(1)
-        offset=(torch.rand(5,device=task.device,generator=generator)*totals).long()
-        pure=((rank-offset[task])%totals[task])<torch.ceil(.3*totals[task]).long()
+        # At least10% of ordinary tracking samples use only vx, with random rotating rank.
+        membership=torch.nn.functional.one_hot(task,4);rank=(membership.cumsum(0)*membership).sum(-1)-1;totals=membership.sum(0).clamp_min(1)
+        offset=(torch.rand(4,device=task.device,generator=generator)*totals).long()
+        pure=((rank-offset[task])%totals[task])<torch.ceil(torch.where(task==0,.1,.3)*totals[task]).long()
         sample=torch.stack((sample[:,0],torch.where(pure,0.,sample[:,1]),torch.where(pure,0.,sample[:,2])),-1)
         return coupled_clip(sample),index
 
@@ -270,11 +273,6 @@ class OfficialCommands:
             table = state.new_tensor([TERRAIN_RANGES['flat']] + [TERRAIN_RANGES[name] for name in self.terrain_names])
             terrain_ranges = table[ids + 1]
             local = torch.clamp(global_ranges, min=terrain_ranges[..., :1], max=terrain_ranges[..., 1:])
-        if self.variant!="simple":
-            post=(state[:,TASK_ID]==3)&(state[:,COMPLETED]>.5)
-            post_ranges=state.new_tensor(((-2.,2.),(-1.,1.),(-1.5,1.5)))
-            completed_ranges=torch.clamp(global_ranges,min=post_ranges[:,:1],max=post_ranges[:,1:])
-            local=torch.where(post[:,None,None],completed_ranges,local)
         return global_ranges, local
 
     def initial(self, position_xy, origins_xy, iteration=0, *, generator=None, random=None,task_id=None,terrain_id=None):
@@ -297,12 +295,10 @@ class OfficialCommands:
         base=torch.cat((base[:,:TASK_ID],task[:,None],terrain[:,None],completion[:,None]),-1)
         return self._resample(base, mask, position_xy, iteration, generator=generator, random=random)
 
-    def advance(self, state, position_xy, iteration, *, generator=None, random=None,completed=None,task_ids=None,terrain_ids=None):
+    def advance(self, state, position_xy, iteration, *, generator=None, random=None,completed=None,task_ids=None,terrain_ids=None,post_command=None):
         if completed is not None:
-            fresh=(completed>.5)&(state[:,COMPLETED]<.5)
             completion=torch.maximum(state[:,COMPLETED],completed.to(state.dtype))
-            timer=torch.where(fresh,torch.zeros_like(state[:,TIMER]),state[:,TIMER])
-            state=torch.cat((state[:,:TIMER],timer[:,None],state[:,TIMER+1:COMPLETED],completion[:,None],state[:,COMPLETED+1:]),-1)
+            state=torch.cat((state[:,:COMPLETED],completion[:,None]),-1)
         if terrain_ids is not None or self.terrain_lookup is not None:
             current=self.terrain_lookup.query(position_xy) if terrain_ids is None else terrain_ids
             terrain=torch.where(current>=0,current.to(state.dtype),state[:,TERRAIN_ID])
@@ -312,6 +308,12 @@ class OfficialCommands:
         updated = torch.cat((state[:, :TIMER], timer[:, None], state[:, ACCUMULATION],
                              elapsed[:, None], state[:, LAST_LIMIT:]), -1)
         result = self._resample(updated, timer <= 0., position_xy, iteration, generator=generator, random=random)
+        if post_command is not None and self.variant!='simple':
+            mix=result[:,COMPLETED:COMPLETED+1]
+            post=coupled_clip(post_command)
+            blended=(1-mix)*result[:,REQUEST]+mix*post
+            actual=torch.where((result[:,TASK_ID]==3)[:,None],blended,result[:,COMMAND])
+            result=torch.cat((result[:,:COMMAND.start],actual,result[:,COMMAND.stop:]),-1)
         distance = torch.linalg.vector_norm(position_xy[:, :2] - result[:, ORIGIN], dim=-1)
         maximum = torch.maximum(result[:, MAX_DISTANCE], distance)
         return torch.cat((result[:, :MAX_DISTANCE], maximum[:, None], result[:, ORIGIN.start:]), -1)
@@ -368,19 +370,19 @@ class OfficialCommands:
             sampled,bins=self.grid.sample(task,terrain,iteration,generator)
             # Ordinary standing and pure-yaw proportions follow the source sampler.
             ordinary=(task==0);sampled=torch.where((is_zero&ordinary)[:,None],zero_command,sampled)
-            special=(task==3)&(state[:,COMPLETED]<.5)
-            post=(task==3)&~special
-            sampled=torch.where(post[:,None],request,sampled)
+            special=task==3
             sampled=torch.where(special[:,None],torch.stack((sampled[:,0].clamp(self.special_contract['minimum_speed_mps'],2.),torch.zeros_like(sampled[:,0]),torch.zeros_like(sampled[:,0])),-1),sampled)
             request=torch.where(due[:,None],sampled,state[:,REQUEST])
             gridbin=torch.where(due,self.grid.bin_indices(request),state[:,GRID_BIN])
-        else:gridbin=state[:,GRID_BIN]
+        else:
+            pure=(u[:,7]<.1)&(state[:,TASK_ID]==0)
+            request=torch.where((due&pure)[:,None],torch.stack((request[:,0],torch.zeros_like(request[:,0]),torch.zeros_like(request[:,0])),-1),request)
+            gridbin=state[:,GRID_BIN]
         actual = coupled_clip(torch.clamp(request, min=ranges[..., 0], max=ranges[..., 1]))
         new_timer = torch.where(is_zero, zero_time, torch.full_like(zero_time, self.resampling_time))
-        if self.variant!="simple":
-            new_timer=torch.where(state[:,TASK_ID]==2,torch.ones_like(new_timer),new_timer)
-            approach=(state[:,TASK_ID]==3)&(state[:,COMPLETED]<.5)
-            new_timer=torch.where(approach,torch.full_like(new_timer,self.episode_seconds),new_timer)
+        new_timer=torch.where(state[:,TASK_ID]==2,torch.ones_like(new_timer),new_timer)
+        approach=state[:,TASK_ID]==3
+        new_timer=torch.where(approach,torch.full_like(new_timer,self.episode_seconds),new_timer)
         timer = torch.where(due, new_timer, state[:, TIMER])
         accumulation = state[:, ACCUMULATION] + torch.where(due[:, None], actual[:, :2], torch.zeros_like(actual[:, :2]))
         last_limit = torch.where(due, limited.to(state.dtype), state[:, LAST_LIMIT])

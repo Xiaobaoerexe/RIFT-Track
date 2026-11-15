@@ -1,4 +1,4 @@
-"""AS2 source-paced learning with held visual latents and optional root event Q."""
+"""AS2 source-paced learning with 50Hz visual latents and total-return critics."""
 import copy,json,math,os,time
 from contextlib import contextmanager
 from dataclasses import asdict
@@ -17,7 +17,6 @@ from .terrain import relief,geometry_crop
 from .depth import DepthObservation
 from .schedules import LearningRateController
 from .sequence_execution import depth_sequence_features,batched_apply,ENCODING_CHUNK
-from .event_sampling import EventSeedArchive,sample_event_seeds
 
 
 @contextmanager
@@ -57,13 +56,13 @@ def subset(data,index):
 
 
 class Learner:
-    schema='as2-perceptive-latent-v1'
+    schema='as2-perceptive-latent-50hz-v2'
     def __init__(self,cfg,env,output,driver=None):
         self.cfg,self.env,self.output=cfg,env,Path(output);self.output.mkdir(parents=True,exist_ok=True)
         self.device=cfg.device;torch.manual_seed(cfg.seed)
         self.policy=Policy(cfg.actor_hidden,experts=cfg.actor_experts,mixed_precision=cfg.mixed_precision).to(cfg.device)
-        self.critic=Critic(cfg.critic_hidden,variant=cfg.variant,mixed_precision=cfg.mixed_precision).to(cfg.device)
-        self.wm=WorldModel(cfg.wm_hidden,mixed_precision=cfg.mixed_precision).to(cfg.device)
+        self.critic=Critic(cfg.critic_hidden,variant=cfg.variant,mixed_precision=False).to(cfg.device)
+        self.wm=WorldModel(cfg.wm_hidden,mixed_precision=cfg.mixed_precision,depth_period=cfg.depth_period).to(cfg.device)
         self.depth=DepthObservation(cfg,env.field)
         self.actor_params=list(self.policy.teacher_encoder.parameters())+list(self.policy.actor.parameters())
         self.cts_params=list(self.policy.student_encoder.distillation_parameters())
@@ -80,8 +79,6 @@ class Learner:
         storage='cpu' if cfg.replay_storage=='cpu' else None
         self.buf=Replay(cfg.num_envs,cfg.buffer_len,cfg.device,cfg.lr_holdout_modulus,storage_device=storage)
         self.archive=Archive(cfg.archive_size,cfg.wm_window,cfg.device,storage_device=storage)
-        self.event_archive=EventSeedArchive(burnin=cfg.cts_burnin) if cfg.variant!='simple' else None
-        self._event_coverage={}
         self.imag=Imagination(cfg,env.consts,env.field,env.command_sampler,self.depth)
         self.schedule=LearningRateController(cfg)
         self.index=torch.arange(cfg.num_envs,device=cfg.device)
@@ -108,12 +105,12 @@ class Learner:
             'branch_loss':'teacher_loss.mean() + student_loss.mean()','replay_tensor_bytes':self.buf.storage_bytes,
             'replay_storage_device':str(self.buf.storage_device),'replay_compute_device':str(self.buf.device),
             'depth_cnn_owner':'world_model_reconstruction_only','student_sequence_effective_frames':20480,
-            'init':'cold','external_providers':0,'future_depth':'5Hz held WM latent; no imagined rendering'},indent=2))
+            'init':'cold','external_providers':0,'future_depth':'50Hz WM latent; no imagined rendering','latent_actor_stop_gradient':cfg.latent_actor_stop_gradient},indent=2))
 
     def refresh_providers(self,before=None):
         before=self.env.snapshot() if before is None else before
         tasks=flat_ids(before['task_ids']);old=self.source.clone();self.source.zero_()
-        for task in range(self.cfg.task_count):
+        for task in range(4):
             ids=(tasks==task).nonzero().flatten();ns=len(ids)-int(len(ids)*self.cfg.teacher_fraction)
             if ns:self.source[ids[torch.linspace(0,len(ids)-1,ns,device=self.device).round().long()]]=1
         changed=self.source!=old;self.real_hidden[changed]=0;self.camera_episode[changed]=-1
@@ -165,7 +162,6 @@ class Learner:
         names=('contact_prob','applied_torque','foot_velocity','joint_acceleration','log_contact_force')
         for name in names:values['next_'+name]=after[name]
         self.buf.add(**values)
-        if self.event_archive is not None:self.event_archive.observe(self.buf)
         training=~self.buf.validation_episodes(before['episode']);telemetry={k:after[k][training] for k in names}
         self.wm.update_stats(before['s'][training],a[training],before['a_prev'][training],before['xi'][training],None,after['s'][training],
             st.pose_delta(before['pose'][training],after['pose'][training]),telemetry,pose=before['pose'][training])
@@ -192,49 +188,6 @@ class Learner:
         starts=torch.where(tasks==0,self.cfg.policy_start,self.cfg.all_terrain_iteration+self.cfg.critic_warmup_iterations)
         return (self.it>=starts).to(seed['s'].dtype)
 
-    @torch.no_grad()
-    def event_training_data(self):
-        """Hard real one-step supervision, with current-policy next-action bootstrap.
-
-        No behavior-policy multi-step lambda return and no soft completion label.
-        The afterstate input keeps PRE-settlement event context, so its value
-        includes the immediate event that just occurred exactly once.
-        """
-        from .task import finite_horizon_mask
-        xs=[];ys=[]
-        for branch in (0,1):
-            n=self.cfg.event_batch//2
-            seed=sample_event_seeds(self.buf,self.event_archive,n,source=branch,burnin=self.cfg.cts_burnin if branch else 0)
-            self._event_coverage[str(branch)]=copy.deepcopy(self.event_archive.last_sample_stats)
-            s,pose=seed['s_next'],seed['pose_next'];tasks=flat_ids(seed['task_ids'])
-            current_priv=st.privileged(s,seed['a'],seed['command'],seed['xi'],relief(pose,self.env.field))
-            x=self.critic.event_features(current_priv,branch,tasks,seed['task_context'],pose,seed['next_contact_prob'])
-            hidden=s.new_zeros((n,256))
-            if branch:
-                hidden=self.imag.burnin(self.policy,seed['prefix'])
-                images=self.depth.captured(seed['depth_pose'],flat_ids(seed['depth_scene_ids']),flat_ids(seed['depth_frame_index']),flat_ids(seed['episode']),flat_ids(seed['trajectory_ids']))
-                z=self.policy.student_encoder.encode_depth(images)
-                single=self.policy.single_norm(st.single_from_history(seed['obs'].float()))
-                hidden=self.policy.student_encoder.advance_memory(single,z,hidden)
-            next_frame=flat_ids(seed['frame_index'])+1;refresh=next_frame%self.cfg.depth_period==0
-            cap=torch.where(refresh[:,None],pose,seed['depth_pose'])
-            cap_frame=torch.where(refresh,next_frame,flat_ids(seed['depth_frame_index']))
-            scene=self.env.field.scene_ids(cap)
-            images=self.depth.captured(cap,scene,cap_frame,flat_ids(seed['episode']),flat_ids(seed['trajectory_ids']))
-            z=self.policy.student_encoder.encode_depth(images)
-            cmd=seed['command_next'];hist=st.push_history(seed['obs'].float(),st.frame(s,seed['a'],cmd,noise=True))
-            priv=st.privileged(s,seed['a'],cmd,seed['xi'],relief(pose,self.env.field))
-            height=geometry_crop(s,pose,self.env.field,kind='teacher') if branch==0 else s.new_zeros((n,2,1,1))
-            action,_,_,_=self.policy.step(hist,priv,branch,depth=None,depth_features=z,hidden=hidden,height=height)
-            raw,dp,telemetry,_=self.wm.predict(s,action,seed['a'],seed['xi'],geometry_crop(s,pose,self.env.field,kind='world_model'),pose,z,next_frame,cap)
-            pp=st.apply_pose_delta(pose,dp);ss=st.reconcile_state(raw,pp,self.env.field,self.env.consts.default_q)
-            np=st.privileged(ss,action,cmd,seed['xi'],relief(pp,self.env.field))
-            nx=self.critic.event_features(np,branch,tasks,seed['task_context_next'],pp,telemetry['contact_prob'])
-            mask=finite_horizon_mask(tasks,seed['terminated'].reshape(-1),seed['timeout'].reshape(-1),self.cfg.variant)
-            target=seed['event_reward'].reshape(-1)+self.cfg.gamma*mask*self.critic.forward_event(nx)
-            xs.append(x);ys.append(target)
-        return torch.cat(xs),torch.cat(ys)
-
     def improve_policy(self,*,detailed_timing=True):
         cfg=self.cfg;nt=int(cfg.imag_batch*cfg.teacher_fraction);sizes=(nt,cfg.imag_batch-nt)
         active=self.it>=cfg.policy_start;all_data=[];means=[0.,0.];start=time.monotonic()
@@ -258,29 +211,23 @@ class Learner:
                 del seed
             gn=clip_grad(self.actor_params,cfg.grad_clip,cfg.grad_clip_elem) if active else torch.tensor(0.)
             if not scalar_finite(gn) or not all(math.isfinite(v) for v in means):raise FloatingPointError('Nonfinite Actor update')
-            if active:self.opt_actor.step();self.counts['actor']+=1
-        self.opt_actor.zero_grad(set_to_none=True);actor_seconds=time.monotonic()-start
+        actor_seconds=time.monotonic()-start
         data={k:torch.cat([d[k] for d in all_data]) for k in all_data[0]}
         target=self.imag.targets(self.critic,data)
+        if active:self.opt_actor.step();self.counts['actor']+=1
+        self.opt_actor.zero_grad(set_to_none=True)
         x=data['critic_in'][:,:-1].reshape(-1,self.critic.feature_dim);y=target.reshape(-1)
         valid=data['critic_valid'].reshape(-1).bool();x,y=x[valid],y[valid]
-        ex,ey=self.event_training_data() if cfg.variant!='simple' else (None,None)
         self.critic.update_stats(x)
-        if ex is not None:self.critic.update_stats(ex)
-        losses=[];event_losses=[];fit_start=time.monotonic()
+        losses=[];fit_start=time.monotonic()
         for _ in range(cfg.critic_epochs):
             order=torch.randperm(len(x),device=self.device)
-            eorder=torch.tensor_split(torch.randperm(len(ex),device=self.device),cfg.critic_minibatches) if ex is not None else [None]*cfg.critic_minibatches
-            for ids,eids in zip(torch.tensor_split(order,cfg.critic_minibatches),eorder):
+            for ids in torch.tensor_split(order,cfg.critic_minibatches):
                 self.opt_critic.zero_grad(set_to_none=True);total=x.new_zeros(())
                 denominators=x[ids,-2:].sum(0).clamp_min(1)
                 for sub in ids.split(cfg.critic_microbatch):
                     loss=critic_loss(self.critic(x[sub]),y[sub],x[sub,-2:],cfg.critic_huber_delta,denominators)
                     loss.backward();total+=loss.detach()
-                if eids is not None:
-                    eloss=critic_loss(self.critic.forward_event(ex[eids]),ey[eids],ex[eids,-2:],cfg.critic_huber_delta)
-                    if not scalar_finite(eloss):raise FloatingPointError('Nonfinite event value loss')
-                    eloss.backward();event_losses.append(float(eloss.detach()))
                 cgn=clip_grad(self.critic.parameters(),cfg.grad_clip)
                 if not scalar_finite(cgn) or not scalar_finite(total):raise FloatingPointError('Nonfinite Critic update')
                 self.opt_critic.step();self.counts['critic']+=1;losses.append(float(total))
@@ -291,13 +238,12 @@ class Learner:
                 mse=[residual[x[:,-2+b]>.5].square().mean() for b in (0,1)]
                 self._quality={'critic_error':float((.5*sum(mse)).sqrt()/y.std().clamp_min(1.)),
                     'critic_explained_variance':float(1-residual.var()/y.var().clamp_min(1e-8)),
-                    'critic_target_max':float(y.abs().max())}
+                    'critic_target_max':float(y.abs().max()),'value_guard':self.imag.last_value_guard}
         return {**self._quality,'branch_objectives':means,'objective':sum(means),'actor_grad_norm':float(gn),
-            'critic_loss':sum(losses)/len(losses),'event_critic_loss':sum(event_losses)/max(1,len(event_losses)),
+            'critic_loss':sum(losses)/len(losses),
             'critic_valid_samples':len(x),'critic_samples_processed':len(x)*cfg.critic_epochs,
-            'event_real_samples':0 if ex is None else len(ex),'actor_seconds':actor_seconds,'critic_seconds':time.monotonic()-fit_start,
-            'event_sample_coverage':self._event_coverage,
-            'immediate':float(data['immediate'].mean()),'bootstrap':float(data['bootstrap'].mean()),'root_event':float(data['root_event'].mean())}
+            'actor_seconds':actor_seconds,'critic_seconds':time.monotonic()-fit_start,
+            'immediate':float(data['immediate'].mean()),'bootstrap':float(data['bootstrap'].mean())}
 
     def sequence_loss(self,student,sequence,training=True):
         cfg=self.cfg;b,total=sequence['obs'].shape[:2];burn=cfg.cts_burnin;steps=total-burn
@@ -401,9 +347,9 @@ class Learner:
             'policy':self.policy.state_dict(),'critic':self.critic.state_dict(),'world_model':self.wm.state_dict(),
             'optimizers':{k:getattr(self,'opt_'+k).state_dict() for k in ('wm','actor','critic','cts')},
             'counts':self.counts,'schedule':self.schedule.state_dict(),'curriculum':self.env.curriculum_state_dict(),
+            'value_guard':{'streak':self.imag.value_guard_streak,'last':self.imag.last_value_guard},
             'action_quality':self.action_quality,'cts_stable':self.cts_stable,'fixed_reports':self.fixed_reports,
             'allocator':None if self.allocator is None else self.allocator.state_dict(),
-            'event_archive':None if self.event_archive is None else self.event_archive.state_dict(),
             'rng':torch.get_rng_state(),'cuda_rng':torch.cuda.get_rng_state_all() if torch.cuda.is_available() else [],
             'physics':'isaacsim_physx','depth':self.depth.metadata,'consts':{k:v.detach().cpu() for k,v in vars(self.env.consts).items()},
             'resume_mode':'fresh simulator episodes and Replay, current models/optimizers/normalizers/curriculum retained'}
@@ -418,9 +364,7 @@ class Learner:
         self.policy.load_state_dict(ck['policy']);self.wm.load_state_dict(ck['world_model']);self.critic.load_state_dict(ck['critic'])
         for k in ('wm','actor','critic','cts'):getattr(self,'opt_'+k).load_state_dict(ck['optimizers'][k])
         self.schedule.load_state_dict(ck['schedule']);self.it=ck['iteration'];self.counts=ck['counts']
-        if self.event_archive is not None and ck.get('event_archive') is not None:
-            self.event_archive.load_state_dict(ck['event_archive'])
-            self.event_archive.last_observed=-1
+        guard=ck.get('value_guard',{});self.imag.value_guard_streak=int(guard.get('streak',0));self.imag.last_value_guard=guard.get('last',{})
         self.action_quality.copy_(ck['action_quality']);self.cts_stable=ck['cts_stable'];self.fixed_reports=ck['fixed_reports']
         if ck.get('allocator') is not None:
             from .terrain_allocation import TerrainAllocator
@@ -459,7 +403,7 @@ class Learner:
                 tick=time.monotonic();stats['wm_loss']=self.fit_world_model();timings['wm_seconds']=time.monotonic()-tick
             if self.it>=self.cfg.warmup_iterations:
                 tick=time.monotonic();stats.update(self.improve_policy(detailed_timing=self.it%self.cfg.log_interval==0));timings['actor_critic_seconds']=time.monotonic()-tick
-            if self.buf.size>=self.cfg.cts_burnin+self.cfg.cts_sequence_steps:
+            if self.it>=self.cfg.policy_start and self.buf.size>=self.cfg.cts_burnin+self.cfg.cts_sequence_steps:
                 tick=time.monotonic();stats['cts_loss']=self.update_cts();stats.update(self._cts_stats);timings['cts_seconds']=time.monotonic()-tick
             stats['phase_times']=timings
             if self.it==1 or self.it%self.cfg.log_interval==0 or self.it==end:self.log(stats)

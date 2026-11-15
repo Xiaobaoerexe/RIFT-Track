@@ -1,42 +1,23 @@
-AS2 PERCEPTION IMPLEMENTATION CONTRACT —2026-11-15
+AS2 FOUR-CONFIGURATION RELEASE CONTRACT —2026-11-15
 
-Authority
-The latest user permits implementation and training on137/125/175. Earlier depth pause/tenfold-speed/old-weight-delete instructions are historical and do not define this new isolated experiment. Only this as2_depth copy is refactored; prior project trees/evidence remain unchanged.
-Primary code baseline:137AS2 blind commit2061be6b0d592afe9e81223206cf5f864e45b9f4. External references and evidence boundaries are inUPSTREAM.json.
+Authorized: replace failed175/125depth projects, add156project, prepare137code-only ablation, qualify and directly launch175/125/156. Preserve137active job and all blind baselines. Archive compact old failure evidence before removing obsolete projects.
 
-Required shared invariants
-- AS2 with Isaac Sim/PhysX, three-dimensional commands, episode-fixed0..2kg payload.
-- No tall obstacle-avoidance terrain/task/reward, external collection provider, task-ID teacher input, action tanh or policy-latent Critic shortcut.
-- Keep AS2 source training scale,15 motion terms, source Adam/clipping/OU/rarity/archive and measured-window LR control unless an explicit perception or variant difference is documented.
-- Teacher/sharedActor:Actor optimizer. Depth CNN+physical/latent model:WM optimizer. Student proprioMoE/GRU/fusion:CTS optimizer. Critic:value optimizer. Parameter ownership sets must be disjoint.
-- Frozen modules keep useful input derivatives during Actor imagination. Capture target construction and value targets detach labels, not future action->physical state/visual-latent derivatives.
-- Full pose7 withdelta6 and AS2 URDF FK. Reward telemetry uses true actuator torque, simulator joint_acc, yaw-frame foot velocity and source-ordered limb log-force.
-- 5Hz camera/50Hz control:held128latent betweenrefreshes, refresh-conditioned nextlatentprediction. Current encoder recomputes target features; immutable noisy images may be cached by exactcapture keys.
-- Perception CNN shared between student and WM is an explicit new adaptation. Its reconstruction target prevents the unrestricted collapse that pure stop-gradient latent matching would permit.
+Source training invariants:4096x1real,Replay1000,8192x32imagination6144/2048,WM2048x8 with2/4updates,CTS2x160x64+16burn-in,Critic20steps,120000iterations. Execution-only CPU transport/chunking may differ by memory capacity. No reduction of statistical batch or optimizer counts for throughput.
+Height0.36m and corresponding q0 apply to reward,foot regularization,live default stance,diagnostics,physical contract and future official-chain scoring. Retain baseline robot dynamics/PD/limits.
+Camera mount(.101958,0,.327)m confirmed; forward horizontal,50Hz. Full xyz+xyzw pose transform. No self-occlusion renderer. No stale5Hz hold/capture-age conditioning.
+Teacher has no taskID;WM has no taskID. Critic uses physical state/reward memory and teacher/student tag, never trainable policy latent. Ten-task/avoidance/recovery/eventTD/rootQ paths are removed.
 
-Variants
-simple(137):plain sharedActor, single motionCritic, no task split/grid/success.
-events(125):sameActor, five tasks/rewards, per-task/per-terrain grids, continuous+hard-event Critic outputs.
-moe(175):events plus3dense action experts; no sparse routing change.
-Five tasks are original-terrain velocity,flat running,flat rapid turns,combined gap/up/down,flat recovery. Use actual terrain geometry in WM/teacher; task IDs only select reward/value bookkeeping.
+Task/curriculum
+0..1000WM;1000..1500task0critic;1500..2500Actor/teacher warmup. Newly unlocked task return updates wait500critic warmup iterations. Scene fractions at5k:60/8/8/24percent, integer2458/328/327/983. These are categories only for156single-reward variant.
+Positivevx cap.5/1/2/4/6/8at0/5k/10k/20k/30k/35k; other axes and terrain caps remain from the AS2 source. Eightm/s is a target, not verified ability. Original distance-based terrain curriculum and source terrain redistribution remain; source redistribution is confined to the ordinary tracking cohort.
+125/175grids retain own-policy progress,0.5downgrade/0.75upgrade,1000iterationchecks. Crossing grades use hard success; its pre-successcommands remain purevx and respect8sreachability. Ordinary forcedpurevx=10percent. No recovery curriculum.
 
-Training/course
-4096x1real,Replay1000,8192x32imagination(6144/2048),WM2048x8,2/4updates. Equal branch means are preserved under any execution chunking.
-WM first1000;task0Critic1000..1500;Actor/teacher ramp1500..2500. OtherCritics receive500iterations after task unlock before theirActor return updates.
-0..2500flat;2500..5000original10terrains;5000all approved variants unlock. Task0 source terrain recipe persists.
-Positivevx caps.5/1/2/4/6/8 at0/5k/10k/20k/30k/35k. Other axes/negativevx retain source constraints. The8m/s cap is a training target, not verified capability.
-Terrain allocation:source20k/25k matching two-cohort10% transfers. Simpleall13terrains;events/moeonlytask0 original10, other tasks stay fixed. Source200/4096 minimum share scales to40 for820-env task0; zero-base terrains remainzero.
-LR:source bounded actual-window scheduler, factor1.3;Actor/Critic fixed5k,WM/CTS fixed40k. No single-step candidate trials, cosine replacement or weight rollback.
+Reward/value
+Fifteen AS2 motion terms retained with approved changes:0.36mheight;crossingheight-1;0.3sabrupt-command width;actionrate/smooth penalties have a continuous nonzero derivative above their former hard caps.
+Run-length mass for once-only soft completion:dc=g*p[K-1];p0'=(1-g)*(1-c);pj'=g*p[j-1];c'=c+dc. Compact smoothstep transition bands and mass conservation are tested. Hardware hard conditions remain exact. The surrogate is not claimed to be calibrated event probability.
+Measured reference scale and checkpoint hash are in calibration/reward_calibration.json. Common positive coefficients are not rescaled. Finite8scrossingbonus uses90percentofreference minus the24motion upper bound.
+Critic estimates total subsequent reward, including future soft success/wait/failure. No separate event channel. Ordinary upperbound6;finite crossing bound6*(1-gamma^remaining)+bonus*(1-c). AnyV>2U+1stops;over1percentV>1.2U+1for3consecutive50iterationchecks stops. Guard state checkpoints. Bounds do not clamp learnedvalues.
 
-Events
-Keep exact hard success/failure and pre-reset transition labels. Success pays once, stable duration continuous in actual control ticks, completed remains irreversible; recovery timeout is distinct from ordinary truncation.
-Continuous value remains. Event value is trained from real event labels with current-policy continuation target; its Actor contribution is one root afterstate term, not repeatedHtimes.
-Special targets are forward corridors with no forward circular exit; pre-successpurevx remains fixed within attempt; post-success3D capped2m/s.
-Special pre-successrange is deadline-aware: maxgap distance3.83m,stable.64s,startallowance.5s; lower=ceil0.1(3.83/(episode-.64-.5)). At8s use[.6,1.] initially,gridextentfloor1 andlatercap2. Shorterbudget recomputeslower and rejects infeasiblephasecaps; this is a projectadaptation, not sourcecurriculum. Recovery starts physically feasible onflat and is not immediately terminated for being fallen.
-No new bonus values are asserted before measuredAS2calibration. All event calibration evidence is stored with its source checkpoint/hash.
-
-Release gate
-CPU tests, source-compatible parameter checks, actualUSD/PhysX readback, recovery visualization, firstActorcompile/backward, repeatedfullupdates, per-stage timing/VRAM plus numerical/gradient checks. Test artifacts and transientlaunchlogic removed before formalruns; keep production tests and permanentcalibration/provenance. Each host gets its own recordedvalidation and measuredthroughput;24GB cannot be assumed equivalent to48GB.
-
-Host memory adaptation:137/175 Replay and WM archive remain on GPU;125 stores their history in CPU RAM with bounded16MiB pinned staging. Selected windows transfer losslessly in batch. The4096x1000Replay releases10.4103GiB device storage; sample membership/dtype/RNG/optimizer steps remain unchanged. This is an execution adaptation, not a reduced-data experiment.
-Event value input uses existing context slot20 for the real required stable duration(.64s gap/.32s jumps or recovery); context remains21D. Source of truth is reset context, also used by the hard settlement rule. Fixed PhysX evaluations separately calibrate Ue against complete real first-episode MC returns for teacher/student; truncated episodes are excluded.
+Release evidence
+GPU probes cover ray/noise/cache equivalence,completion mass and once-only awards,gradient ownership and137detach. Full-scale qualification covers first Actor backward,all unlocked tasks,WM4updates,Critic20steps,CTS2steps,loaded FK/physics,standing height and sustained complete-update timing. Only pretraining mechanics are established; no learned success claimed.
+Delete temporary qualification scripts/logs/configs/checkpoints and retired implementation directories before training. Preserve a compact acceptance record and source/physics/calibration manifests.137oldrunningproject is out of deletion scope.

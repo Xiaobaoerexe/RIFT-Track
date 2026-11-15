@@ -40,12 +40,12 @@
     "new latent delta output rows initialized to zero following Instinct; existing physical output initialization retained"
   ],
   "project_adaptations": [
-    "AS2 full-pose physical WM, 1024x3 unchanged",
-    "128-dimensional features and 48x64 images",
-    "5Hz held capture latent with phase and relative SE(3) capture context; supervise real refreshes only",
-    "CNN/decoder reconstruction normalized clean frozen-generator output; not exact simulator raycast",
-    "latent prediction loss averaged over valid refreshes rather than all control steps",
-    "preserve predicted latent -> student GRU -> Actor input derivatives; unlike upstream z.detach()",
-    "teacher has geometry but no task label; CTS handles proprio MoE, GRU and fusion only"
+    "AS2 full-pose physical WM1024x3 unchanged",
+    "128Dfeatures and48x64images",
+    "50Hzcapture and latent prediction every control step;8stepautoregressive supervision",
+    "Reconstruction of clean collision-mesh optical depth from noisy input",
+    "latent loss over every valid control transition",
+    "175/125/156 retain predictedlatent->GRU->Actor input derivative;137policy-entry stop-gradient ablation",
+    "teacher geometry without taskID;CTS updates proprioMoE/GRU/fusion only"
   ]
 }

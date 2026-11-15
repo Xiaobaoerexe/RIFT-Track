@@ -1,0 +1,432 @@
+{
+  "schema": "as2_bptt_50hz_acceptance_v2",
+  "date": "2026-11-15",
+  "scope": "pretraining numerical/gradient/loaded-physics and complete-update throughput; not learned locomotion or sim2sim success",
+  "hosts": {
+    "175": {
+      "steady": {
+        "mean_seconds": 6.661681848019361,
+        "median_seconds": 6.678798041306436,
+        "minimum_seconds": 6.508409909904003,
+        "maximum_seconds": 6.791673293802887,
+        "updates": 5,
+        "real_transitions_per_second": 614.8597446480899,
+        "imagined_transitions_per_second": 39351.02365747775,
+        "projected_120k_hours_without_evaluation_or_checkpoint": 222.0560616006454
+      },
+      "gpu_utilization": {
+        "mean_pct": 85.27272727272727,
+        "maximum_pct": 99.0,
+        "samples": 33
+      },
+      "gpu_max_sampled_mib": 34823.0,
+      "torch_peak_allocated_bytes": 22744413184,
+      "device_min_free_observed_bytes": 14342684672,
+      "standing_probe": {
+        "target_m": 0.36,
+        "mean_m": 0.34132692217826843,
+        "minimum_m": 0.3381379544734955,
+        "mae_m": 0.018673058599233627,
+        "falls": 0,
+        "payload_endpoints_kg": [
+          0.0,
+          2.0
+        ],
+        "scope": "Zero action at new joint zero, 2s flat settle; last 1s measured."
+      },
+      "latent_gradient_probe": {
+        "action_to_refreshed_latent_vjp_l2": 0.08691494911909103,
+        "latent_to_student_actor_vjp_l2": 0.02615480124950409,
+        "actual_instinct_core_policy_latent_vjp_absent": true,
+        "actual_instinct_core_wm_latent_vjp_l2": 45.255577087402344,
+        "frozen_module_parameter_grads_absent": true,
+        "scope": "GPU VJP on real replay states; every-step latent forecast; not latent prediction accuracy"
+      },
+      "loaded_fk_check": {
+        "maximum_link_position_error_m": 3.1054019927978516e-05,
+        "tolerance_m": 0.003
+      },
+      "counts": {
+        "collect": 103,
+        "transitions": 421888,
+        "wm": 36,
+        "actor": 7,
+        "critic": 140,
+        "cts": 14
+      },
+      "actor_microbatch": 8192,
+      "replay_storage": "device",
+      "depth_cache_gib": 26.0,
+      "full_cache_committed": true,
+      "host_memory_after_cache_commit": "MemTotal:       131540444 kB\nMemFree:          926248 kB\nMemAvailable:   84111708 kB\nBuffers:         2464820 kB\nCached:         77862200 kB\nSwapCached:       220796 kB\nActive:         47793580 kB\nInactive:       71653416 kB\nActive(anon):   39633512 kB\nInactive(anon):   924076 kB\nActive(file):    8160068 kB\nInactive(file): 70729340 kB\nUnevictable:       20428 kB\nMlocked:           14268 kB\nSwapTotal:      15999996 kB\nSwapFree:       15538572 kB\nZswap:                 0 kB\nZswapped:              0 kB\nDirty:             17612 kB\nWriteback:             0 kB\nAnonPages:      39123024 kB\nMapped:          5007540 kB\nShmem:           2706440 kB\nKReclaimable:    5547404 kB\nSlab:            7903692 kB\nSReclaimable:    5547404 kB\nSUnreclaim:      2356288 kB\nKernelStack:       36848 kB\nPageTables:       141080 kB\nSecPageTables:     40900 kB\nNFS_Unstable:          0 kB\nBounce:                0 kB\nWritebackTmp:          0 kB\nCommitLimit:    81770216 kB\nCommitted_AS:   60875108 kB\nVmallocTotal:   13743895347199 kB\nVmallocUsed:      182656 kB\nVmallocChunk:          0 kB\nPercpu:           433152 kB\nHardwareCorrupted:     0 kB\nAnonHugePages:    464896 kB\nShmemHugePages:        0 kB\nShmemPmdMapped:        0 kB\nFileHugePages:   2656256 kB\nFilePmdMapped:      4096 kB\nCmaTotal:              0 kB\nCmaFree:               0 kB\nUnaccepted:            0 kB\nBalloon:               0 kB\nHugePages_Total:       0\nHugePages_Free:        0\nHugePages_Rsvd:        0\nHugePages_Surp:        0\nHugepagesize:       2048 kB\nHugetlb:               0 kB\nDirectMap4k:    13655432 kB\nDirectMap2M:    114976768 kB\nDirectMap1G:     7340032 kB\n",
+      "phase_seconds": {
+        "collect_host_seconds": 0.20607200283557175,
+        "world_model_host_seconds": 2.012119085714221,
+        "actor_critic_host_seconds": 3.2172148657031356,
+        "student_host_seconds": 1.1777060145512224
+      },
+      "measured_iterations": [
+        5502,
+        5503,
+        5504,
+        5505,
+        5506
+      ]
+    },
+    "125": {
+      "steady": {
+        "mean_seconds": 6.13259548121132,
+        "median_seconds": 6.099950551986694,
+        "minimum_seconds": 6.025134582072496,
+        "maximum_seconds": 6.278977761045098,
+        "updates": 5,
+        "real_transitions_per_second": 667.906437421004,
+        "imagined_transitions_per_second": 42746.01199494425,
+        "projected_120k_hours_without_evaluation_or_checkpoint": 204.41984937371066
+      },
+      "gpu_utilization": {
+        "mean_pct": 87.46666666666667,
+        "maximum_pct": 100.0,
+        "samples": 30
+      },
+      "gpu_max_sampled_mib": 20006.0,
+      "torch_peak_allocated_bytes": 8281562624,
+      "device_min_free_observed_bytes": 4263641088,
+      "standing_probe": {
+        "target_m": 0.36,
+        "mean_m": 0.34132692217826843,
+        "minimum_m": 0.3381379544734955,
+        "mae_m": 0.018673058599233627,
+        "falls": 0,
+        "payload_endpoints_kg": [
+          0.0,
+          2.0
+        ],
+        "scope": "Zero action at new joint zero, 2s flat settle; last 1s measured."
+      },
+      "latent_gradient_probe": {
+        "action_to_refreshed_latent_vjp_l2": 0.12419597059488297,
+        "latent_to_student_actor_vjp_l2": 0.05673908069729805,
+        "frozen_module_parameter_grads_absent": true,
+        "scope": "GPU VJP on real replay states; every-step latent forecast; not latent prediction accuracy"
+      },
+      "loaded_fk_check": {
+        "maximum_link_position_error_m": 4.35560941696167e-05,
+        "tolerance_m": 0.003
+      },
+      "counts": {
+        "collect": 103,
+        "transitions": 421888,
+        "wm": 36,
+        "actor": 7,
+        "critic": 140,
+        "cts": 14
+      },
+      "actor_microbatch": 8192,
+      "replay_storage": "cpu",
+      "depth_cache_gib": 26.0,
+      "full_cache_committed": true,
+      "host_memory_after_cache_commit": "MemTotal:       65290784 kB\nMemFree:          609176 kB\nMemAvailable:   13105048 kB\nBuffers:          216456 kB\nCached:         13559328 kB\nSwapCached:      2114748 kB\nActive:         52711088 kB\nInactive:        6578004 kB\nActive(anon):   47707940 kB\nInactive(anon):   623260 kB\nActive(file):    5003148 kB\nInactive(file):  5954744 kB\nUnevictable:      381448 kB\nMlocked:          292804 kB\nSwapTotal:      60000252 kB\nSwapFree:       51922520 kB\nZswap:                 0 kB\nZswapped:              0 kB\nDirty:               988 kB\nWriteback:             0 kB\nAnonPages:      45776256 kB\nMapped:          4613376 kB\nShmem:           2804936 kB\nKReclaimable:    2805940 kB\nSlab:            3443856 kB\nSReclaimable:    2715260 kB\nSUnreclaim:       728596 kB\nKernelStack:       76112 kB\nPageTables:       281616 kB\nSecPageTables:     13264 kB\nNFS_Unstable:          0 kB\nBounce:                0 kB\nWritebackTmp:          0 kB\nCommitLimit:    92645644 kB\nCommitted_AS:   86448712 kB\nVmallocTotal:   34359738367 kB\nVmallocUsed:      258604 kB\nVmallocChunk:          0 kB\nPercpu:            40512 kB\nHardwareCorrupted:     0 kB\nAnonHugePages:    456704 kB\nShmemHugePages:    16384 kB\nShmemPmdMapped:        0 kB\nFileHugePages:    284672 kB\nFilePmdMapped:      8192 kB\nCmaTotal:              0 kB\nCmaFree:          126104 kB\nUnaccepted:            0 kB\nBalloon:               0 kB\nHugePages_Total:       0\nHugePages_Free:        0\nHugePages_Rsvd:        0\nHugePages_Surp:        0\nHugepagesize:       2048 kB\nHugetlb:               0 kB\nDirectMap4k:    59057508 kB\nDirectMap2M:     3305472 kB\nDirectMap1G:     4194304 kB\n",
+      "phase_seconds": {
+        "collect_host_seconds": 0.17966482418123633,
+        "world_model_host_seconds": 1.9626855364069342,
+        "actor_critic_host_seconds": 3.0817291179904713,
+        "student_host_seconds": 0.8849006553646177
+      },
+      "measured_iterations": [
+        5502,
+        5503,
+        5504,
+        5505,
+        5506
+      ]
+    },
+    "156": {
+      "steady": {
+        "mean_seconds": 8.240887871722226,
+        "median_seconds": 8.236398826527875,
+        "minimum_seconds": 8.100158824003302,
+        "maximum_seconds": 8.475605624960735,
+        "updates": 10,
+        "real_transitions_per_second": 497.03382253931767,
+        "imagined_transitions_per_second": 31810.16464251633,
+        "projected_120k_hours_without_evaluation_or_checkpoint": 274.69626239074086
+      },
+      "gpu_utilization": {
+        "mean_pct": 76.525,
+        "maximum_pct": 100.0,
+        "samples": 80
+      },
+      "gpu_max_sampled_mib": 14973.0,
+      "torch_peak_allocated_bytes": 3272548352,
+      "device_min_free_observed_bytes": 9550626816,
+      "standing_probe": {
+        "target_m": 0.36,
+        "mean_m": 0.3413269817829132,
+        "minimum_m": 0.33813247084617615,
+        "mae_m": 0.018673036247491837,
+        "falls": 0,
+        "payload_endpoints_kg": [
+          0.0,
+          2.0
+        ],
+        "scope": "Zero action at new joint zero, 2s flat settle; last 1s measured."
+      },
+      "latent_gradient_probe": {
+        "action_to_refreshed_latent_vjp_l2": 0.09431470185518265,
+        "latent_to_student_actor_vjp_l2": 0.016975482925772667,
+        "actual_instinct_core_policy_latent_vjp_absent": true,
+        "actual_instinct_core_wm_latent_vjp_l2": 45.27864456176758,
+        "frozen_module_parameter_grads_absent": true,
+        "scope": "GPU VJP on real replay states; every-step latent forecast; not latent prediction accuracy"
+      },
+      "loaded_fk_check": {
+        "maximum_link_position_error_m": 3.288686275482178e-05,
+        "tolerance_m": 0.003
+      },
+      "counts": {
+        "collect": 108,
+        "transitions": 442368,
+        "wm": 56,
+        "actor": 12,
+        "critic": 240,
+        "cts": 24
+      },
+      "actor_microbatch": 2048,
+      "replay_storage": "cpu",
+      "depth_cache_gib": 4.0,
+      "full_cache_committed": true,
+      "host_memory_after_cache_commit": "MemTotal:       32801616 kB\nMemFree:         2281900 kB\nMemAvailable:    4199884 kB\nBuffers:           59064 kB\nCached:          4800768 kB\nSwapCached:        34480 kB\nActive:         27428532 kB\nInactive:        1478944 kB\nActive(anon):   25890364 kB\nInactive(anon):   874800 kB\nActive(file):    1538168 kB\nInactive(file):   604144 kB\nUnevictable:         108 kB\nMlocked:             108 kB\nSwapTotal:       2097148 kB\nSwapFree:           1308 kB\nZswap:                 0 kB\nZswapped:              0 kB\nDirty:               104 kB\nWriteback:             0 kB\nAnonPages:      24012392 kB\nMapped:          3972468 kB\nShmem:           2735928 kB\nKReclaimable:     244068 kB\nSlab:             506524 kB\nSReclaimable:     244068 kB\nSUnreclaim:       262456 kB\nKernelStack:       21104 kB\nPageTables:       110488 kB\nSecPageTables:         0 kB\nNFS_Unstable:          0 kB\nBounce:                0 kB\nWritebackTmp:          0 kB\nCommitLimit:    18497956 kB\nCommitted_AS:   40653808 kB\nVmallocTotal:   34359738367 kB\nVmallocUsed:      240920 kB\nVmallocChunk:          0 kB\nPercpu:             8896 kB\nHardwareCorrupted:     0 kB\nAnonHugePages:    350208 kB\nShmemHugePages:        0 kB\nShmemPmdMapped:        0 kB\nFileHugePages:         0 kB\nFilePmdMapped:         0 kB\nUnaccepted:            0 kB\nHugePages_Total:       0\nHugePages_Free:        0\nHugePages_Rsvd:        0\nHugePages_Surp:        0\nHugepagesize:       2048 kB\nHugetlb:               0 kB\nDirectMap4k:     8076344 kB\nDirectMap2M:    25413632 kB\nDirectMap1G:           0 kB\n",
+      "phase_seconds": {
+        "collect_host_seconds": 0.202966164809186,
+        "world_model_host_seconds": 2.0235658912337384,
+        "actor_critic_host_seconds": 4.637608003779315,
+        "student_host_seconds": 1.3135271592298523
+      },
+      "measured_iterations": [
+        5502,
+        5503,
+        5504,
+        5505,
+        5506,
+        5507,
+        5508,
+        5509,
+        5510,
+        5511
+      ]
+    }
+  },
+  "alternative_benchmarks": {
+    "125/full_v4": {
+      "steady": {
+        "mean_seconds": 6.979485254385509,
+        "median_seconds": 7.001632075989619,
+        "minimum_seconds": 6.854019238962792,
+        "maximum_seconds": 7.094757528975606,
+        "updates": 5,
+        "real_transitions_per_second": 586.8627628987838,
+        "imagined_transitions_per_second": 37559.21682552216,
+        "projected_120k_hours_without_evaluation_or_checkpoint": 232.64950847951695
+      },
+      "actor_microbatch": 2048,
+      "full_cache_committed": false
+    },
+    "156/full_v4": {
+      "steady": {
+        "mean_seconds": 8.495933102001436,
+        "median_seconds": 8.49413992697373,
+        "minimum_seconds": 8.368803097982891,
+        "maximum_seconds": 8.668155004968867,
+        "updates": 5,
+        "real_transitions_per_second": 482.11302405795567,
+        "imagined_transitions_per_second": 30855.233539709163,
+        "projected_120k_hours_without_evaluation_or_checkpoint": 283.19777006671455
+      },
+      "actor_microbatch": 2048,
+      "full_cache_committed": false
+    },
+    "156/full_v5": {
+      "steady": {
+        "mean_seconds": 10.231508191046306,
+        "median_seconds": 9.48166058305651,
+        "minimum_seconds": 8.198968566022813,
+        "maximum_seconds": 14.654613213031553,
+        "updates": 5,
+        "real_transitions_per_second": 400.33198659650685,
+        "imagined_transitions_per_second": 25621.24714217644,
+        "projected_120k_hours_without_evaluation_or_checkpoint": 341.05027303487685
+      },
+      "actor_microbatch": 8192,
+      "full_cache_committed": true
+    }
+  },
+  "instinct_ablation": "137 code-only; only predicted-latent policy-entry derivative stopped; no launch",
+  "test_cleanup": "temporary scripts/configs/logs/checkpoints removed before formal launch; compact acceptance retained",
+  "camera": {
+    "confirmed_date": "2026-11-15",
+    "parent_frame": "base_link",
+    "axes": "x_forward_y_left_z_up",
+    "optical_center_m": [
+      0.101958,
+      0.0,
+      0.327
+    ],
+    "direction": "horizontal_forward",
+    "nominal_fov_degrees": [
+      87,
+      58
+    ],
+    "depth_hz": 50,
+    "optical_depth_range_m": [
+      0.1,
+      6.0
+    ],
+    "image_hw": [
+      48,
+      64
+    ],
+    "evidence": "user-confirmed inherited model coordinates; not measured AS2 hardware calibration",
+    "base_mesh_head_top_z_m": 0.13478276133537292,
+    "camera_above_head_top_m": 0.1922172386646271
+  },
+  "qualification_fixture_correction": "Early discarded standing test put4096robots at one calibration point and exceeded broadphase capacity. Accepted tests distributed robots among original flat tiles; no solver buffer inflation.",
+  "algebra": {
+    "timeout_return": 27.099998474121094,
+    "finite_return": 2.799999952316284,
+    "termination_return": 1.0,
+    "post_timeout_reward_gradient_zero": true,
+    "lambda1_matches_return": true,
+    "value_guard_3checks_and_hard_limit": true
+  },
+  "noise_weights_extraction": {
+    "source_sha256": "137f90824abc604c03e19a3f15edc232f168c64bb9d1c47930d48bfe6260d8ae",
+    "sha256": "9e98bb745b34c32f2c782ebc91cd4dc848d0a8659df35fd6bc97ce7fb1ba89e7",
+    "bytes": 507701,
+    "noise_tensor_count": 25,
+    "all_noise_tensors_exact": true
+  },
+  "noise_source_functions_ast_unchanged": true,
+  "ray_and_completion_probes": [
+    {
+      "host": "175",
+      "returncode": 0,
+      "records": [
+        {
+          "completion_mass": {
+            "award": [
+              0.42308855056762695,
+              0.011546983383595943
+            ],
+            "gradient": [
+              5.343918800354004,
+              0.40737128257751465
+            ]
+          },
+          "once_only_hard_bonus": 27.367191314697266,
+          "critic_shapes": [
+            [
+              8,
+              246
+            ],
+            [
+              8
+            ]
+          ],
+          "policy_visual_gradient": {
+            "connected_norm": 0.2456446886062622,
+            "detached_is_none": true
+          }
+        },
+        {
+          "ray_plane_max_error_m": 4.76837158203125e-07,
+          "noise_cache_eviction_exact": true,
+          "depth_range": [
+            0.0,
+            2.017578125
+          ]
+        }
+      ]
+    },
+    {
+      "host": "125",
+      "returncode": 0,
+      "records": [
+        {
+          "completion_mass": {
+            "award": [
+              0.42308855056762695,
+              0.011546983383595943
+            ],
+            "gradient": [
+              5.343918800354004,
+              0.40737128257751465
+            ]
+          },
+          "once_only_hard_bonus": 27.367191314697266,
+          "critic_shapes": [
+            [
+              8,
+              246
+            ],
+            [
+              8
+            ]
+          ],
+          "policy_visual_gradient": {
+            "connected_norm": 0.3357184827327728,
+            "detached_is_none": true
+          }
+        },
+        {
+          "ray_plane_max_error_m": 4.76837158203125e-07,
+          "noise_cache_eviction_exact": true,
+          "depth_range": [
+            0.0,
+            2.017578125
+          ]
+        }
+      ]
+    },
+    {
+      "host": "156",
+      "returncode": 0,
+      "records": [
+        {
+          "completion_mass": {
+            "award": [
+              0.42308855056762695,
+              0.011546983383595943
+            ],
+            "gradient": [
+              5.343918800354004,
+              0.40737128257751465
+            ]
+          },
+          "once_only_hard_bonus": 27.367191314697266,
+          "critic_shapes": [
+            [
+              8,
+              246
+            ],
+            [
+              8
+            ]
+          ],
+          "policy_visual_gradient": {
+            "connected_norm": 0.39304018020629883,
+            "detached_is_none": true
+          }
+        },
+        {
+          "ray_plane_max_error_m": 4.76837158203125e-07,
+          "noise_cache_eviction_exact": true,
+          "depth_range": [
+            0.0,
+            2.017578125
+          ]
+        }
+      ]
+    }
+  ]
+}
