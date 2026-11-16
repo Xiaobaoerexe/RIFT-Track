@@ -20,6 +20,7 @@ class TrainCfg:
     wm_hidden: tuple = (1024, 1024, 1024)
     wm_window: int = 8
     wm_batch: int = 2048
+    wm_visual_windows: int = 512
     wm_prioritized_frac: float = .25
     wm_archive_frac: float = .25
     archive_size: int = 100000
@@ -78,6 +79,8 @@ class TrainCfg:
     evaluation_python: str = ''
     depth_package: str = 'observation/depth_input'
     depth_chunk_size: int = 1024
+    encoding_chunk_size: int = 2048
+    torch_threads: int = 8
     depth_period: int = 1
     imagination_depth_period: int = 5
     depth_cache_gib: float = 26.
@@ -87,6 +90,8 @@ class TrainCfg:
     depth_precision: str = 'fp32'
     compile: bool = True
     device: str = 'cuda:0'
+    gpu_mode: str = 'single'
+    noise_devices: tuple = ()
 
     def wm_updates_for(self, iteration):
         return 2 if iteration < self.terrain_start_iteration else 4
@@ -99,6 +104,8 @@ class TrainCfg:
         return cls(**record)
 
     def validate(self, production=True):
+        if self.gpu_mode not in ('single','auto'):
+            raise ValueError('gpu_mode must be single or auto')
         if self.robot != 'as2' or self.variant not in ('simple', 'events', 'moe'):
             raise ValueError('Only the three AS2 experiments are supported')
         if self.replay_storage not in ('device','cpu'):
@@ -108,6 +115,10 @@ class TrainCfg:
             raise ValueError('Variant/task/actor mismatch')
         if (self.collect_steps, self.horizon, self.wm_window) != (1, 32, 8):
             raise ValueError('Source collect/H/K contract is 1/32/8')
+        if not 0 < self.wm_visual_windows <= self.wm_batch:
+            raise ValueError('Visual supervision must sample valid whole WM windows')
+        if self.depth_precision not in ('fp32','bf16') or min(self.encoding_chunk_size,self.torch_threads)<=0:
+            raise ValueError('Invalid noise precision or execution batching')
         if production and (self.num_envs, self.buffer_len, self.imag_batch, self.wm_batch) != (4096, 1000, 8192, 2048):
             raise ValueError('Production scale must be 4096/1000/8192/2048')
         if production and self.iterations != 120000:

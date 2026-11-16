@@ -1,0 +1,929 @@
+{
+  "schema": "as2_speed_acceptance_20261116",
+  "before_commit": "c8c83fb38b5294dc7e6c22921d1d13d5d405e997",
+  "scope": "execution and short prediction qualification; not proof of learned locomotion",
+  "protocol": "4096 environments,1000 real prefill steps,iteration5500,12complete updates; exclude first2; synchronized phases; alltasks active",
+  "hosts": {
+    "175": {
+      "updates": 10,
+      "mean_seconds": 4.211853539431468,
+      "median_seconds": 4.222123650368303,
+      "range_seconds": [
+        4.01192826544866,
+        4.455494933295995
+      ],
+      "phase_mean_seconds": {
+        "collect": 0.19218468009494244,
+        "wm": 0.7407628947868943,
+        "actor_critic": 2.8303802998736503,
+        "cts": 0.4485256646759808
+      },
+      "peak_torch_allocated_gib": 22.182692527770996,
+      "minimum_device_free_after_update_gib": 14.21466064453125,
+      "critic_steps_per_iteration": 20,
+      "critic_valid_samples_range": [
+        257857,
+        258453
+      ],
+      "real_transitions_per_second": 972.493454877563,
+      "imagined_transitions_per_second": 62239.58111216403,
+      "flat_projection_120k_hours_excluding_evaluation_and_checkpoints": 140.39511798104894,
+      "gpu_utilization_mean_pct": 84.9375,
+      "gpu_utilization_max_pct": 99.0,
+      "gpu_sample_count": 80,
+      "peak_device_used_mib": 33942.0,
+      "config": {
+        "robot": "as2",
+        "variant": "moe",
+        "stage": "terrain",
+        "num_envs": 4096,
+        "buffer_len": 1000,
+        "replay_storage": "device",
+        "collect_steps": 1,
+        "iterations": 120000,
+        "warmup_iterations": 1000,
+        "critic_warmup_iterations": 500,
+        "actor_ramp_iterations": 1000,
+        "policy_start": 1500,
+        "terrain_start_iteration": 2500,
+        "all_terrain_iteration": 5000,
+        "wm_hidden": [
+          1024,
+          1024,
+          1024
+        ],
+        "wm_window": 8,
+        "wm_batch": 2048,
+        "wm_prioritized_frac": 0.25,
+        "wm_archive_frac": 0.25,
+        "archive_size": 100000,
+        "archive_keep_prob": 0.02,
+        "event_history_steps": 100,
+        "imag_batch": 8192,
+        "teacher_fraction": 0.75,
+        "horizon": 32,
+        "actor_microbatch": 8192,
+        "actor_hidden": [
+          512,
+          256,
+          128
+        ],
+        "critic_hidden": [
+          512,
+          256,
+          128
+        ],
+        "actor_experts": 3,
+        "proprio_experts": 8,
+        "task_count": 4,
+        "task_context_dim": 62,
+        "cts_updates": 2,
+        "cts_batch": 160,
+        "cts_sequence_steps": 64,
+        "cts_burnin": 16,
+        "cts_lr": 0.0003,
+        "cts_balance": 0.01,
+        "cts_action_weight": 0.1,
+        "critic_epochs": 5,
+        "critic_minibatches": 4,
+        "critic_microbatch": 65536,
+        "critic_huber_delta": 1.0,
+        "lr": 0.0002,
+        "teacher_lr": 0.0002,
+        "wm_lr": 0.0002,
+        "lr_adjust_factor": 1.3,
+        "lr_fixed_until": 5000,
+        "wm_fixed_until": 40000,
+        "cts_fixed_until": 40000,
+        "wm_lr_bounds": [
+          5e-05,
+          0.0002
+        ],
+        "actor_lr_bounds": [
+          5e-05,
+          0.0002
+        ],
+        "critic_lr_bounds": [
+          5e-05,
+          0.0002
+        ],
+        "cts_lr_bounds": [
+          0.0001,
+          0.0003
+        ],
+        "lr_holdout_modulus": 32,
+        "grad_clip": 1.0,
+        "grad_clip_elem": 0.1,
+        "gamma": 0.99,
+        "lam": 0.95,
+        "action_noise": 0.1,
+        "explore_frac": 0.25,
+        "explore_noise": 0.3,
+        "explore_theta": 2.0,
+        "driver_policy": "",
+        "driver_frac": 0.0,
+        "log_interval": 50,
+        "save_interval": 1000,
+        "seed": 17,
+        "dt": 0.02,
+        "physics_dt": 0.005,
+        "episode_seconds": 20.0,
+        "payload_max_kg": 2.0,
+        "reward_calibration": "calibration/reward_calibration.json",
+        "evaluation_interval": 5000,
+        "evaluation_python": "",
+        "depth_package": "observation/depth_input",
+        "depth_chunk_size": 1024,
+        "depth_period": 1,
+        "mixed_precision": true,
+        "depth_precision": "bf16",
+        "compile": true,
+        "device": "cuda:0",
+        "depth_cache_gib": 26.0,
+        "latent_actor_stop_gradient": false,
+        "base_height_target": 0.36,
+        "imagination_depth_period": 5,
+        "wm_visual_windows": 512,
+        "encoding_chunk_size": 2048,
+        "torch_threads": 8
+      },
+      "previous_qualification_seconds": 6.961013215128332,
+      "historical_comparison_note": "prior qualification, different Replay population; not a controlled ablation",
+      "rollout_equivalence": [
+        {
+          "phase": "rollout_equivalence",
+          "objective_max": 0.0,
+          "fit_data_max": 0.0,
+          "gradient_relative": 0.00023465129197575152,
+          "timeout_count": 64,
+          "unix": 1794804633.8887208
+        }
+      ]
+    },
+    "125": {
+      "updates": 10,
+      "mean_seconds": 3.887242799124215,
+      "median_seconds": 3.830987146939151,
+      "range_seconds": [
+        3.7441893520299345,
+        4.426288488088176
+      ],
+      "phase_mean_seconds": {
+        "collect": 0.15992463688598946,
+        "wm": 0.6775216245092451,
+        "actor_critic": 2.6539089193218386,
+        "cts": 0.39588761840714143
+      },
+      "peak_torch_allocated_gib": 8.6958646774292,
+      "minimum_device_free_after_update_gib": 3.91412353515625,
+      "critic_steps_per_iteration": 20,
+      "critic_valid_samples_range": [
+        257842,
+        258591
+      ],
+      "real_transitions_per_second": 1053.7031545657035,
+      "imagined_transitions_per_second": 67437.00189220502,
+      "flat_projection_120k_hours_excluding_evaluation_and_checkpoints": 129.57475997080715,
+      "gpu_utilization_mean_pct": 89.60810810810811,
+      "gpu_utilization_max_pct": 100.0,
+      "gpu_sample_count": 74,
+      "peak_device_used_mib": 20066.0,
+      "config": {
+        "robot": "as2",
+        "variant": "events",
+        "stage": "terrain",
+        "num_envs": 4096,
+        "buffer_len": 1000,
+        "replay_storage": "cpu",
+        "collect_steps": 1,
+        "iterations": 120000,
+        "warmup_iterations": 1000,
+        "critic_warmup_iterations": 500,
+        "actor_ramp_iterations": 1000,
+        "policy_start": 1500,
+        "terrain_start_iteration": 2500,
+        "all_terrain_iteration": 5000,
+        "wm_hidden": [
+          1024,
+          1024,
+          1024
+        ],
+        "wm_window": 8,
+        "wm_batch": 2048,
+        "wm_prioritized_frac": 0.25,
+        "wm_archive_frac": 0.25,
+        "archive_size": 100000,
+        "archive_keep_prob": 0.02,
+        "event_history_steps": 100,
+        "imag_batch": 8192,
+        "teacher_fraction": 0.75,
+        "horizon": 32,
+        "actor_microbatch": 8192,
+        "actor_hidden": [
+          512,
+          256,
+          128
+        ],
+        "critic_hidden": [
+          512,
+          256,
+          128
+        ],
+        "actor_experts": 1,
+        "proprio_experts": 8,
+        "task_count": 4,
+        "task_context_dim": 62,
+        "cts_updates": 2,
+        "cts_batch": 160,
+        "cts_sequence_steps": 64,
+        "cts_burnin": 16,
+        "cts_lr": 0.0003,
+        "cts_balance": 0.01,
+        "cts_action_weight": 0.1,
+        "critic_epochs": 5,
+        "critic_minibatches": 4,
+        "critic_microbatch": 65536,
+        "critic_huber_delta": 1.0,
+        "lr": 0.0002,
+        "teacher_lr": 0.0002,
+        "wm_lr": 0.0002,
+        "lr_adjust_factor": 1.3,
+        "lr_fixed_until": 5000,
+        "wm_fixed_until": 40000,
+        "cts_fixed_until": 40000,
+        "wm_lr_bounds": [
+          5e-05,
+          0.0002
+        ],
+        "actor_lr_bounds": [
+          5e-05,
+          0.0002
+        ],
+        "critic_lr_bounds": [
+          5e-05,
+          0.0002
+        ],
+        "cts_lr_bounds": [
+          0.0001,
+          0.0003
+        ],
+        "lr_holdout_modulus": 32,
+        "grad_clip": 1.0,
+        "grad_clip_elem": 0.1,
+        "gamma": 0.99,
+        "lam": 0.95,
+        "action_noise": 0.1,
+        "explore_frac": 0.25,
+        "explore_noise": 0.3,
+        "explore_theta": 2.0,
+        "driver_policy": "",
+        "driver_frac": 0.0,
+        "log_interval": 50,
+        "save_interval": 1000,
+        "seed": 17,
+        "dt": 0.02,
+        "physics_dt": 0.005,
+        "episode_seconds": 20.0,
+        "payload_max_kg": 2.0,
+        "reward_calibration": "calibration/reward_calibration.json",
+        "evaluation_interval": 5000,
+        "evaluation_python": "",
+        "depth_package": "observation/depth_input",
+        "depth_chunk_size": 1024,
+        "depth_period": 1,
+        "mixed_precision": true,
+        "depth_precision": "bf16",
+        "compile": true,
+        "device": "cuda:0",
+        "depth_cache_gib": 26.0,
+        "latent_actor_stop_gradient": false,
+        "base_height_target": 0.36,
+        "imagination_depth_period": 5,
+        "wm_visual_windows": 512,
+        "encoding_chunk_size": 2048,
+        "torch_threads": 8
+      },
+      "previous_qualification_seconds": 6.126310607022606,
+      "historical_comparison_note": "prior qualification, different Replay population; not a controlled ablation",
+      "rollout_equivalence": []
+    },
+    "156": {
+      "updates": 10,
+      "mean_seconds": 4.414590419165324,
+      "median_seconds": 4.417556253960356,
+      "range_seconds": [
+        4.354338334989734,
+        4.470686077955179
+      ],
+      "phase_mean_seconds": {
+        "collect": 0.1850198667962104,
+        "wm": 0.8030307268840261,
+        "actor_critic": 2.7743858389789238,
+        "cts": 0.6521539865061641
+      },
+      "peak_torch_allocated_gib": 9.386847019195557,
+      "minimum_device_free_after_update_gib": 3.30487060546875,
+      "critic_steps_per_iteration": 20,
+      "critic_valid_samples_range": [
+        257724,
+        258271
+      ],
+      "real_transitions_per_second": 927.8323946470302,
+      "imagined_transitions_per_second": 59381.273257409935,
+      "flat_projection_120k_hours_excluding_evaluation_and_checkpoints": 147.1530139721775,
+      "gpu_utilization_mean_pct": 82.16666666666667,
+      "gpu_utilization_max_pct": 99.0,
+      "gpu_sample_count": 84,
+      "peak_device_used_mib": 20697.0,
+      "config": {
+        "robot": "as2",
+        "variant": "simple",
+        "stage": "terrain",
+        "num_envs": 4096,
+        "buffer_len": 1000,
+        "replay_storage": "cpu",
+        "collect_steps": 1,
+        "iterations": 120000,
+        "warmup_iterations": 1000,
+        "critic_warmup_iterations": 500,
+        "actor_ramp_iterations": 1000,
+        "policy_start": 1500,
+        "terrain_start_iteration": 2500,
+        "all_terrain_iteration": 5000,
+        "wm_hidden": [
+          1024,
+          1024,
+          1024
+        ],
+        "wm_window": 8,
+        "wm_batch": 2048,
+        "wm_prioritized_frac": 0.25,
+        "wm_archive_frac": 0.25,
+        "archive_size": 100000,
+        "archive_keep_prob": 0.02,
+        "event_history_steps": 100,
+        "imag_batch": 8192,
+        "teacher_fraction": 0.75,
+        "horizon": 32,
+        "actor_microbatch": 8192,
+        "actor_hidden": [
+          512,
+          256,
+          128
+        ],
+        "critic_hidden": [
+          512,
+          256,
+          128
+        ],
+        "actor_experts": 3,
+        "proprio_experts": 8,
+        "task_count": 1,
+        "task_context_dim": 62,
+        "cts_updates": 2,
+        "cts_batch": 160,
+        "cts_sequence_steps": 64,
+        "cts_burnin": 16,
+        "cts_lr": 0.0003,
+        "cts_balance": 0.01,
+        "cts_action_weight": 0.1,
+        "critic_epochs": 5,
+        "critic_minibatches": 4,
+        "critic_microbatch": 65536,
+        "critic_huber_delta": 1.0,
+        "lr": 0.0002,
+        "teacher_lr": 0.0002,
+        "wm_lr": 0.0002,
+        "lr_adjust_factor": 1.3,
+        "lr_fixed_until": 5000,
+        "wm_fixed_until": 40000,
+        "cts_fixed_until": 40000,
+        "wm_lr_bounds": [
+          5e-05,
+          0.0002
+        ],
+        "actor_lr_bounds": [
+          5e-05,
+          0.0002
+        ],
+        "critic_lr_bounds": [
+          5e-05,
+          0.0002
+        ],
+        "cts_lr_bounds": [
+          0.0001,
+          0.0003
+        ],
+        "lr_holdout_modulus": 32,
+        "grad_clip": 1.0,
+        "grad_clip_elem": 0.1,
+        "gamma": 0.99,
+        "lam": 0.95,
+        "action_noise": 0.1,
+        "explore_frac": 0.25,
+        "explore_noise": 0.3,
+        "explore_theta": 2.0,
+        "driver_policy": "",
+        "driver_frac": 0.0,
+        "log_interval": 50,
+        "save_interval": 1000,
+        "seed": 17,
+        "dt": 0.02,
+        "physics_dt": 0.005,
+        "episode_seconds": 20.0,
+        "payload_max_kg": 2.0,
+        "reward_calibration": "calibration/reward_calibration.json",
+        "evaluation_interval": 5000,
+        "evaluation_python": "",
+        "depth_package": "observation/depth_input",
+        "depth_chunk_size": 1024,
+        "depth_period": 1,
+        "mixed_precision": true,
+        "depth_precision": "bf16",
+        "compile": true,
+        "device": "cuda:0",
+        "depth_cache_gib": 2.0,
+        "latent_actor_stop_gradient": false,
+        "base_height_target": 0.36,
+        "imagination_depth_period": 5,
+        "wm_visual_windows": 512,
+        "encoding_chunk_size": 2048,
+        "torch_threads": 4
+      },
+      "previous_qualification_seconds": 8.322372117801569,
+      "historical_comparison_note": "prior qualification, different Replay population; not a controlled ablation",
+      "rollout_equivalence": []
+    }
+  },
+  "same_host_control_125": {
+    "baseline": {
+      "updates": 6,
+      "mean_seconds": 6.30208890735715,
+      "median_seconds": 6.314007145469077,
+      "range_seconds": [
+        6.207436920027249,
+        6.380755048128776
+      ],
+      "phase_mean_seconds": {
+        "collect": 0.17719616015286496,
+        "wm": 2.0118581848219037,
+        "actor_critic": 3.226350949204061,
+        "cts": 0.8866836131783202
+      },
+      "peak_torch_allocated_gib": 8.644118309020996,
+      "minimum_device_free_after_update_gib": 3.01373291015625,
+      "critic_steps_per_iteration": 20,
+      "critic_valid_samples_range": [
+        257315,
+        258512
+      ],
+      "real_transitions_per_second": 649.9432267955266,
+      "imagined_transitions_per_second": 41596.3665149137,
+      "flat_projection_120k_hours_excluding_evaluation_and_checkpoints": 210.06963024523833
+    },
+    "optimized": 3.887242799124215,
+    "note": "same host,4096envs,1000prefill,8192x32imagination,all update counts unchanged; random trajectories diverge after updates"
+  },
+  "unit_results": {
+    "cts_fp32": {
+      "losses": [
+        1.6711326837539673,
+        1.6711326837539673
+      ],
+      "gradient_relative": 1.651360470589225e-08
+    },
+    "cts_bf16": {
+      "losses": [
+        1.672394871711731,
+        1.672394871711731
+      ],
+      "gradient_relative": 3.9574631955474615e-05
+    },
+    "critic_fp32": {
+      "value_relative": 0.0,
+      "parameter_gradient_relative": 0.0,
+      "input_gradient_relative": 0.0,
+      "grouped_gradient_relative": 4.654681902138691e-07
+    },
+    "critic_bf16": {
+      "value_relative": 0.004123235587030649,
+      "parameter_gradient_relative": 0.004809319041669369,
+      "input_gradient_relative": 0.0005424449918791652
+    }
+  },
+  "kernel_benchmark": {
+    "encoder_512": 0.008753925503697246,
+    "teacher_map_512": 0.004998267977498472,
+    "encoder_1024": 0.007407728000544012,
+    "teacher_map_1024": 0.004672395472880453,
+    "encoder_2048": 0.00875360204372555,
+    "teacher_map_2048": 0.005487418966367841,
+    "encoder_4096": 0.010889953991863877,
+    "teacher_map_4096": 0.005979547917377204,
+    "critic_8192": 0.007073738030157983,
+    "critic_16384": 0.0035199070116505027,
+    "critic_32768": 0.0034998824703507125,
+    "critic_65536": 0.003625141514930874,
+    "adam_False": 0.0031873705447651446,
+    "adam_True": 0.0003692525206133723,
+    "adam_max_difference": 2.980232238769531e-07,
+    "adam_relative_difference": 2.673776293704577e-07
+  },
+  "noise_bf16": {
+    "fp32_seconds": 0.01816116797272116,
+    "bf16_seconds": 0.009250006056390703,
+    "speedup": 1.9633682250590374,
+    "hole_flip_fraction": 0.0002689361572265625,
+    "hole_rates": [
+      0.025595664978027344,
+      0.02561473846435547
+    ],
+    "metric_error_nonholes_max": 0.0002875328063964844,
+    "logits_rmse": 0.1053347960114479,
+    "sigma_max_diff": 0.00029533589258790016
+  },
+  "gru_compile_rejected": {
+    "losses": [
+      1.0592824220657349,
+      1.0592825412750244
+    ],
+    "gradient_relative": 7.551327144028619e-05,
+    "eager_seconds": 0.018622530973516405,
+    "compiled_seconds": 0.01961134048178792,
+    "speedup": 0.9495797082718658
+  },
+  "cache_equivalence": [
+    {
+      "phase": "cache_equivalence",
+      "noisy_max": 0.0,
+      "clean_max": 0.0,
+      "hit_equal": true,
+      "eviction_equal": true,
+      "unix": 1794804426.163887
+    }
+  ],
+  "wm_80_updates": [
+    {
+      "phase": "wm_holdout",
+      "visual": 2048,
+      "horizon": 8,
+      "errors": {
+        "state": 7.527881622314453,
+        "pose": 14.111804008483887,
+        "contact": 0.3844137489795685,
+        "telemetry": 0.9055918455123901,
+        "consistency": 0.023587942123413086,
+        "velocity_mse": 0.1657980978488922,
+        "pose_mse": 0.0006528517114929855,
+        "one_step": 1.510272741317749,
+        "latent": 0.05462051182985306,
+        "total": 22.932048797607422
+      },
+      "feature_std": 0.9880019426345825,
+      "reconstruction_l1": 0.10382223129272461,
+      "valid_mean": 7.95703125
+    },
+    {
+      "phase": "wm_holdout",
+      "visual": 2048,
+      "horizon": 16,
+      "errors": {
+        "state": 10.482250213623047,
+        "pose": 41.58195495605469,
+        "contact": 0.3887602984905243,
+        "telemetry": 0.9075818061828613,
+        "consistency": 0.018260320648550987,
+        "velocity_mse": 0.19184359908103943,
+        "pose_mse": 0.001750152325257659,
+        "one_step": 1.5386946201324463,
+        "latent": 0.13552787899971008,
+        "total": 53.36237335205078
+      },
+      "feature_std": 1.0115046501159668,
+      "reconstruction_l1": 0.11234068870544434,
+      "valid_mean": 15.95703125
+    },
+    {
+      "phase": "wm_holdout",
+      "visual": 2048,
+      "horizon": 32,
+      "errors": {
+        "state": 16.520233154296875,
+        "pose": 146.12313842773438,
+        "contact": 0.40865710377693176,
+        "telemetry": 1.0227375030517578,
+        "consistency": 0.019832149147987366,
+        "velocity_mse": 0.27692580223083496,
+        "pose_mse": 0.005700909998267889,
+        "one_step": 1.6845316886901855,
+        "latent": 0.29047292470932007,
+        "total": 164.07675170898438
+      },
+      "feature_std": 1.051315426826477,
+      "reconstruction_l1": 0.11363091319799423,
+      "valid_mean": 31.55859375
+    },
+    {
+      "phase": "wm_holdout",
+      "visual": 512,
+      "horizon": 8,
+      "errors": {
+        "state": 8.08476734161377,
+        "pose": 15.111696243286133,
+        "contact": 0.36748504638671875,
+        "telemetry": 0.9056363105773926,
+        "consistency": 0.03889845311641693,
+        "velocity_mse": 0.17946267127990723,
+        "pose_mse": 0.0007379649905487895,
+        "one_step": 1.5925147533416748,
+        "latent": 0.05650419741868973,
+        "total": 24.47347640991211
+      },
+      "feature_std": 0.9786601066589355,
+      "reconstruction_l1": 0.10164724290370941,
+      "valid_mean": 7.95703125
+    },
+    {
+      "phase": "wm_holdout",
+      "visual": 512,
+      "horizon": 16,
+      "errors": {
+        "state": 11.548002243041992,
+        "pose": 44.4780387878418,
+        "contact": 0.37271207571029663,
+        "telemetry": 0.9080601334571838,
+        "consistency": 0.029889937490224838,
+        "velocity_mse": 0.21902453899383545,
+        "pose_mse": 0.001965517411008477,
+        "one_step": 1.6010832786560059,
+        "latent": 0.1407630741596222,
+        "total": 57.30979919433594
+      },
+      "feature_std": 1.0014728307724,
+      "reconstruction_l1": 0.11729066073894501,
+      "valid_mean": 15.95703125
+    },
+    {
+      "phase": "wm_holdout",
+      "visual": 512,
+      "horizon": 32,
+      "errors": {
+        "state": 21.517696380615234,
+        "pose": 156.77987670898438,
+        "contact": 0.39488887786865234,
+        "telemetry": 1.0219905376434326,
+        "consistency": 0.03171510994434357,
+        "velocity_mse": 0.3394280672073364,
+        "pose_mse": 0.006548168137669563,
+        "one_step": 1.7687418460845947,
+        "latent": 0.3104456663131714,
+        "total": 179.71762084960938
+      },
+      "feature_std": 1.041398525238037,
+      "reconstruction_l1": 0.10975061357021332,
+      "valid_mean": 31.55859375
+    }
+  ],
+  "wm_160_updates": [
+    {
+      "phase": "wm_holdout",
+      "visual": 2048,
+      "horizon": 8,
+      "errors": {
+        "state": 6.609467506408691,
+        "pose": 12.546146392822266,
+        "contact": 0.28304165601730347,
+        "telemetry": 0.8693822622299194,
+        "consistency": 0.032105088233947754,
+        "velocity_mse": 0.16038647294044495,
+        "pose_mse": 0.0005758366896770895,
+        "one_step": 1.3613502979278564,
+        "latent": 0.053004294633865356,
+        "total": 20.311248779296875
+      },
+      "feature_std": 1.5822269916534424,
+      "reconstruction_l1": 0.0717717856168747,
+      "valid_mean": 7.95703125
+    },
+    {
+      "phase": "wm_holdout",
+      "visual": 2048,
+      "horizon": 16,
+      "errors": {
+        "state": 9.471267700195312,
+        "pose": 36.850746154785156,
+        "contact": 0.2812202572822571,
+        "telemetry": 0.8698177337646484,
+        "consistency": 0.02852429822087288,
+        "velocity_mse": 0.18288952112197876,
+        "pose_mse": 0.0015105537604540586,
+        "one_step": 1.349587082862854,
+        "latent": 0.12203195691108704,
+        "total": 47.47590637207031
+      },
+      "feature_std": 1.6167266368865967,
+      "reconstruction_l1": 0.07839950174093246,
+      "valid_mean": 15.95703125
+    },
+    {
+      "phase": "wm_holdout",
+      "visual": 2048,
+      "horizon": 32,
+      "errors": {
+        "state": 17.74346923828125,
+        "pose": 133.60638427734375,
+        "contact": 0.2949666678905487,
+        "telemetry": 0.9871030449867249,
+        "consistency": 0.03756924718618393,
+        "velocity_mse": 0.2815128564834595,
+        "pose_mse": 0.005159612745046616,
+        "one_step": 1.5266458988189697,
+        "latent": 0.25555628538131714,
+        "total": 152.63568115234375
+      },
+      "feature_std": 1.6712510585784912,
+      "reconstruction_l1": 0.08155931532382965,
+      "valid_mean": 31.55859375
+    },
+    {
+      "phase": "wm_holdout",
+      "visual": 1024,
+      "horizon": 8,
+      "errors": {
+        "state": 6.5552659034729,
+        "pose": 12.594924926757812,
+        "contact": 0.27386561036109924,
+        "telemetry": 0.8691712617874146,
+        "consistency": 0.03347811847925186,
+        "velocity_mse": 0.16457684338092804,
+        "pose_mse": 0.0005761391366831958,
+        "one_step": 1.3551106452941895,
+        "latent": 0.05288979411125183,
+        "total": 20.29657554626465
+      },
+      "feature_std": 1.5266004800796509,
+      "reconstruction_l1": 0.06738083064556122,
+      "valid_mean": 7.95703125
+    },
+    {
+      "phase": "wm_holdout",
+      "visual": 1024,
+      "horizon": 16,
+      "errors": {
+        "state": 9.479077339172363,
+        "pose": 37.00459289550781,
+        "contact": 0.2697204351425171,
+        "telemetry": 0.8691979646682739,
+        "consistency": 0.03150439262390137,
+        "velocity_mse": 0.1918182373046875,
+        "pose_mse": 0.0015187605749815702,
+        "one_step": 1.349367380142212,
+        "latent": 0.12165690958499908,
+        "total": 47.625732421875
+      },
+      "feature_std": 1.5606989860534668,
+      "reconstruction_l1": 0.07914453744888306,
+      "valid_mean": 15.95703125
+    },
+    {
+      "phase": "wm_holdout",
+      "visual": 1024,
+      "horizon": 32,
+      "errors": {
+        "state": 18.342594146728516,
+        "pose": 138.45217895507812,
+        "contact": 0.280153751373291,
+        "telemetry": 0.9873425960540771,
+        "consistency": 0.05465785413980484,
+        "velocity_mse": 0.3169580101966858,
+        "pose_mse": 0.005452485755085945,
+        "one_step": 1.5291944742202759,
+        "latent": 0.25591543316841125,
+        "total": 158.0677490234375
+      },
+      "feature_std": 1.6124485731124878,
+      "reconstruction_l1": 0.08351904153823853,
+      "valid_mean": 31.55859375
+    },
+    {
+      "phase": "wm_holdout",
+      "visual": 512,
+      "horizon": 8,
+      "errors": {
+        "state": 6.72174072265625,
+        "pose": 12.764108657836914,
+        "contact": 0.29213792085647583,
+        "telemetry": 0.8741665482521057,
+        "consistency": 0.03955574706196785,
+        "velocity_mse": 0.16539986431598663,
+        "pose_mse": 0.000589281611610204,
+        "one_step": 1.3629004955291748,
+        "latent": 0.05254431441426277,
+        "total": 20.656108856201172
+      },
+      "feature_std": 1.5069352388381958,
+      "reconstruction_l1": 0.07376539707183838,
+      "valid_mean": 7.95703125
+    },
+    {
+      "phase": "wm_holdout",
+      "visual": 512,
+      "horizon": 16,
+      "errors": {
+        "state": 9.839536666870117,
+        "pose": 37.8251953125,
+        "contact": 0.29055503010749817,
+        "telemetry": 0.8750575184822083,
+        "consistency": 0.03401930257678032,
+        "velocity_mse": 0.19462521374225616,
+        "pose_mse": 0.0015854276716709137,
+        "one_step": 1.3493725061416626,
+        "latent": 0.12111173570156097,
+        "total": 48.83374786376953
+      },
+      "feature_std": 1.54072904586792,
+      "reconstruction_l1": 0.08214989304542542,
+      "valid_mean": 15.95703125
+    },
+    {
+      "phase": "wm_holdout",
+      "visual": 512,
+      "horizon": 32,
+      "errors": {
+        "state": 18.002548217773438,
+        "pose": 136.80032348632812,
+        "contact": 0.30406567454338074,
+        "telemetry": 0.9916076064109802,
+        "consistency": 0.03686806559562683,
+        "velocity_mse": 0.3230002224445343,
+        "pose_mse": 0.005361518356949091,
+        "one_step": 1.5262645483016968,
+        "latent": 0.25292497873306274,
+        "total": 156.10223388671875
+      },
+      "feature_std": 1.5931212902069092,
+      "reconstruction_l1": 0.07774423062801361,
+      "valid_mean": 31.55859375
+    }
+  ],
+  "wm_selected_tradeoff": {
+    "selected_windows": 512,
+    "latent_relative_change": -0.010296387914420557,
+    "physical_total_relative_change": 0.02271128682496637,
+    "velocity_rmse_relative_change": 0.07115493729613243,
+    "note": "matched held-out episodes,160offline updates; not long-term policy noninferiority. Latent/reconstruction/feature spread retained; physical velocity RMSE modestly worse."
+  },
+  "156_memory_note": "Multi-setting process accumulated compilation memory, exhausted32GBhost RAM and was stopped. Fresh single-setting4-thread8192fusion process completed12updates, about4GiBhost available during steady updates. Keep2GiBCPU image cache and2compiler workers.",
+  "preserved": [
+    "4096 environments",
+    "8192x32 imagination,6144teacher+2048student",
+    "physical WM2048x8,2/4updates",
+    "CTS2x160x64 plus16burn-in",
+    "Critic20 optimizer steps",
+    "120000iterations",
+    "AS2 physics/rewards/curricula/LR ownership",
+    "50Hz real visual/WM recurrence;10Hzimagined policy input",
+    "no value-range stop"
+  ],
+  "not_adopted": [
+    "standalone compiled GRU was5%slower",
+    "1024/4096encoding chunks lost complete-update throughput versus2048",
+    "larger156host cache risks paging",
+    "fullCUDAgraphs require dynamic-reset/sampling redesign and extra memory; not qualified",
+    "no network shrinking,lower physical batch,fewer physical updates,shorter BPTT or less student training without learning evidence",
+    "no persistent cache of trainable visual latents"
+  ],
+  "source_hash_encoding": "SHA256 of source bytes normalized to LF, matching Git/server checkout",
+  "source_sha256": {
+    "go2_physx_cts/activation.py": "f8cb1d17e51edd852f0854b31a37389a647840558059ef5f4c3226de1df751bf",
+    "go2_physx_cts/buffer.py": "9dd7a4cf38ec47ea6926cb02fc891f5f690ff8b8f10d78ffb19a0ae146bbb117",
+    "go2_physx_cts/calibration.py": "391c9ec050d3bc8657b3812a4ac4c1789f17d83759466dda44a00a6c193def28",
+    "go2_physx_cts/camera_geometry.py": "bb1eae981c516d1908f661d9c8c9b932b61ac4c925b05ed30ceec01c0b08644b",
+    "go2_physx_cts/capture_cache.py": "46cd1c8ab8c8976f574d62cdd753be79efde1d6fab2e41cf0f2ae8a8997c8a49",
+    "go2_physx_cts/commands.py": "c87c9ca7544d7f40cdcb44247fa3deeb40409f9021ae2e58fe1ae90d6c67037f",
+    "go2_physx_cts/config.py": "4c2214776127691dde25fd835351f8444d3b7b79dca973bca92cf0c6210593c4",
+    "go2_physx_cts/depth.py": "831cc162e09c252a7f18bc62caeef2b5d8c777f360d25c11c60f318efa61d87f",
+    "go2_physx_cts/diagnostics.py": "6f2e4172e5b4022535a7febc62ecaf3fd5e49c84c24d212e335e4effb50ddb83",
+    "go2_physx_cts/imagine.py": "e5c8ab6d4279f508fac258387088b19ec95d1e1f2f663fd08e1af4d6c67232da",
+    "go2_physx_cts/latent.py": "7e7495af1eda77edff844a23a69e87503f3818d838e90e08ebdc9c49bcd0cff1",
+    "go2_physx_cts/learner.py": "14b163b03fd32392a60c83375b9204fbcd0e18d62fc308b12c982f7b1540d20a",
+    "go2_physx_cts/moe.py": "c373ce1cd3312de4413bd315f2f063f67502aa62c7b936b356f93dd678e1879f",
+    "go2_physx_cts/networks.py": "752fb7b0d725b3daf6c6b002d74885a9c616290652d3606f2cb1545c4f70c466",
+    "go2_physx_cts/official_terrain_heightfield.py": "d477a0df65e333f51c8f7e70a34ee12efa1a62320fef5731de14b23070dad4b4",
+    "go2_physx_cts/official_terrain_mesh.py": "83d3d3a81d41077f9cf4a3aed8c94fe3291adfff92743a667a2dd6279b685e22",
+    "go2_physx_cts/physx_env.py": "1cc4c3f87776c60a792bc8a9d687ae05c49114dbdee4ea0018937f017a20a696",
+    "go2_physx_cts/precision.py": "e36c5186bc61ab18c036a750eb1d09a49a75cde949f28c7158d411e33c106e12",
+    "go2_physx_cts/robots.py": "c28a01e228865ab3ab1988f5b87a776e5e6b9011bff2eec1593f7bcfae94c2c8",
+    "go2_physx_cts/schedules.py": "473bb82478ddc075e1206bbdd3b97886681cae4f2322e862e3a86cccc22f48cf",
+    "go2_physx_cts/sequence_execution.py": "fcbe9fb72df8fd176a7538bcf7a752e78a42920173e1b4f5592ec8420b823459",
+    "go2_physx_cts/state.py": "cada656524c07f6a4c1f2a81134ea500fc714d968855b7e8415fce130e301dab",
+    "go2_physx_cts/task.py": "2f31ce439bee5c9ba36bad88e86e15a5567507562af31a8245054b2d51aab56a",
+    "go2_physx_cts/terrain.py": "0085fffb75f22a935fa28e791c11f8606ac9193591532716e20705f4d1c5356b",
+    "go2_physx_cts/terrain_allocation.py": "6391be4fc2f2e1a48c58fd1a72d28527ff738eb37bd0a4f5084f06e5c8151973",
+    "go2_physx_cts/terrain_scene.py": "7d7f51b5a98232869abbe1e7d053574a5642a7fbca0114a804b8b2770eb25c76",
+    "go2_physx_cts/train.py": "1a74a4d1fd3330e2482460b7d8b54a3a42d8777e4b9c39f99e6a629fa23c88b0",
+    "go2_physx_cts/value.py": "e313a330d415b6b5b255eb4ddcc16571f9d74d5afe41a694b247e565a4087281",
+    "go2_physx_cts/world_model.py": "fd80e1b36683de7638ed1cc9bfdfac3d82958ad8c42cd2f11937296d5a8b517c",
+    "go2_physx_cts/__init__.py": "9441e1f002b7597cb4c17762b5fd37c4537549a0ff67e6fba5e2f9268c080c6e"
+  }
+}

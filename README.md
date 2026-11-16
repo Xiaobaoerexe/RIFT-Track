@@ -4,17 +4,16 @@
 
 默认复现 **137 版本**：3 个稠密 Actor 专家、4 个任务 Critic、学生本体 MoE + 深度 CNN + GRU。预测深度 latent 在进入学生策略时停止梯度，WM 自身的 latent 递推仍保留梯度。教师不接收任务 ID。
 
-## 1. 双 4090 工作站如何使用
+## 1. 自动识别单卡／多卡4090
 
-当前训练器是**单进程、单 GPU**，没有 DDP 或跨卡模型切分。两张标准 24 GB 4090 不等于一张可使用 48 GB 显存的设备。
+2026-11-16：同步175已验收的加速实现，137仍只在策略入口截断预测latent梯度。
+默认推荐 `configs/workstation_4090_24g.json`：4096环境、8192融合想象、2048物理监督窗口、2GiB CPU图像缓存、4个CPU线程；48GB显存及大内存机器也可用 `configs/host137.json`（26GiB CPU缓存、8线程）。
 
-- 先用一张卡复现；使用 `configs/workstation_4090_24g.json`，不要直接使用针对 48 GB 卡的 `host137.json`。
-- 第二张卡可独立运行另一个随机种子。两次实验各自拥有 Replay、优化器和输出目录，不同步参数。
-- 24 GB 配置只改变执行内存分配：Replay 放 CPU，深度图 CPU 缓存 2 GiB，想象按 2048 分块。4096 环境、8192 条想象轨迹、损失分母和优化器步数不变。
-- 单实例建议至少 64 GB 主机内存；双实例建议 128 GB。32 GB 主机曾在编译和缓存叠加时出现换页。先确认单实例稳定且有内存余量，再运行第二个实例。
-- Linux x86_64 为已验证平台。检查 NVIDIA 驱动、CUDA 13 支持、Vulkan/EGL 和剩余磁盘空间；本项目不要求另装系统 CUDA Toolkit。服务器实测驱动为 595.91.07。
+`gpu_mode=auto` 按CUDA可见设备的UUID核对NVIDIA清单，跳过其他计算进程占用的卡，主卡需至少21GiB空闲。额外空闲4090需至少4GiB空闲，自动分担冻结的深度加噪网络推理。每张卡处理完整图像块，保留逐图噪声键与返回顺序，输出回到主卡。几何、PhysX、Replay、WM/Actor/Critic/CTS参数和优化器仍在主卡；这不是DDP，也不是多份独立训练，更不能将两张24GB显存当成一张48GB。
 
-此 24 GB 配置由已验证的执行参数组合生成；尚未在同事的双卡机器上实测，不能承诺两卡带来单次训练的两倍速度。
+该自动分配不修改全局批量、损失分母、优化器步数或课程。`CUDA_VISIBLE_DEVICES` 可限制可用卡；只暴露一张时自动沿用单卡计算。资源选择是启动快照，不是集群预约系统；团队应避免同时向同一批卡启动多个作业。
+
+**多卡分支按要求仅做静态审查，没有执行GPU测试，不能承诺多卡加速倍数。** 4090通常缺少CUDA P2P，跨卡拷贝会有额外成本；加噪只是训练的一部分，Actor BPTT尚不跨卡。单卡加速证据见 `SPEED_ACCEPTANCE.json`。不建议用 `torchrun` 启动本入口。
 
 ## 2. 获取代码
 
@@ -25,7 +24,7 @@ cd as2-depth
 git rev-parse HEAD
 ```
 
-不要向 `main` 合并或推送本实验。源训练版本为 `be95832fe610649da663ed1989eda3e43e995e55`；本分支后续提交整理文档、清除无引用残留并增加工作站配置，没有更换训练算法。
+不要向 `main` 合并或推送本实验。本次加速参照版本为 `d2d270b1c319f1f79786d6b3baa5c46a6f592a72`；本次同步已验收的加速配置、清除旧逻辑，并增加自动多卡冻结加噪推理；监督采样变化和验证边界见第8节。
 
 ## 3. 配置匹配的 Isaac Lab 环境
 
@@ -95,42 +94,22 @@ print('Configuration and required imports passed; PhysX startup is checked by th
 PY
 ```
 
-## 4. 单卡启动与双卡独立实验
+## 4. 启动一个自动利用可用GPU的训练
 
-在仓库根目录运行，输出写在仓库之外。正式入口要求源码工作树干净，避免结果对应不到明确提交。
+在仓库根目录运行，权重放在仓库外。确认GPU未被其他作业占用，不要复用已有run目录。
 
 ```bash
 git status --short
 mkdir -p "$HOME/as2-depth-runs"
-
-CUDA_VISIBLE_DEVICES=0 "$AS2_PYTHON" -u -m go2_physx_cts.train \
+"$AS2_PYTHON" -u -m go2_physx_cts.train \
   --config configs/workstation_4090_24g.json \
-  --output "$HOME/as2-depth-runs/instinct_s17_gpu0" \
+  --output "$HOME/as2-depth-runs/instinct_s17_speed" \
   --usd assets/as2/as2.usd
 ```
 
-不要复用已有 run 目录。如果希望退出终端后继续训练，可在 `tmux` 中执行。首次启动及首次 Actor 反传会编译，不能把编译期时间当作稳态单轮耗时。
+不要将 `CUDA_VISIBLE_DEVICES` 限制为单卡后期待多卡工作。如需手动只用一张可设置 `CUDA_VISIBLE_DEVICES=0`。解析后的实际设备和分工写入 `gpu_resources.json`；没有可用主卡就明确报错，不抢占现有任务。
 
-第二张卡运行独立 seed 18：先在仓库外生成配置，再另开终端启动。配置中的 `cuda:0` 表示该进程通过 `CUDA_VISIBLE_DEVICES` 看到的第一张卡，不应改成 `cuda:1`。
-
-```bash
-"$AS2_PYTHON" - <<'PY'
-import json
-from pathlib import Path
-cfg = json.loads(Path('configs/workstation_4090_24g.json').read_text())
-cfg['seed'] = 18
-path = Path.home() / 'as2-depth-runs' / 'seed18.json'
-path.write_text(json.dumps(cfg, indent=2))
-print(path)
-PY
-
-CUDA_VISIBLE_DEVICES=1 "$AS2_PYTHON" -u -m go2_physx_cts.train \
-  --config "$HOME/as2-depth-runs/seed18.json" \
-  --output "$HOME/as2-depth-runs/instinct_s18_gpu1" \
-  --usd assets/as2/as2.usd
-```
-
-用 `nvidia-smi` 核对各进程实际占卡和主机内存。这里没有跨卡加速同一次 BPTT 的实现，也不要用 `torchrun` 启动。
+**137当前运行目录 `/home/abc/Documents/as2_supermimic_depth` 不属于此次修改范围。** 本分支代码副本为 `/home/abc/Documents/as2_supermimic_depth_instinct`，发布工作树为 `/home/abc/Documents/as2_depth_github_20261115`；此次没有启动、重启或测试137训练。
 
 ## 5. 复现时保持不变的设置
 
@@ -168,3 +147,13 @@ CUDA_VISIBLE_DEVICES=1 "$AS2_PYTHON" -u -m go2_physx_cts.train \
 训练入口 `go2_physx_cts/train.py`；学习器 `learner.py`；想象 `imagine.py`；WM `world_model.py`；策略 `networks.py`；奖励 `task.py`。机器人 USD/URDF/mesh、奖励标尺以及冻结噪声权重均随分支提供，无需旧策略 checkpoint。
 
 算法来源及固定提交见 `UPSTREAM.json`，物理／实现契约见 `BUILD_CONTRACT.txt`，版本实测见 `RUNTIME_LOCK.json`。保留 `licenses/` 中各上游许可证，其中 InstinctMJ 来源包含 CC-BY-NC-4.0；请按相应条款使用和分发。
+
+## 8. 2026-11-16 加速与验证边界
+
+- WM物理监督及latent递推仍为2048×8；每次更新随机512条完整窗口生成8步视觉标签，初始latent仍编码2048张，重建仍512张，全标签验证不抽样。
+- 缓存最终FP16带噪图像；episode参与槽位偏移；噪声CNN用BF16，几何/随机场/腐蚀运算FP32。
+- CTS合并B×T的Actor调用，去掉GRU重复重算；Critic分组与BF16隐藏层保持20次优化步；使用fusedAdam，删除无用Critic拟合图。
+- 175/125/156完整更新平均4.21/3.89/4.41秒。125同机从6.30降至3.89秒。这是已测单卡版本的证据，不是137消融版或多卡版实测。
+- 短期512窗口对照：32步latent误差约−1.03%，综合物理误差约+2.27%，速度预测RMSE约+7.12%。不能据此声称长期策略无损。
+- 每5000轮记录只读8/16/32步全标签预测诊断，不参与停机或学习率调节。价值越界停机逻辑已删除；保留非有限数值报错。
+- 本次没有在137执行测试、导入训练模块或启动仿真。多卡加噪路径新增，仅静态审查；跨卡数值及吞吐仍待团队在实际多卡机器验收。

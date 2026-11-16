@@ -3,7 +3,8 @@
 Reference: project-instinct/InstinctMJ@03563ee02665f327425106372264070315673748,
 rl/supermimic/{runner,networks}.py (CC BY-NC 4.0; see licenses/).
 50 Hz camera and controller; eight autoregressive supervised transitions.
-The latent denotes the current image; every valid transition is supervised.
+The latent denotes the current image; selected windows supervise all eight valid
+50Hz transitions. Physical supervision and latent recurrence retain the full batch.
 No permanently cached trainable feature, target encoder, or imagined renderer.
 """
 from dataclasses import dataclass
@@ -38,15 +39,18 @@ class LatentTargets:
     increments: torch.Tensor
     reconstruction_noisy: torch.Tensor
     reconstruction_clean: torch.Tensor
+    sampling_weight: float = 1.
 
 
 @torch.no_grad()
-def prepare_latent_targets(window, depth, encoder, period=1, reconstruction_images=512):
+def prepare_latent_targets(window, depth, encoder, period=1, reconstruction_images=512,visual_windows=None,encoding_chunk_size=1024):
     """Re-encode immutable real captures with the current CNN, outside BPTT.
 
     Terminal targets use pose_next/frame+1 before reset, never the next episode.
     ``valid`` masks transitions after reset, but includes the terminal transition.
-    Only refresh images are materialized, not B*K copies of held images.
+    Uniform whole-window subsampling reduces visual label generation only.
+    The physical batch and the reconstruction batch are unchanged; validation
+    omits visual_windows and always uses every valid label.
     """
     w=window; batch,steps=w['a'].shape[:2]
     def sequence(name):
@@ -61,8 +65,15 @@ def prepare_latent_targets(window, depth, encoder, period=1, reconstruction_imag
     cap_scene=sequence('depth_scene_ids')[:,0,0].long()
     cap_frame=sequence('depth_frame_index')[:,0,0].long()
     first=depth.captured(cap_pose,cap_scene,cap_frame,episode[:,0],trajectory[:,0])
-    initial=batched_apply(encoder,first).float()
+    initial=batched_apply(encoder,first,chunk_size=encoding_chunk_size).float()
     refresh=w['valid'].reshape(batch,steps).bool()
+    if visual_windows is not None and visual_windows<batch:
+        # Sample whole windows uniformly from the already rarity-balanced batch.
+        # All eight transitions of a selected window keep their true 50Hz label;
+        # physical/telemetry supervision and latent recurrence retain all rows.
+        selected=torch.zeros(batch,dtype=torch.bool,device=initial.device)
+        selected[torch.randperm(batch,device=initial.device)[:visual_windows]]=True
+        refresh=refresh&selected[:,None]
     rows,cols=refresh.nonzero(as_tuple=True)
     targets=initial.new_zeros((batch,steps,LATENT_DIM))
     if len(rows):
@@ -71,21 +82,22 @@ def prepare_latent_targets(window, depth, encoder, period=1, reconstruction_imag
         next_frame=frame[rows,cols]+1
         noisy=depth.captured(next_pose,next_scene,next_frame,episode[rows,cols],trajectory[rows,cols])
         # Frozen image cache is FP16; captured() defines the canonical quantization.
-        targets[rows,cols]=batched_apply(encoder,noisy).float()
+        targets[rows,cols]=batched_apply(encoder,noisy,chunk_size=encoding_chunk_size).float()
         nr=min(reconstruction_images,len(rows))
         take=torch.randperm(len(rows),device=rows.device)[:nr]
-        _,clean=depth.paired(next_pose[take],next_scene[take],next_frame[take],episode[rows[take],cols[take]],trajectory[rows[take],cols[take]])
+        clean=depth.clean(next_pose[take])
         recon_noisy=noisy[take]
     else:
         # Small diagnostic windows need not contain a refresh; the CNN can still
         # reconstruct a real captured image without inventing a latent label.
         nr=min(reconstruction_images,batch)
         take=torch.randperm(batch,device=initial.device)[:nr]
-        _,clean=depth.paired(cap_pose[take],cap_scene[take],cap_frame[take],episode[take,0],trajectory[take,0])
+        clean=depth.clean(cap_pose[take])
         recon_noisy=first[take]
     held=initial
     increments=[]
     for j in range(steps):
         increments.append(targets[:,j]-held)
         held=torch.where(refresh[:,j,None],targets[:,j],held)
-    return LatentTargets(initial,targets,refresh,torch.stack(increments,1),recon_noisy,clean.float()/6.)
+    sampling_weight=batch/min(batch,visual_windows) if visual_windows is not None else 1.
+    return LatentTargets(initial,targets,refresh,torch.stack(increments,1),recon_noisy,clean.float()/6.,sampling_weight)

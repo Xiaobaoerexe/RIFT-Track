@@ -16,7 +16,7 @@ Reward/value
 Fifteen AS2 motion terms retained with approved changes:0.36mheight;crossingheight-1;0.3sabrupt-command width;actionrate/smooth penalties have a continuous nonzero derivative above their former hard caps.
 Run-length mass for once-only soft completion:dc=g*p[K-1];p0'=(1-g)*(1-c);pj'=g*p[j-1];c'=c+dc. Compact smoothstep transition bands and mass conservation are tested. Hardware hard conditions remain exact. The surrogate is not claimed to be calibrated event probability.
 Measured reference scale and checkpoint hash are in calibration/reward_calibration.json. Common positive coefficients are not rescaled. Finite8scrossingbonus uses90percentofreference minus the24motion upper bound.
-Critic estimates total subsequent reward, including future soft success/wait/failure. No separate event channel. Ordinary upperbound6;finite crossing bound6*(1-gamma^remaining)+bonus*(1-c). AnyV>2U+1stops;over1percentV>1.2U+1for3consecutive50iterationchecks stops. Guard state checkpoints. Bounds do not clamp learnedvalues.
+Critic estimates total subsequent reward, including future soft success/wait/failure. No separate event channel. Value-range-triggered stopping and its bound/counter/checkpoint machinery were removed2026-11-16 by user instruction after Critic-prewarm stops. Values and targets are not clipped to reward-derived bounds. Existing nonfinite checks remain.
 
 Release evidence
 GPU probes cover ray/noise/cache equivalence,completion mass and once-only awards,gradient ownership and137detach. Full-scale qualification covers first Actor backward,all unlocked tasks,WM4updates,Critic20steps,CTS2steps,loaded FK/physics,standing height and sustained complete-update timing. Only pretraining mechanics are established; no learned success claimed.

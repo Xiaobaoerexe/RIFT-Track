@@ -184,8 +184,9 @@ def native_diagnostics(learner,steps=500,levels=(2,5),seeds=(17,29,43,61,83)):
 
 
 @torch.no_grad()
-def model_diagnostics(learner,batch=2048):
-    w=learner.buf.windows(batch,learner.cfg.wm_window,validation=True)
+def model_diagnostics(learner,batch=256,horizon=None):
+    horizon=learner.cfg.wm_window if horizon is None else horizon
+    w=learner.buf.windows(batch,horizon,validation=True)
     target=prepare_latent_targets(w,learner.depth,learner.policy.student_encoder.depth_encoder,learner.cfg.depth_period)
     scales=(learner.wm.out_norm.var.sqrt().clamp_min(1e-4),learner.wm.telemetry_norm.var.sqrt().clamp_min(1e-3))
     errors=learner.wm.validation_errors(w,learner.env.field,learner.env.consts.default_q,scales,latent_targets=target)
@@ -193,6 +194,15 @@ def model_diagnostics(learner,batch=2048):
     for task in tasks.unique().tolist():
         mask=tasks==task
         rows.append({'task_id':int(task),'windows':int(mask.sum()),**{name:float(value[mask].mean()) for name,value in errors.items()}})
-    return {'iteration':learner.it,'rows':rows,'mean_errors':{name:float(value.mean()) for name,value in errors.items()},
+    return {'iteration':learner.it,'horizon':horizon,'rows':rows,'mean_errors':{name:float(value.mean()) for name,value in errors.items()},
         'sampling':'held-out real windows with re-encoded real 50Hz visual targets',
         'note':'Read-only normalized prediction errors; no running-statistics, optimizer, curriculum or Replay updates.'}
+
+
+@torch.no_grad()
+def model_horizon_diagnostics(learner):
+    """Full-label 8/16/32-step audit; never a stop rule or LR feedback input."""
+    cpu_rng=torch.get_rng_state();cuda_rng=torch.cuda.get_rng_state_all()
+    try:return {str(h):model_diagnostics(learner,horizon=h) for h in (8,16,32)}
+    finally:
+        torch.set_rng_state(cpu_rng);torch.cuda.set_rng_state_all(cuda_rng)

@@ -1,0 +1,31 @@
+{
+  "date": "2026-11-16",
+  "speed_reference": "d2d270b1c319f1f79786d6b3baa5c46a6f592a72",
+  "previous_github": "71d8102c9ba661d0f1ab2389b51e1fc2217bcbe6",
+  "config137_vs175": {
+    "noise_devices": [
+      null,
+      []
+    ],
+    "latent_actor_stop_gradient": [
+      false,
+      true
+    ],
+    "gpu_mode": [
+      null,
+      "auto"
+    ]
+  },
+  "validation": "Static source/AST/configuration inspection only. No runtime tests, imports or GPU workload executed for this release.",
+  "multi_gpu": {
+    "mode": "automatic idle visible4090 selection",
+    "parallel_work": "frozen keyed sensor-noise inference",
+    "single_gpu_work": "PhysX, ray geometry, WM/Actor/Critic/CTS, optimizers, Replay",
+    "ddp": false,
+    "runtime_verified": false,
+    "speedup_claim": null
+  },
+  "active137_untouched": "/home/abc/Documents/as2_supermimic_depth",
+  "code137_target": "/home/abc/Documents/as2_supermimic_depth_instinct",
+  "gpu_workloads_started_on137": false
+}

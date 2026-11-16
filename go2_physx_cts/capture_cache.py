@@ -1,7 +1,7 @@
-"""Bounded direct-index CPU clean-depth cache; no per-frame Python dictionary.
+"""Bounded direct-index CPU noisy-depth cache; no per-frame Python dictionary.
 
-FP16 magnitude is optical depth; sign stores geometric validity (no extra mask).
-Noise is regenerated from immutable keys. No trainable latent is cached.
+FP16 stores the final frozen observation. Geometry and keyed noise are generated
+only on misses. No trainable latent is cached.
 """
 import time
 import numpy as np
@@ -71,7 +71,12 @@ class CapturedImages:
     def get(self,render,pose,scene,frame,episode,trajectory,capture_keys=None):
         self._drain();n=len(pose)
         keys=self.keys(pose,scene,frame,episode,trajectory) if capture_keys is None else capture_keys
-        slots=keys[:,0].remainder(self.num_envs)*self.slots_per_env+keys[:,2].remainder(self.slots_per_env)
+        # Offset each episode in the bounded ring. Indexing only by frame made
+        # every short reset overwrite the same small prefix, wasting most of a
+        # long Replay cache. Full tags still verify every hit; collisions only
+        # cause deterministic re-rendering, never observation substitution.
+        frame_slot=(keys[:,2]+104729*keys[:,1]).remainder(self.slots_per_env)
+        slots=keys[:,0].remainder(self.num_envs)*self.slots_per_env+frame_slot
         hit=(self.tags[slots]==keys).all(-1)
         out=torch.empty((n,1,48,64),device=self.device,dtype=torch.float16)
         ids=hit.nonzero().flatten()
@@ -79,7 +84,7 @@ class CapturedImages:
             rows=ids[start:start+self.stage_rows];out[rows.to(self.device)]=self._upload(self.data[slots[rows]])
         missing=(~hit).nonzero().flatten();self.hits+=len(ids);self.misses+=len(missing)
         if len(missing):
-            gpu=missing.to(self.device);value=render(pose[gpu]).to(torch.float16)
+            gpu=missing.to(self.device);value=render(pose[gpu],gpu).to(torch.float16)
             out[gpu]=value;self._store(value,slots[missing],keys[missing])
         return out
 

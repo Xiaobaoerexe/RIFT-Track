@@ -3,6 +3,7 @@ import os
 if 'PYTORCH_ALLOC_CONF' not in os.environ and 'PYTORCH_CUDA_ALLOC_CONF' not in os.environ:
     os.environ['PYTORCH_ALLOC_CONF']='expandable_segments:True'
 os.environ.setdefault('OMNI_KIT_ACCEPT_EULA','YES')
+os.environ.setdefault('TORCHINDUCTOR_COMPILE_THREADS','2')
 import argparse,hashlib,importlib,importlib.util,importlib.metadata,json,signal,subprocess,sys,time
 from pathlib import Path
 from .config import TrainCfg
@@ -133,6 +134,9 @@ def write_contract(env,cfg,usd,out,sim_cfg,code_commit):
         'actor_structure':'plain MLP' if cfg.actor_experts==1 else 'dense 3-expert MoE',
         'policy_hz':1/cfg.dt,'physics_hz':1/cfg.physics_dt,'depth_hz':1/(cfg.dt*cfg.depth_period),
         'network_precision':'bf16 mixed' if cfg.mixed_precision else 'fp32',
+        'critic_precision':'BF16 hidden layers; FP32 scalar projection, targets and optimizer state' if cfg.mixed_precision else 'FP32',
+        'noise_precision':cfg.depth_precision,'wm_visual_supervision_windows':cfg.wm_visual_windows,
+        'wm_physical_supervision_windows':cfg.wm_batch,'optimizer_execution':'fused Adam on CUDA; unchanged hyperparameters',
         'depth_cnn_optimizer':'world_model only, clean-depth reconstruction',
         'future_imagination':'50Hz WM latent recurrence; 10Hz held policy visual input; no future depth-image rendering',
         'imagination_policy_depth_hz':1/(cfg.dt*cfg.imagination_depth_period),
@@ -213,11 +217,14 @@ def main():
     if cfg.variant!='simple' and not cfg.reward_calibration:
         raise ValueError('Four-task launch requires the measured mature-AS2 reward budget')
     import torch
-    torch.manual_seed(cfg.seed);torch.set_num_threads(8);torch.set_float32_matmul_precision('high')
+    from .gpu_resources import resolve_devices
+    resources=resolve_devices(cfg)
+    torch.manual_seed(cfg.seed);torch.set_num_threads(cfg.torch_threads);torch.set_float32_matmul_precision('high')
     if cfg.reward_calibration:
         from .task import configure_reward_budget
         configure_reward_budget(cfg.reward_calibration)
     out=Path(args.output);out.mkdir(parents=True,exist_ok=True)
+    (out/'gpu_resources.json').write_text(json.dumps(resources,indent=2))
     sim_cfg=physics_configuration(cfg)
     with launch_simulation(sim_cfg,args):
         from .physx_env import PhysXEnv
@@ -236,12 +243,7 @@ def main():
         if args.resume:learner.load(args.resume,continue_run=True)
         def stop(signum,frame):learner.stop_requested=True
         learner.stop_requested=False;signal.signal(signal.SIGTERM,stop);signal.signal(signal.SIGINT,stop)
-        from .imagine import ValueRangeStop
-        try:learner.run()
-        except ValueRangeStop:
-            learner.save(out/'value_guard_stop.pt')
-            (out/'value_guard_stop.json').write_text(json.dumps(learner.imag.last_value_guard,indent=2))
-            raise
+        learner.run()
         learner.export(out/'student_latest.pt')
 
 if __name__=='__main__':main()

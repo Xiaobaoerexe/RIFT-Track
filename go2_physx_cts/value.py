@@ -3,12 +3,14 @@ import torch
 from torch import nn
 from . import state as st
 from .networks import RunningNorm, mlp
+from .precision import network_autocast
 from .task import TASK_CONTEXT_DIM, GOAL, ORIGIN, ROUTE, ROUTE_YAW, PREVIOUS_COMMAND, CHANGE_AGE, CHANGE_STRENGTH
 
 class Critic(nn.Module):
     def __init__(self,hidden=(512,256,128),field=None,context_dim=TASK_CONTEXT_DIM,
-                 compile=False,mixed_precision=False,variant='simple',task_count=None):
+                 compile=False,mixed_precision=True,variant='simple',task_count=None):
         super().__init__();self.variant=variant;self.task_count=1 if variant=='simple' else 4
+        self.mixed_precision=mixed_precision
         if task_count is not None and task_count!=self.task_count:raise ValueError('Critic task count mismatch')
         self.context_dim=5 if variant=='simple' else TASK_CONTEXT_DIM+14
         self.physical_dim=st.PRIV_DIM+self.context_dim
@@ -45,11 +47,31 @@ class Critic(nn.Module):
 
     @torch.no_grad()
     def update_stats(self,x):
+        if self.task_count==1:
+            self.norms[0].update(self.norm_input(x));return
         for task,norm in enumerate(self.norms):norm.update(self.norm_input(x[x[...,-3]==task]))
+
+    def forward_task(self,x,task):
+        net=self.nets[task];hidden=self.norms[task](self.norm_input(x))
+        with network_autocast(hidden,self.mixed_precision):
+            for layer in net[:-1]:hidden=layer(hidden)
+        # Keep scalar value projection, TD targets, reductions and optimizer state FP32.
+        return net[-1](hidden.float())[:,0]
+
+    def groups(self,x):
+        if self.task_count==1:return [(0,torch.arange(len(x),device=x.device))]
+        return [(task,(x[:,-3]==task).nonzero().flatten()) for task in range(self.task_count)]
+
+    def batched(self,x,chunk_size):
+        flat=x.reshape(-1,self.feature_dim);out=flat.new_zeros(len(flat))
+        for task,ids in self.groups(flat):
+            for part in ids.split(chunk_size):
+                if part.numel():out=out.index_copy(0,part,self.forward_task(flat[part],task))
+        return out.reshape(x.shape[:-1])
 
     def forward(self,x):
         shape=x.shape[:-1];flat=x.reshape(-1,self.feature_dim).float();out=flat.new_zeros(len(flat))
-        for task,(norm,net) in enumerate(zip(self.norms,self.nets)):
-            ids=(flat[:,-3]==task).nonzero().flatten()
-            if ids.numel():out=out.index_copy(0,ids,net(norm(self.norm_input(flat[ids])))[:,0])
+        if self.task_count==1:return self.forward_task(flat,0).reshape(shape)
+        for task,ids in self.groups(flat):
+            if ids.numel():out=out.index_copy(0,ids,self.forward_task(flat[ids],task))
         return out.reshape(shape)
