@@ -236,12 +236,7 @@ def main():
         if args.resume:learner.load(args.resume,continue_run=True)
         def stop(signum,frame):learner.stop_requested=True
         learner.stop_requested=False;signal.signal(signal.SIGTERM,stop);signal.signal(signal.SIGINT,stop)
-        from .imagine import ValueRangeStop
-        try:learner.run()
-        except ValueRangeStop:
-            learner.save(out/'value_guard_stop.pt')
-            (out/'value_guard_stop.json').write_text(json.dumps(learner.imag.last_value_guard,indent=2))
-            raise
+        learner.run()
         learner.export(out/'student_latest.pt')
 
 if __name__=='__main__':main()

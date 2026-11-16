@@ -10,7 +10,7 @@ import torch
 from .activation import matrix_checkpoint
 from . import state as st
 from .terrain import relief,geometry_crop
-from .task import task_reward,episode_time_reached,ELAPSED,EPISODE_LIMIT,POST_COMMAND,COMPLETED,reward_budget
+from .task import task_reward,episode_time_reached,ELAPSED,EPISODE_LIMIT,POST_COMMAND
 from .sequence_execution import depth_sequence_features,batched_apply
 
 
@@ -41,14 +41,9 @@ def time_limit_lambda_targets(rewards,soft_done,timeout,values,gamma,lam):
 def flat_ids(x): return x.reshape(-1).long()
 
 
-class ValueRangeStop(RuntimeError):
-    pass
-
-
 class Imagination:
     def __init__(self,cfg,consts,field,commands,depth):
         self.cfg,self.c,self.field,self.commands,self.depth=cfg,consts,field,commands,depth
-        self.value_guard_streak=0;self.last_value_guard={}
         # Only the deterministic differentiable core is compiled. Random command
         # draws and observation noise retain their original eager RNG ordering.
         self._core_fn=matrix_checkpoint(self._core)
@@ -118,7 +113,7 @@ class Imagination:
             prefix=seed['student_prefix'] if 'student_prefix' in seed else {k:v[student] for k,v in seed['prefix'].items()}
             hidden=torch.cat((hidden[:nteacher],self.burnin(policy,prefix)),0)
         active=~episode_time_reached(context[:,ELAPSED],context[:,EPISODE_LIMIT]); valid_start=active.to(s.dtype)
-        rewards=[]; soft_done=[]; timeouts=[]; valid=[]; features=[]; bounds=[]; values=[s.new_zeros(b)]
+        rewards=[]; soft_done=[]; timeouts=[]; valid=[]; features=[]; values=[s.new_zeros(b)]
         for t in range(cfg.horizon):
             # This is a policy observation clock, never the WM recurrence clock.
             # Start with the real capture; refresh from z_t only every five steps.
@@ -127,7 +122,7 @@ class Imagination:
             command=self.commands.command(cmd_state)
             priv=st.privileged(s,a_prev,command,xi,relief(pose,self.field))
             features.append(critic.features(priv,branch,tasks,context,pose,contacts))
-            valid.append(active);bounds.append(self.value_upper(context,tasks))
+            valid.append(active)
             args=(s,pose,a_prev,a_prev2,hist,cmd_state,xi,hidden,context,depth_features,policy_depth_features)
             # The core owns selective activation storage inside torch.compile.
             # Command/noise/history operations retain their ordinary small graph;
@@ -147,7 +142,7 @@ class Imagination:
                 ids=timeout.nonzero().flatten(); v=s.new_zeros(b)
                 if ids.numel(): v=v.index_copy(0,ids,critic(next_feature[ids]))
                 values.append(v)
-        features.append(next_feature); features=torch.stack(features,1);bounds.append(self.value_upper(context,tasks))
+        features.append(next_feature); features=torch.stack(features,1)
         rewards=torch.stack(rewards,1); soft_done=torch.stack(soft_done,1); timeouts=torch.stack(timeouts,1)
         # Finite event-task deadlines are terminal; ordinary AS2 episode truncations bootstrap.
         finite=(tasks>=3) if cfg.variant!='simple' else torch.zeros_like(tasks,dtype=torch.bool)
@@ -156,30 +151,13 @@ class Imagination:
         objective,surv,immediate,bootstrap=time_limit_return(rewards,soft_done,timeouts,value_tensor,cfg.gamma,valid_start)
         return objective,{'rewards':rewards.detach(),'surv':surv.detach(),'soft_done':soft_done.detach(),
             'timeout':timeouts,'critic_valid':torch.stack(valid,1),'critic_in':features.detach(),
-            'value_upper':torch.stack(bounds,1),'guard_valid':torch.stack(valid+[active],1),'iteration':torch.full((b,),iteration,device=s.device,dtype=torch.long),'finite':finite,'immediate':immediate.detach(),'bootstrap':bootstrap.detach()}
-    def value_upper(self,context,tasks):
-        upper=context.new_full((len(context),),6.)
-        if self.cfg.variant!='simple':
-            n=torch.round((context[:,EPISODE_LIMIT]-context[:,ELAPSED])/.02).clamp_min(0)
-            amount=float(reward_budget()['tasks'][3]['success_bonus'])
-            special=6*(1-self.cfg.gamma**n)+amount*(1-context[:,COMPLETED]).clamp(0,1)
-            upper=torch.where(tasks==3,special,upper)
-        return upper
+            'finite':finite,'immediate':immediate.detach(),'bootstrap':bootstrap.detach()}
 
     @torch.no_grad()
     def targets(self,critic,data):
         flat=data['critic_in'].reshape(-1,critic.feature_dim)
         chunk_size=getattr(self.cfg,'critic_microbatch',4096)
         values=torch.cat([critic(part) for part in flat.split(chunk_size)]).reshape(data['critic_in'].shape[:2])
-        mask=data['guard_valid'];upper=data['value_upper']
-        excessive=((values>2*upper+1)&mask).any()
-        ratio=float(((values>1.2*upper+1)&mask).sum()/mask.sum().clamp_min(1))
-        iteration=int(data['iteration'][0])
-        if iteration%50==0:self.value_guard_streak=self.value_guard_streak+1 if ratio>.01 else 0
-        self.last_value_guard={'iteration':iteration,'maximum_value':float(values[mask].max()),
-            'over_1_2_bound_fraction':ratio,'consecutive_checks':self.value_guard_streak}
-        if bool(excessive) or self.value_guard_streak>=3:
-            raise ValueRangeStop('Value upper-bound stop: '+str(self.last_value_guard))
         zero_tail=torch.cat((torch.zeros_like(data['timeout'][:,:1]),data['timeout']&data['finite'][:,None]),1)
         values=values.masked_fill(zero_tail,0.)
         return time_limit_lambda_targets(data['rewards'],data['soft_done'],data['timeout'],values,self.cfg.gamma,self.cfg.lam)

@@ -239,7 +239,7 @@ class Learner:
                 mse=[residual[x[:,-2+b]>.5].square().mean() for b in (0,1)]
                 self._quality={'critic_error':float((.5*sum(mse)).sqrt()/y.std().clamp_min(1.)),
                     'critic_explained_variance':float(1-residual.var()/y.var().clamp_min(1e-8)),
-                    'critic_target_max':float(y.abs().max()),'value_guard':self.imag.last_value_guard}
+                    'critic_target_max':float(y.abs().max())}
         return {**self._quality,'branch_objectives':means,'objective':sum(means),'actor_grad_norm':float(gn),
             'critic_loss':sum(losses)/len(losses),
             'critic_valid_samples':len(x),'critic_samples_processed':len(x)*cfg.critic_epochs,
@@ -348,7 +348,6 @@ class Learner:
             'policy':self.policy.state_dict(),'critic':self.critic.state_dict(),'world_model':self.wm.state_dict(),
             'optimizers':{k:getattr(self,'opt_'+k).state_dict() for k in ('wm','actor','critic','cts')},
             'counts':self.counts,'schedule':self.schedule.state_dict(),'curriculum':self.env.curriculum_state_dict(),
-            'value_guard':{'streak':self.imag.value_guard_streak,'last':self.imag.last_value_guard},
             'action_quality':self.action_quality,'cts_stable':self.cts_stable,'fixed_reports':self.fixed_reports,
             'allocator':None if self.allocator is None else self.allocator.state_dict(),
             'rng':torch.get_rng_state(),'cuda_rng':torch.cuda.get_rng_state_all() if torch.cuda.is_available() else [],
@@ -365,7 +364,6 @@ class Learner:
         self.policy.load_state_dict(ck['policy']);self.wm.load_state_dict(ck['world_model']);self.critic.load_state_dict(ck['critic'])
         for k in ('wm','actor','critic','cts'):getattr(self,'opt_'+k).load_state_dict(ck['optimizers'][k])
         self.schedule.load_state_dict(ck['schedule']);self.it=ck['iteration'];self.counts=ck['counts']
-        guard=ck.get('value_guard',{});self.imag.value_guard_streak=int(guard.get('streak',0));self.imag.last_value_guard=guard.get('last',{})
         self.action_quality.copy_(ck['action_quality']);self.cts_stable=ck['cts_stable'];self.fixed_reports=ck['fixed_reports']
         if ck.get('allocator') is not None:
             from .terrain_allocation import TerrainAllocator

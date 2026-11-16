@@ -21,7 +21,7 @@ For156 these are sampling categories, not hidden policy tasks: one motion reward
 Ordinary tracking forced-pure-forward probability0.10; retain source standing/turning sampling. Abrupt commands change every1s; tracking width relaxes for0.3s proportional to command change, then returns to the original kernel. Crossing height coefficient-1.
 Crossing success: hard stable16ticks for up/down and32ticks for gap; once-only bonus, then continue3D motion. Pre-success pure-forward feasible approach commands; target corridor has no upper-forward boundary. Soft imagined completion is a run-length mass recurrence, bounded at1. It is a project surrogate, not a physical probability calibration.
 Actor uses32steps differentiable total reward plus terminal total future value. Four critics have independent MLPs/normalizers and no policy latent input. Termination removes continuation; ordinary time limits bootstrap; crossing finite deadlines do not.
-Value guard checks the reward upper bound before the Actor optimizer step; saves a stopped checkpoint on violation. No value clipping or automatic resume disguises a violation.
+2026-11-16: removed value-range-triggered stopping, its bounds, counters and special stop-checkpoint path after it interrupted Critic prewarm. Critic values and targets are not clipped to reward-derived bounds. Existing nonfinite-update checks remain.
 
 Perception and gradient ownership
 Camera50Hz,48x64 metric optical depth,.1..6m. Mount relative to base_link=(.101958,0,.327)m, horizontal forward, nominal87x58degFOV; user confirmed2026-11-15. These are model coordinates, not measured AS2 hardware calibration.
