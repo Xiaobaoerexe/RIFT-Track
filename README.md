@@ -7,9 +7,9 @@
 ## 1. 自动识别单卡／多卡4090
 
 2026-11-16：同步175已验收的加速实现，137仍只在策略入口截断预测latent梯度。
-默认推荐 `configs/workstation_4090_24g.json`：4096环境、8192融合想象、2048物理监督窗口、2GiB CPU图像缓存、4个CPU线程；48GB显存及大内存机器也可用 `configs/host137.json`（26GiB CPU缓存、8线程）。
+默认推荐 `configs/workstation_4090_24g.json`：4096环境、8192融合想象、2048物理监督窗口、CPU Replay、2GiB CPU图像缓存、4个CPU线程；48GB显存及大内存机器也可用 `configs/host137.json`（26GiB CPU缓存、8线程）。
 
-`gpu_mode=auto` 按CUDA可见设备的UUID核对NVIDIA清单，跳过其他计算进程占用的卡，主卡需至少21GiB空闲。额外空闲4090需至少4GiB空闲，自动分担冻结的深度加噪网络推理。每张卡处理完整图像块，保留逐图噪声键与返回顺序，输出回到主卡。几何、PhysX、Replay、WM/Actor/Critic/CTS参数和优化器仍在主卡；这不是DDP，也不是多份独立训练，更不能将两张24GB显存当成一张48GB。
+`gpu_mode=auto` 按CUDA可见设备的UUID核对NVIDIA清单，跳过其他计算进程占用的卡，主卡需至少21GiB空闲。主卡显存不足32GiB时自动采用已测24GiB执行设置：CPU Replay、最多2GiB图像缓存和4个CPU线程。额外空闲4090需至少4GiB空闲，自动分担冻结的深度加噪网络推理。每张卡处理完整图像块，保留逐图噪声键与返回顺序，输出回到主卡。几何、PhysX、Replay、WM/Actor/Critic/CTS参数和优化器仍在主卡；这不是DDP，也不是多份独立训练，更不能将两张24GB显存当成一张48GB。
 
 该自动分配不修改全局批量、损失分母、优化器步数或课程。`CUDA_VISIBLE_DEVICES` 可限制可用卡；只暴露一张时自动沿用单卡计算。资源选择是启动快照，不是集群预约系统；团队应避免同时向同一批卡启动多个作业。
 

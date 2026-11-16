@@ -4,7 +4,7 @@
   "stage": "terrain",
   "num_envs": 4096,
   "buffer_len": 1000,
-  "replay_storage": "device",
+  "replay_storage": "cpu",
   "collect_steps": 1,
   "iterations": 120000,
   "warmup_iterations": 1000,

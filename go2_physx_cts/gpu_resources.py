@@ -48,9 +48,18 @@ def resolve_devices(cfg):
         raise RuntimeError('No idle visible RTX4090 with at least21GiB free; existing jobs will not be interrupted')
     chosen=max(primary,key=lambda d:d['free_mib'])
     workers=[chosen]+[d for d in idle if d!=chosen and d['free_mib']>=4*1024]
+    execution_before={k:getattr(cfg,k) for k in ('replay_storage','depth_cache_gib','torch_threads')}
+    # Reuse the measured24GiB execution choices, not the48GiB GPU-Replay layout.
+    # Replay sampling, physical batch sizes and optimizer steps do not change.
+    if chosen['total_mib']<32*1024:
+        cfg.replay_storage='cpu'
+        cfg.depth_cache_gib=min(cfg.depth_cache_gib,2.)
+        cfg.torch_threads=min(cfg.torch_threads,4)
     cfg.device=chosen['device'];cfg.noise_devices=tuple(d['device'] for d in workers)
     torch.cuda.set_device(cfg.device)
     return {'mode':'auto','primary':cfg.device,'noise_devices':list(cfg.noise_devices),
         'visible_devices':visible,'cuda_visible_devices':os.environ.get('CUDA_VISIBLE_DEVICES'),
+        'execution_before':execution_before,
+        'execution_resolved':{k:getattr(cfg,k) for k in execution_before},
         'distribution':'single PhysX/learner; parallel frozen noise inference',
         'global_batch_changed':False,'multi_gpu_runtime_verified':False}
