@@ -1,6 +1,6 @@
 {
   "schema": "as2-perceptive-source-contract-v2",
-  "updated": "2026-11-15",
+  "updated": "2026-11-16",
   "primary_baseline": {
     "kind": "project-tested AS2 blind implementation",
     "host": "192.168.8.137",
@@ -92,5 +92,13 @@
     "repository": "https://github.com/HybridRobotics/supermimic",
     "commit": "abc124c1bd5976341034668af3d12c087f2f1f55",
     "scope": "Official source found during this audit; AS2 behavior remains pinned to project-tested2061be6, not silently replaced by humanoid reference tracking."
+  },
+  "speed_adaptation": {
+    "reference_before_change": "c8c83fb38b5294dc7e6c22921d1d13d5d405e997",
+    "visual_label_windows_per_wm_update": 512,
+    "physical_windows_per_wm_update": 2048,
+    "supervised_transitions_per_window": 8,
+    "source": "project-controlled short supervision and complete-update measurements; not claimed as an upstream configuration",
+    "evidence": "SPEED_ACCEPTANCE.json"
   }
 }

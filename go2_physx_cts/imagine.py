@@ -61,7 +61,7 @@ class Imagination:
     def burnin(self,policy,sequence):
         """Rebuild current-encoder memory from exact configured50Hz captures."""
         b,t=sequence['obs'].shape[:2]; hidden=sequence['obs'].new_zeros((b,256),dtype=torch.float32)
-        features=depth_sequence_features(policy.student_encoder,self.depth,sequence,0,t)
+        features=depth_sequence_features(policy.student_encoder,self.depth,sequence,0,t,chunk_size=self.cfg.encoding_chunk_size)
         obs=sequence['obs'].float().reshape(b*t,-1)
         singles=policy.single_norm(st.single_from_history(obs)).reshape(b,t,-1)
         for j in range(t):
@@ -105,7 +105,7 @@ class Imagination:
         capture_pose=seed['depth_pose']
         images=self.depth.captured(capture_pose,flat_ids(seed['depth_scene_ids']),flat_ids(seed['depth_frame_index']),
             flat_ids(seed['episode']),flat_ids(seed['trajectory_ids']))
-        with torch.no_grad():depth_features=batched_apply(policy.student_encoder.encode_depth,images)
+        with torch.no_grad():depth_features=batched_apply(policy.student_encoder.encode_depth,images,chunk_size=cfg.encoding_chunk_size)
         contacts=seed['contact_prob']
         nteacher=branch[0] if isinstance(branch,tuple) else (b if branch==0 else 0)
         student=slice(nteacher,b)
@@ -120,8 +120,11 @@ class Imagination:
             # Keep the same tensor/graph between refreshes, including its gradients.
             if t%cfg.imagination_depth_period==0:policy_depth_features=depth_features
             command=self.commands.command(cmd_state)
-            priv=st.privileged(s,a_prev,command,xi,relief(pose,self.field))
-            features.append(critic.features(priv,branch,tasks,context,pose,contacts))
+            # Fit-data features never enter the Actor objective. Do not retain
+            # an unused graph for every intermediate Critic observation.
+            with torch.no_grad():
+                priv=st.privileged(s,a_prev,command,xi,relief(pose,self.field))
+                features.append(critic.features(priv,branch,tasks,context,pose,contacts))
             valid.append(active)
             args=(s,pose,a_prev,a_prev2,hist,cmd_state,xi,hidden,context,depth_features,policy_depth_features)
             # The core owns selective activation storage inside torch.compile.
@@ -135,12 +138,16 @@ class Imagination:
             timeout=current_active&episode_time_reached(context[:,ELAPSED],context[:,EPISODE_LIMIT])
             rewards.append(r); soft_done.append(done); timeouts.append(timeout)
             active=active&~timeout
-            p=st.privileged(s,a_prev,self.commands.command(cmd_state),xi,relief(pose,self.field))
-            next_feature=critic.features(p,branch,tasks,context,pose,contacts)
-            if t==cfg.horizon-1: values.append(critic(next_feature))
+            ids=timeout.nonzero().flatten()
+            if t==cfg.horizon-1 or ids.numel():
+                # Preserve the full input derivative at every actual bootstrap
+                # boundary. Ordinary intermediate states need no second copy.
+                p=st.privileged(s,a_prev,self.commands.command(cmd_state),xi,relief(pose,self.field))
+                next_feature=critic.features(p,branch,tasks,context,pose,contacts)
+            if t==cfg.horizon-1:values.append(critic(next_feature))
             else:
-                ids=timeout.nonzero().flatten(); v=s.new_zeros(b)
-                if ids.numel(): v=v.index_copy(0,ids,critic(next_feature[ids]))
+                v=s.new_zeros(b)
+                if ids.numel():v=v.index_copy(0,ids,critic(next_feature[ids]))
                 values.append(v)
         features.append(next_feature); features=torch.stack(features,1)
         rewards=torch.stack(rewards,1); soft_done=torch.stack(soft_done,1); timeouts=torch.stack(timeouts,1)
@@ -157,7 +164,7 @@ class Imagination:
     def targets(self,critic,data):
         flat=data['critic_in'].reshape(-1,critic.feature_dim)
         chunk_size=getattr(self.cfg,'critic_microbatch',4096)
-        values=torch.cat([critic(part) for part in flat.split(chunk_size)]).reshape(data['critic_in'].shape[:2])
+        values=critic.batched(flat,chunk_size).reshape(data['critic_in'].shape[:2])
         zero_tail=torch.cat((torch.zeros_like(data['timeout'][:,:1]),data['timeout']&data['finite'][:,None]),1)
         values=values.masked_fill(zero_tail,0.)
         return time_limit_lambda_targets(data['rewards'],data['soft_done'],data['timeout'],values,self.cfg.gamma,self.cfg.lam)

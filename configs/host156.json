@@ -28,7 +28,7 @@
   "imag_batch": 8192,
   "teacher_fraction": 0.75,
   "horizon": 32,
-  "actor_microbatch": 2048,
+  "actor_microbatch": 8192,
   "actor_hidden": [
     512,
     256,
@@ -52,7 +52,7 @@
   "cts_action_weight": 0.1,
   "critic_epochs": 5,
   "critic_minibatches": 4,
-  "critic_microbatch": 8192,
+  "critic_microbatch": 65536,
   "critic_huber_delta": 1.0,
   "lr": 0.0002,
   "teacher_lr": 0.0002,
@@ -102,11 +102,14 @@
   "depth_chunk_size": 1024,
   "depth_period": 1,
   "mixed_precision": true,
-  "depth_precision": "fp32",
+  "depth_precision": "bf16",
   "compile": true,
   "device": "cuda:0",
   "depth_cache_gib": 2.0,
   "latent_actor_stop_gradient": false,
   "base_height_target": 0.36,
-  "imagination_depth_period": 5
+  "imagination_depth_period": 5,
+  "wm_visual_windows": 512,
+  "encoding_chunk_size": 2048,
+  "torch_threads": 4
 }

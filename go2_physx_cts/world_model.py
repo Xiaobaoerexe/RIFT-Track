@@ -78,7 +78,7 @@ class WorldModel(nn.Module):
 
     @torch.no_grad()
     def update_latent_stats(self,targets,rate=.01):
-        weight=targets.refresh.to(targets.targets.dtype)[...,None]
+        weight=targets.refresh.to(targets.targets.dtype)[...,None]*targets.sampling_weight
         count=weight.sum();total=count+len(targets.initial)
         mean=(targets.initial.sum(0)+(targets.targets*weight).sum((0,1)))/total
         second=(targets.initial.square().sum(0)+(targets.targets.square()*weight).sum((0,1)))/total
@@ -172,7 +172,7 @@ class WorldModel(nn.Module):
         terms={name:(errors[name]*valid).sum()/den for name in ('state','pose','contact','telemetry','consistency')}
         result=terms['state']+terms['pose']+terms['contact']+terms['telemetry']+.1*terms['consistency']
         if target is not None:
-            # Every valid control transition has its own current-image label.
+            # Every valid transition in a selected visual window has its own label.
             terms['latent']=(errors['latent']*target.refresh).sum()/target.refresh.sum().clamp_min(1)
             reconstruction=self.latent_decoder(encoder(target.reconstruction_noisy))
             terms['reconstruction']=F.l1_loss(reconstruction,target.reconstruction_clean)

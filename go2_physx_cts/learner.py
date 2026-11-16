@@ -5,7 +5,6 @@ from dataclasses import asdict
 from pathlib import Path
 import torch
 from torch.nn import functional as F
-from torch.utils.checkpoint import checkpoint
 from . import UPSTREAM_COMMIT,state as st
 from .networks import Policy,StudentExport
 from .value import Critic
@@ -16,7 +15,7 @@ from .imagine import Imagination,flat_ids
 from .terrain import relief,geometry_crop
 from .depth import DepthObservation
 from .schedules import LearningRateController
-from .sequence_execution import depth_sequence_features,batched_apply,ENCODING_CHUNK
+from .sequence_execution import depth_sequence_features
 
 
 @contextmanager
@@ -32,7 +31,8 @@ def frozen(*modules):
 def clip_grad(params,global_norm=1.,elem=float('inf')):
     params=[p for p in params if p.grad is not None]
     norm=torch.nn.utils.clip_grad_norm_(params,global_norm)
-    for p in params:p.grad.clamp_(-elem,elem)
+    if math.isfinite(elem):
+        for p in params:p.grad.clamp_(-elem,elem)
     return norm
 
 
@@ -61,16 +61,17 @@ class Learner:
         self.cfg,self.env,self.output=cfg,env,Path(output);self.output.mkdir(parents=True,exist_ok=True)
         self.device=cfg.device;torch.manual_seed(cfg.seed)
         self.policy=Policy(cfg.actor_hidden,experts=cfg.actor_experts,mixed_precision=cfg.mixed_precision).to(cfg.device)
-        self.critic=Critic(cfg.critic_hidden,variant=cfg.variant,mixed_precision=False).to(cfg.device)
+        self.critic=Critic(cfg.critic_hidden,variant=cfg.variant,mixed_precision=cfg.mixed_precision).to(cfg.device)
         self.wm=WorldModel(cfg.wm_hidden,mixed_precision=cfg.mixed_precision,depth_period=cfg.depth_period).to(cfg.device)
         self.depth=DepthObservation(cfg,env.field)
         self.actor_params=list(self.policy.teacher_encoder.parameters())+list(self.policy.actor.parameters())
         self.cts_params=list(self.policy.student_encoder.distillation_parameters())
         self.wm_params=list(self.wm.parameters())+list(self.policy.student_encoder.depth_encoder.parameters())
-        self.opt_wm=torch.optim.Adam(self.wm_params,lr=cfg.wm_lr)
-        self.opt_actor=torch.optim.Adam(self.actor_params,lr=cfg.lr,betas=(.9,.95))
-        self.opt_critic=torch.optim.Adam(self.critic.parameters(),lr=cfg.lr)
-        self.opt_cts=torch.optim.Adam(self.cts_params,lr=cfg.cts_lr)
+        fused=torch.device(cfg.device).type=='cuda'
+        self.opt_wm=torch.optim.Adam(self.wm_params,lr=cfg.wm_lr,fused=fused)
+        self.opt_actor=torch.optim.Adam(self.actor_params,lr=cfg.lr,betas=(.9,.95),fused=fused)
+        self.opt_critic=torch.optim.Adam(self.critic.parameters(),lr=cfg.lr,fused=fused)
+        self.opt_cts=torch.optim.Adam(self.cts_params,lr=cfg.cts_lr,fused=fused)
         owners=[{id(p) for g in opt.param_groups for p in g['params']} for opt in
                 (self.opt_wm,self.opt_actor,self.opt_critic,self.opt_cts)]
         if any(owners[i]&owners[j] for i in range(4) for j in range(i)):
@@ -175,7 +176,8 @@ class Learner:
         losses=[]
         for _ in range(self.cfg.wm_updates_for(self.it)):
             w=mixed_windows(self.buf,self.archive,self.cfg,self.env.xi)
-            latent=prepare_latent_targets(w,self.depth,self.policy.student_encoder.depth_encoder,self.cfg.depth_period)
+            latent=prepare_latent_targets(w,self.depth,self.policy.student_encoder.depth_encoder,self.cfg.depth_period,
+                visual_windows=self.cfg.wm_visual_windows,encoding_chunk_size=self.cfg.encoding_chunk_size)
             loss=self._wm_loss_fn(self.wm,w,self.env.field,self.env.consts.default_q,
                 encoder=self.policy.student_encoder.depth_encoder,latent_targets=latent)
             self.opt_wm.zero_grad(set_to_none=True);loss.backward();gn=clip_grad(self.wm_params,self.cfg.grad_clip)
@@ -225,17 +227,21 @@ class Learner:
             order=torch.randperm(len(x),device=self.device)
             for ids in torch.tensor_split(order,cfg.critic_minibatches):
                 self.opt_critic.zero_grad(set_to_none=True);total=x.new_zeros(())
-                denominators=x[ids,-2:].sum(0).clamp_min(1)
-                for sub in ids.split(cfg.critic_microbatch):
-                    loss=critic_loss(self.critic(x[sub]),y[sub],x[sub,-2:],cfg.critic_huber_delta,denominators)
-                    loss.backward();total+=loss.detach()
+                batch=x[ids];targets=y[ids];denominators=batch[:,-2:].sum(0).clamp_min(1)
+                # Group once per unchanged minibatch, not once per task per chunk.
+                for task,group in self.critic.groups(batch):
+                    for sub in group.split(cfg.critic_microbatch):
+                        if not sub.numel():continue
+                        item=batch[sub]
+                        loss=critic_loss(self.critic.forward_task(item,task),targets[sub],item[:,-2:],cfg.critic_huber_delta,denominators)
+                        loss.backward();total+=loss.detach()
                 cgn=clip_grad(self.critic.parameters(),cfg.grad_clip)
                 if not scalar_finite(cgn) or not scalar_finite(total):raise FloatingPointError('Nonfinite Critic update')
                 self.opt_critic.step();self.counts['critic']+=1;losses.append(float(total))
         self.opt_critic.zero_grad(set_to_none=True)
         if detailed_timing:
             with torch.no_grad():
-                residual=torch.cat([self.critic(part) for part in x.split(cfg.critic_microbatch)])-y
+                residual=self.critic.batched(x,cfg.critic_microbatch)-y
                 mse=[residual[x[:,-2+b]>.5].square().mean() for b in (0,1)]
                 self._quality={'critic_error':float((.5*sum(mse)).sqrt()/y.std().clamp_min(1.)),
                     'critic_explained_variance':float(1-residual.var()/y.var().clamp_min(1e-8)),
@@ -251,36 +257,37 @@ class Learner:
         hidden=sequence['obs'].new_zeros((b,256),dtype=torch.float32)
         with torch.no_grad():
             single=self.policy.single_norm(st.single_from_history(sequence['obs'].float().reshape(b*total,-1))).reshape(b,total,-1)
-            features=depth_sequence_features(student,self.depth,sequence,0,total,training=False)
+            features=depth_sequence_features(student,self.depth,sequence,0,total,training=False,chunk_size=cfg.encoding_chunk_size)
             for j in range(burn):hidden=student.advance_memory(single[:,j],features[:,j],hidden,sequence['reset'][:,j].reshape(-1).bool())
             history=self.policy.history_norm(sequence['obs'][:,burn:].float().reshape(b*steps,-1))
             fields={k:sequence[k][:,burn:].reshape(b*steps,*sequence[k].shape[2:]) for k in ('s','a_prev','command','xi','relief','pose')}
             labels=[]
-            for lo in range(0,b*steps,ENCODING_CHUNK):
-                item={k:v[lo:lo+ENCODING_CHUNK] for k,v in fields.items()}
+            for lo in range(0,b*steps,cfg.encoding_chunk_size):
+                item={k:v[lo:lo+cfg.encoding_chunk_size] for k,v in fields.items()}
                 priv=st.privileged(item['s'],item['a_prev'],item['command'],item['xi'],item['relief'])
                 height=geometry_crop(item['s'],item['pose'],self.env.field,kind='teacher')
                 labels.append(self.policy.teacher_latent(priv,height))
             label=torch.cat(labels).reshape(b,steps,-1)
         proprio,gates=student.encode_proprio(history);proprio=proprio.reshape(b,steps,-1)
-        latent_losses=[];action_losses=[];action_mse=[]
+        latents=[]
         for j in range(steps):
             reset=sequence['reset'][:,burn+j].reshape(-1).bool()
             args=(proprio[:,j],single[:,burn+j],features[:,burn+j],hidden,reset)
-            z,hidden=checkpoint(student.fuse_features,*args,use_reentrant=False) if training else student.fuse_features(*args)
-            latent_losses.append((z.float()-label[:,j]).square().mean(-1))
-            with torch.no_grad():target=self.policy.actor(label[:,j],single[:,burn+j])
-            prediction=self.policy.actor(z,single[:,burn+j]);delta=(prediction-target)*self.env.consts.action_scale/.25
-            per=2*F.huber_loss(delta,torch.zeros_like(delta),reduction='none',delta=1.).mean(-1)
-            kind=flat_ids(sequence['terrain_ids'][:,burn+j]).clamp(0,len(self.action_quality)-1)
-            action_losses.append(per*self.action_quality[kind]);action_mse.append(delta.detach().square().mean(-1))
+            z,hidden=student.fuse_features(*args)
+            latents.append(z)
+        z=torch.stack(latents,1);flat_single=single[:,burn:].reshape(b*steps,-1)
+        with torch.no_grad():target=self.policy.actor(label.reshape(b*steps,-1),flat_single)
+        prediction=self.policy.actor(z.reshape(b*steps,-1),flat_single)
+        delta=(prediction-target)*self.env.consts.action_scale/.25
+        per=2*F.huber_loss(delta,torch.zeros_like(delta),reduction='none',delta=1.).mean(-1).reshape(b,steps)
+        kind=sequence['terrain_ids'][:,burn:].reshape(b,steps).long().clamp(0,len(self.action_quality)-1)
         mask=sequence['valid'][:,burn:].reshape(b,steps).float();den=mask.sum().clamp_min(1)
-        latent=(torch.stack(latent_losses,1)*mask).sum()/den
-        action=(torch.stack(action_losses,1)*mask).sum()/den
+        latent=((z.float()-label).square().mean(-1)*mask).sum()/den
+        action=(per*self.action_quality[kind]*mask).sum()/den
         balance=(gates.float().mean(0)-1/8).square().mean();ramp=min(1.,max(0.,(self.it-2500)/2500))
         loss=latent+cfg.cts_balance*balance+cfg.cts_action_weight*ramp*action
         self._cts_stats={'cts_latent_loss':float(latent.detach()),'cts_balance_loss':float(balance.detach()),
-            'cts_action_loss':float(action.detach()),'cts_action_mse':float(torch.stack(action_mse).mean()),'cts_action_coefficient':cfg.cts_action_weight*ramp}
+            'cts_action_loss':float(action.detach()),'cts_action_mse':float(delta.detach().square().mean()),'cts_action_coefficient':cfg.cts_action_weight*ramp}
         return loss
 
     def update_cts(self):
@@ -408,7 +415,8 @@ class Learner:
             if self.it==1 or self.it%self.cfg.log_interval==0 or self.it==end:self.log(stats)
             if self.it==1 or self.it%self.cfg.save_interval==0 or self.it==end:self.save()
             if self.it%self.cfg.evaluation_interval==0:
-                from .diagnostics import native_diagnostics
+                from .diagnostics import native_diagnostics,model_horizon_diagnostics
+                (self.output/f'model_errors_{self.it:08d}.json').write_text(json.dumps(model_horizon_diagnostics(self),indent=2))
                 report=native_diagnostics(self)
                 (self.output/f'native_{self.it:08d}.json').write_text(json.dumps(report,indent=2))
                 self.consume_fixed_report(report)
