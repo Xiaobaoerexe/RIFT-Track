@@ -35,6 +35,11 @@ def _device(device):
         return torch.device('cuda',torch.cuda.current_device())
     return device
 
+
+class ReplayPartitionUnavailable(ValueError):
+    """No eligible replay positions exist, rather than random rejection failure."""
+
+
 class PackedTransport:
     """Lossless batched transfer with one bounded pinned staging allocation.
 
@@ -117,6 +122,7 @@ class Replay:
         self.heldout=torch.zeros((n,length),device=self.storage_device,dtype=torch.bool)
         self.ptr=self.size=0
         self.total_collections=0
+        self.sampling_fallbacks=0;self.last_sampling_fallback=None
         self.data={k:torch.zeros((n,length,d),device=self.storage_device,dtype=torch.float16 if k in HALF_FIELDS else torch.float32) for k,d in FLOAT_FIELDS.items()}
         self.data.update({k:torch.zeros((n,length,1),device=self.storage_device,dtype=d) for k,d in INT_FIELDS.items()})
         self.data.update({k:torch.zeros((n,length,1),device=self.storage_device,dtype=torch.bool) for k in BOOL_FIELDS})
@@ -170,8 +176,38 @@ class Replay:
             ids=ok.nonzero().flatten()[:remaining]
             selected_e.append(e[ids]);selected_t.append(t[ids]);remaining-=len(ids)
             if not remaining:break
-        if remaining:raise ValueError('Insufficient independent replay samples for requested partition')
+        if remaining:
+            e,t=self._exact_positions(remaining,length,source,validation,whole)
+            selected_e.append(e);selected_t.append(t)
         return torch.cat(selected_e),torch.cat(selected_t)
+
+    def _exact_positions(self,batch,length,source,validation,whole):
+        """Rare fallback only. Keep the original uniform-with-replacement law.
+
+        Enumerate metadata, never replay payloads or length-expanded windows.
+        Prefix counts implement the existing all-heldout sequence predicate in
+        O(n*size) memory, including when the physical ring wraps.
+        """
+        starts=torch.arange(self.size-length+1,device=self.index_device)
+        if whole and length>1:
+            slots=self.physical(torch.arange(self.size,device=self.index_device))
+            bad=self.heldout[:,slots]!=validation
+            prefix=torch.cat((torch.zeros((self.n,1),device=self.index_device,dtype=torch.int32),
+                              bad.cumsum(1,dtype=torch.int32)),1)
+            eligible=(prefix[:,length:]-prefix[:,:-length])==0
+        else:
+            eligible=self.heldout[:,self.physical(starts)]==validation
+        if source is not None:
+            eligible&=self.data['source'][:,self.physical(starts+length-1),0]==source
+        flat=eligible.reshape(-1).nonzero().flatten()
+        self.sampling_fallbacks+=1
+        self.last_sampling_fallback={'requested':batch,'available_positions':len(flat),
+            'length':length,'source':source,'validation':bool(validation),'whole':bool(whole)}
+        if not len(flat):
+            raise ReplayPartitionUnavailable('No eligible replay positions: '+str(self.last_sampling_fallback))
+        pick=torch.randint(len(flat),(batch,),device=self.device).to(self.index_device)
+        chosen=flat[pick];width=len(starts)
+        return chosen//width,chosen%width
 
     def sample_states(self,batch,source=None,validation=False):
         e,t=self._positions(batch,1,source,validation)

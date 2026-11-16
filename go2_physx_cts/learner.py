@@ -10,7 +10,7 @@ from .networks import Policy,StudentExport
 from .value import Critic
 from .world_model import WorldModel,supervised_loss
 from .latent import prepare_latent_targets
-from .buffer import Replay,Archive,mixed_windows
+from .buffer import Replay,Archive,mixed_windows,ReplayPartitionUnavailable
 from .imagine import Imagination,flat_ids
 from .terrain import relief,geometry_crop
 from .depth import DepthObservation
@@ -95,6 +95,7 @@ class Learner:
         self.counts=dict(collect=0,transitions=0,wm=0,actor=0,critic=0,cts=0)
         self.metrics=[];self.window_stats=[];self.start_time=time.monotonic()
         self._quality={};self._validation_phase=None;self._wm_validation=None;self._anchor=None
+        self._validation_status={'available':False,'reason':'replay_prefill'}
         self._anchor_reference=None;self._cts_stats={};self.cts_stable=False;self.fixed_reports=[]
         self.allocator=None
         self.action_quality=torch.zeros(13,device=cfg.device)
@@ -307,10 +308,19 @@ class Learner:
         if self.buf.size<max(self.cfg.wm_window,self.cfg.cts_burnin+1):return {}
         phase=(self.it//5000,int(self.it>=2500),int(self.it>=5000))
         if self._validation_phase!=phase:
+            try:
+                window=self.buf.windows(256,self.cfg.wm_window,validation=True)
+                anchor=self.buf.seeds(128,source=1,burnin=self.cfg.cts_burnin,validation=True)
+            except ReplayPartitionUnavailable as exc:
+                # Diagnostics may wait; do not replace held-out data with training
+                # data or feed fabricated metrics to the learning-rate controller.
+                self._validation_status={'available':False,'phase':phase,'reason':str(exc)}
+                return {}
+            scales=(self.wm.out_norm.var.sqrt().clamp_min(1e-4).clone(),self.wm.telemetry_norm.var.sqrt().clamp_min(1e-3).clone())
+            # Commit the cohort as one unit only after both partitions exist.
+            self._wm_validation,self._anchor,self._validation_scales=window,anchor,scales
             self._validation_phase=phase
-            self._wm_validation=self.buf.windows(256,self.cfg.wm_window,validation=True)
-            self._validation_scales=(self.wm.out_norm.var.sqrt().clamp_min(1e-4).clone(),self.wm.telemetry_norm.var.sqrt().clamp_min(1e-3).clone())
-            self._anchor=self.buf.seeds(128,source=1,burnin=self.cfg.cts_burnin,validation=True)
+            self._validation_status={'available':True,'phase':phase}
             self._anchor_reference=None;self._validation_identity=str(time.time_ns())
         w=self._wm_validation;targets=prepare_latent_targets(w,self.depth,self.policy.student_encoder.depth_encoder,self.cfg.depth_period)
         errors=self.wm.validation_errors(w,self.env.field,self.env.consts.default_q,self._validation_scales,latent_targets=targets)
@@ -337,6 +347,8 @@ class Learner:
             'metrics':metrics,'falls_per_env_min':metrics['falls']/self.cfg.num_envs*60/self.cfg.dt,
             'archive_size':self.archive.size,'archive_retention':self.archive.statistics(self.buf.total_collections),
             'nonfinite_skipped':0,'terrain_levels':self.env.terrain_level_statistics,**stats,**quality,
+            'validation_status':self._validation_status,
+            'replay_sampling':{'fallbacks':self.buf.sampling_fallbacks,'last_fallback':self.buf.last_sampling_fallback},
             'reward_weights':reward_weights(self.it),'task_metrics':[r.get('task_metrics',{}) for r in rows]}
         if quality and self.it%50==0:
             self.schedule.observe({'iteration':self.it,**quality,'reward':metrics['reward'],'xy_rmse':metrics['xy_rmse'],

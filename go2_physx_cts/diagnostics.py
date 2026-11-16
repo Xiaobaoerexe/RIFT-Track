@@ -11,6 +11,7 @@ from .commands import TERRAIN_NAMES,TERRAIN_RANGES,speed_cap,special_speed_contr
 from .terrain import geometry_crop
 from .task import COMPLETED,EPISODE_LIMIT
 from .latent import prepare_latent_targets
+from . import buffer as replay_buffer
 
 
 def _ids(s,key):return s[key].reshape(-1).long()
@@ -186,7 +187,14 @@ def native_diagnostics(learner,steps=500,levels=(2,5),seeds=(17,29,43,61,83)):
 @torch.no_grad()
 def model_diagnostics(learner,batch=256,horizon=None):
     horizon=learner.cfg.wm_window if horizon is None else horizon
-    w=learner.buf.windows(batch,horizon,validation=True)
+    try:
+        w=learner.buf.windows(batch,horizon,validation=True)
+    except ValueError as exc:
+        # Existing125/156 processes can import this file lazily while their
+        # already-loaded Replay is the old version. Never require a new symbol
+        # at import time or swallow that legacy sampler's unrelated ValueErrors.
+        if not isinstance(exc,getattr(replay_buffer,'ReplayPartitionUnavailable',())):raise
+        return {'iteration':learner.it,'horizon':horizon,'available':False,'reason':str(exc)}
     target=prepare_latent_targets(w,learner.depth,learner.policy.student_encoder.depth_encoder,learner.cfg.depth_period)
     scales=(learner.wm.out_norm.var.sqrt().clamp_min(1e-4),learner.wm.telemetry_norm.var.sqrt().clamp_min(1e-3))
     errors=learner.wm.validation_errors(w,learner.env.field,learner.env.consts.default_q,scales,latent_targets=target)
@@ -194,7 +202,7 @@ def model_diagnostics(learner,batch=256,horizon=None):
     for task in tasks.unique().tolist():
         mask=tasks==task
         rows.append({'task_id':int(task),'windows':int(mask.sum()),**{name:float(value[mask].mean()) for name,value in errors.items()}})
-    return {'iteration':learner.it,'horizon':horizon,'rows':rows,'mean_errors':{name:float(value.mean()) for name,value in errors.items()},
+    return {'iteration':learner.it,'horizon':horizon,'available':True,'rows':rows,'mean_errors':{name:float(value.mean()) for name,value in errors.items()},
         'sampling':'held-out real windows with re-encoded real 50Hz visual targets',
         'note':'Read-only normalized prediction errors; no running-statistics, optimizer, curriculum or Replay updates.'}
 
